@@ -21,10 +21,8 @@
 // The fix: name the cache after this worker's own scope plus a hand-bumped
 // version, and only evict caches carrying this same scope prefix. Bump
 // CACHE_VERSION when a release must invalidate its own old cache.
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 
-// A stable, filesystem-safe id for this deployment, derived from the worker's
-// scope path: "/PaperRocket-V16-Claude/" -> "paperrocket-v16-claude".
 const SCOPE_SLUG =
   (new URL(self.registration.scope).pathname || '/')
     .replace(/^\/+|\/+$/g, '')
@@ -32,44 +30,47 @@ const SCOPE_SLUG =
     .toLowerCase() || 'root';
 
 const CACHE_PREFIX = `remix3d-${SCOPE_SLUG}-`;
-const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
+const SHELL_CACHE_NAME = `${CACHE_PREFIX}shell-${CACHE_VERSION}`;
+const RUNTIME_CACHE_NAME = `${CACHE_PREFIX}runtime-${CACHE_VERSION}`;
+const MAX_RUNTIME_ENTRIES = 80;
 
-// Same-origin shell. Relative so it works at any deployment depth.
-const STATIC_PRECACHE = [
+// Application Shell - All local, self-hosted assets
+const SHELL_PRECACHE = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './fonts/fonts.css',
+  './draco/draco_encoder.js',
+  './draco/draco_decoder.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon.svg',
 ];
 
-// Third-party extras. Kept separate because cache.addAll() rejects the WHOLE
-// batch if any single request fails — one unreachable CDN used to silently take
-// the entire app shell down with it, leaving nothing precached at all.
-const OPTIONAL_PRECACHE = [
-  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap',
-  'https://cdn.jsdelivr.net/gh/google/draco@1.5.7/javascript/draco_encoder.js',
-  'https://cdn.jsdelivr.net/gh/google/draco@1.5.7/javascript/draco_decoder.js',
-];
+// Runtime caching allowlist: only same-origin assets under verified paths
+const RUNTIME_ALLOWLIST = /\/(?:assets|models|draco|fonts|icons)\//;
+
+async function trimCache(cacheName, maxItems) {
+  try {
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    if (keys.length > maxItems) {
+      await cache.delete(keys[0]);
+      await trimCache(cacheName, maxItems);
+    }
+  } catch (err) {
+    console.warn('[SW] Cache trim error:', err);
+  }
+}
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      // The shell matters, so let a failure here be visible in the log.
-      await cache.addAll(STATIC_PRECACHE).catch((err) => {
-        console.warn('[SW] App shell pre-cache incomplete:', err);
+      const shellCache = await caches.open(SHELL_CACHE_NAME);
+      await shellCache.addAll(SHELL_PRECACHE).catch((err) => {
+        console.warn('[SW] App shell pre-cache partial fail:', err);
       });
-      // Extras are best-effort and independent of one another.
-      await Promise.all(
-        OPTIONAL_PRECACHE.map((url) =>
-          cache.add(url).catch(() => {
-            /* offline, blocked, or CDN down - not fatal */
-          })
-        )
-      );
     })()
   );
 });
@@ -80,20 +81,16 @@ self.addEventListener('activate', (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys.map((key) => {
-          // One-time cleanup of the old naming scheme. `remix3d-v14-<timestamp>`
-          // was minted fresh on every single page load, so real installs have
-          // accumulated dozens of orphaned caches (18 on this dev machine alone)
-          // that no current worker will ever claim. Every deployment used that
-          // same prefix, so none of them are in use now and all are safe to drop.
           if (/^remix3d-v14-\d+$/.test(key)) {
             console.log('[SW] Removing legacy cache:', key);
             return caches.delete(key);
           }
-          // Only ever evict this deployment's own older caches. Anything else on
-          // the origin belongs to a different version of the app and is not ours
-          // to delete.
-          if (key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME) {
-            console.log('[SW] Purging own stale cache:', key);
+          if (
+            key.startsWith(CACHE_PREFIX) &&
+            key !== SHELL_CACHE_NAME &&
+            key !== RUNTIME_CACHE_NAME
+          ) {
+            console.log('[SW] Purging stale deployment cache:', key);
             return caches.delete(key);
           }
           return undefined;
@@ -113,26 +110,51 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Handle Vite HMR / live reload websocket or internal requests cleanly
-  if (request.url.includes('/@vite/') || request.url.includes('/@react-refresh') || request.url.includes('hot-update')) {
+  if (
+    request.url.includes('/@vite/') ||
+    request.url.includes('/@react-refresh') ||
+    request.url.includes('hot-update')
+  ) {
     return;
   }
 
-  // Network-first, deliberately: the tablet must pick up new code on the next
-  // load rather than after a cache expiry. The cache is the offline fallback.
+  const url = new URL(request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+
+  // Network-first strategy with offline cache fallback
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          // Cache to runtime cache if in allowlist and same origin
+          if (isSameOrigin && RUNTIME_ALLOWLIST.test(url.pathname)) {
+            caches.open(RUNTIME_CACHE_NAME).then(async (cache) => {
+              await cache.put(request, clone);
+              await trimCache(RUNTIME_CACHE_NAME, MAX_RUNTIME_ENTRIES);
+            });
+          }
         }
         return networkResponse;
       })
       .catch(async () => {
-        const cached = await caches.match(request);
-        if (cached) return cached;
+        // Fallback to caches
+        const shellMatch = await caches.match(request, { cacheName: SHELL_CACHE_NAME });
+        if (shellMatch) return shellMatch;
+
+        const runtimeMatch = await caches.match(request, { cacheName: RUNTIME_CACHE_NAME });
+        if (runtimeMatch) return runtimeMatch;
+
+        const anyMatch = await caches.match(request);
+        if (anyMatch) return anyMatch;
+
         if (request.mode === 'navigate') {
-          return (await caches.match('./index.html')) || (await caches.match('./'));
+          return (
+            (await caches.match('./index.html', { cacheName: SHELL_CACHE_NAME })) ||
+            (await caches.match('./', { cacheName: SHELL_CACHE_NAME })) ||
+            (await caches.match('./index.html')) ||
+            (await caches.match('./'))
+          );
         }
         return Response.error();
       })

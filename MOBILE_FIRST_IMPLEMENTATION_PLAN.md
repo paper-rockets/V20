@@ -19,7 +19,7 @@ Target: `E:\X\AiStudio Workflow\V20`
 - Production build passes.
 - Current production output remains heavy for mobile: main JavaScript is about 734 KB uncompressed, Three.js about 977 KB, Motion about 127 KB, and the main CSS about 145 KB.
 - `TECHNICAL_ISSUES.md` already records major release blockers, including destructive model replacement, missing automated tests, weak deployment checks, offline dependencies, unbounded service-worker caching, mobile contrast/touch problems, and performance risk.
-- V20 renders the Studio shell only, but old Play/Pro compatibility remains in `uiModeStore.ts`, `App.tsx`, `Viewport.tsx`, `Option3SphereNavigator.tsx`, test hooks, comments, names, and unused Play components. This is residue, not a second product surface.
+- V20 now renders one Studio shell and the obsolete Play/Pro compatibility layer has been removed. Retained shared components use neutral Studio naming.
 - The default brush already uses `profile: 'ribbon'` and `materialType: 'shadeless'`, but surface attachment is not explicit in the default object.
 - `CompactColorStudioModal.tsx` explicitly applies `color: currentColor` when a shader is applied to the brush. This is the confirmed cause of the unwanted shader/color mixing.
 
@@ -36,7 +36,7 @@ Target: `E:\X\AiStudio Workflow\V20`
 
 These are bounded, mechanical tasks. Complete one phase at a time in the real V20 folder. After every phase run `npm run lint`, `npm run build`, and the relevant Playwright smoke test. Do not redesign screens or invent engine methods.
 
-### AG-1: Remove obsolete Play/Pro compatibility residue
+### AG-1: Remove obsolete Play/Pro compatibility residue (completed)
 
 - Replace `uiModeStore.ts` with only the still-needed onboarding/preferences state, or move that state to a clearly named store.
 - Remove `setUiMode`, `useUiMode`, `ProSurface`, `proSurface`, and the `__testApp.setUiMode` hook.

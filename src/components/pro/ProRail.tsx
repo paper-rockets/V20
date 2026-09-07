@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { IcPointer, IcDraw, IcCreate, IcDeform, IcLayers } from './StudioIcons';
-import { ProMode, toggleSheet, useOpenSheet, closeSheet, openSheetId } from '../play/sheetStore';
+import { ProMode, toggleSheet, useOpenSheet, closeSheet, openSheetId } from '../studio/panelStore';
 import { haptics } from '../../utils/haptics';
 import { ToolType, BrushSettings } from '../../types';
 import { RealBrushSizeControl } from '../common/RealBrushSizeControl';

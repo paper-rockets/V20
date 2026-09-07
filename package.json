@@ -18,24 +18,24 @@
     "preview": "vite preview --host=0.0.0.0",
     "clean": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); try{fs.unlinkSync('server.js')}catch(e){}\"",
     "lint": "tsc --noEmit",
+    "test": "node scripts/smoke-test.mjs",
     "dev:remote": "node scripts/remote-server.mjs"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
     "jszip": "^3.10.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "three": "^0.185.1",
-    "three-mesh-bvh": "^0.9.14",
-    "vite": "^6.2.3"
+    "three-mesh-bvh": "^0.9.14"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
     "@types/node": "^22.14.0",
     "@types/three": "^0.185.4",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-react": "^5.0.4",
     "@webgpu/types": "^0.1.72",
     "playwright": "^1.63.0",
     "qrcode-terminal": "^0.12.0",

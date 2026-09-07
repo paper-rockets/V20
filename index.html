@@ -18,12 +18,10 @@
     <meta property="og:description" content="3D model painting studio and Draco compression suite with universal file conversion (GLB, GLTF, OBJ, FBX, 3DS, STL, PLY, DAE), orientation adjustment, geometry baking, and in-app local storage." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-    <!-- Google Draco Geometry Compression Library -->
-    <script src="https://cdn.jsdelivr.net/gh/google/draco@1.5.7/javascript/draco_encoder.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/google/draco@1.5.7/javascript/draco_decoder.js"></script>
+    <!-- Self-hosted Fonts & Draco Runtime -->
+    <link rel="stylesheet" href="/fonts/fonts.css" />
+    <script src="/draco/draco_encoder.js"></script>
+    <script src="/draco/draco_decoder.js"></script>
   </head>
   <body class="bg-[#0c0e14] text-neutral-200 overflow-hidden select-none">
     <div id="root" class="w-full h-full"></div>

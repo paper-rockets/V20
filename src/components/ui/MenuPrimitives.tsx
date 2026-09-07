@@ -113,7 +113,6 @@ export const MenuHeader: React.FC<MenuHeaderProps> = ({
             ariaLabel={`Close ${title}`}
             title="Close"
             theme={theme}
-            className="w-7 h-7 min-w-[28px] min-h-[28px] rounded-lg"
           />
         )}
       </div>

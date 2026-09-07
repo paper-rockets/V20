@@ -1,10 +1,10 @@
 /**
- * Play-mode sheet coordinator.
+ * Studio panel coordinator.
  *
  * The zone law allows exactly one bottom sheet open at a time — opening one closes
  * any other. That is a single global fact, not per-component state, so it lives in
- * the same tiny pub/sub as uiModeStore rather than a React context that would
- * re-render the whole Play tree on every open and close.
+ * a tiny pub/sub rather than a React context that would
+ * re-render the whole Studio tree on every open and close.
  */
 
 import { useSyncExternalStore } from 'react';
@@ -12,7 +12,7 @@ import { useSyncExternalStore } from 'react';
 /** Pro-mode rail modes. Each corresponds to one contextual panel. */
 export type ProMode = 'select' | 'draw' | 'create' | 'deform' | 'layers';
 
-/** Every sheet or panel Play/Pro mode can raise. Add here, not as a loose string. */
+/** Every sheet or panel the Studio can raise. Add here, not as a loose string. */
 export type SheetId = 'colour' | 'size' | 'fx' | 'brushes' | 'shapes' | 'settings' | ProMode | null;
 
 type Listener = () => void;

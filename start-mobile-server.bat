@@ -1,8 +1,8 @@
 @echo off
-title Sketchbook V14 - Mobile Dev Server
+title Remix 3D Studio - Mobile Dev Server
 cls
 echo ========================================================
-echo     SKETCHBOOK V14 - LOCAL MOBILE TESTING SERVER
+echo     REMIX 3D STUDIO - MOBILE TESTING SERVER
 echo ========================================================
 echo.
 echo Starting server and generating terminal QR code for phone...

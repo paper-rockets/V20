@@ -1,16 +1,16 @@
 import React, { useEffect, useRef } from 'react';
-import { SheetId, closeSheet, useOpenSheet } from './sheetStore';
+import { SheetId, closeSheet, useOpenSheet } from './panelStore';
 import { StudioCloseButton } from '../common/StudioCloseButton';
 
 /**
- * The one bottom-sheet primitive every Play popover uses.
+ * The shared bottom-sheet primitive used by the Studio workspace.
  *
  * Zone law: sheets rise from the bottom edge only, never wider than the screen and
  * never taller than 40vh, so the canvas above stays visible and drawable. Touching
  * the canvas dismisses — a child should never have to find a close button.
  */
 
-interface PlaySheetProps {
+interface StudioSheetProps {
   id: Exclude<SheetId, null>;
   title: string;
   children: React.ReactNode;
@@ -19,7 +19,7 @@ interface PlaySheetProps {
   tall?: boolean;
 }
 
-export const PlaySheet: React.FC<PlaySheetProps> = ({ id, title, children, theme = 'dark', tall = false }) => {
+export const StudioSheet: React.FC<StudioSheetProps> = ({ id, title, children, theme = 'dark', tall = false }) => {
   const open = useOpenSheet() === id;
   const sheetRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +70,7 @@ export const PlaySheet: React.FC<PlaySheetProps> = ({ id, title, children, theme
       aria-label={title}
       data-sheet-id={id}
       data-theme={theme}
-      className={`pr-surface paperrocket-play-sheet fixed left-0 right-0 bottom-0 sm:left-auto sm:right-5 sm:bottom-5 z-50 w-full sm:w-[380px] sm:max-w-[400px] rounded-t-3xl sm:rounded-2xl border-t border-x sm:border shadow-2xl font-sans
+      className={`pr-surface paperrocket-studio-sheet fixed left-0 right-0 bottom-0 sm:left-auto sm:right-5 sm:bottom-5 z-50 w-full sm:w-[380px] sm:max-w-[400px] rounded-t-3xl sm:rounded-2xl border-t border-x sm:border shadow-2xl font-sans
         motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-8 motion-safe:duration-250 motion-safe:ease-out
         ${isLight ? 'bg-white border-neutral-200 text-neutral-800' : 'bg-[#18191d] border-zinc-800 text-zinc-100'}`}
       style={{
@@ -79,7 +79,7 @@ export const PlaySheet: React.FC<PlaySheetProps> = ({ id, title, children, theme
         transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       }}
     >
-      <div className="paperrocket-sheet-header px-5 pt-3.5 pb-1 flex items-center justify-between min-h-[40px]">
+      <div className="paperrocket-sheet-header px-5 pt-3.5 pb-1 flex items-center justify-between min-h-[44px]">
         <h2 className="text-sm font-extrabold tracking-tight">{title}</h2>
         <StudioCloseButton onClick={closeSheet} ariaLabel={`Close ${title}`} theme={theme} />
       </div>

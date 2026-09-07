@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrushSettings } from '../../types';
-import { PlaySheet } from './PlaySheet';
+import { StudioSheet } from './StudioSheet';
 import { haptics } from '../../utils/haptics';
 
 /**
@@ -70,7 +70,7 @@ export const ShapesSheet: React.FC<ShapesSheetProps> = ({
   );
 
   return (
-    <PlaySheet id="shapes" title="Shape Snapping" theme={theme} tall>
+    <StudioSheet id="shapes" title="Shape Snapping" theme={theme} tall>
       <div className={`flex items-center gap-3 py-3 border-b ${isLight ? 'border-neutral-200' : 'border-neutral-800'}`}>
         <div className="flex-1">
           <div className="text-sm font-bold">Auto-detect shapes</div>
@@ -131,6 +131,6 @@ export const ShapesSheet: React.FC<ShapesSheetProps> = ({
           ))}
         </div>
       </div>
-    </PlaySheet>
+    </StudioSheet>
   );
 };

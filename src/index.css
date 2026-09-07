@@ -21,7 +21,7 @@ canvas {
   touch-action: none;
 }
 
-/* One tactile interaction language across Play, Pro, and every nested menu. */
+/* One tactile interaction language across the Studio and every nested menu. */
 .paperrocket-ui {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
@@ -38,32 +38,10 @@ canvas {
   min-width: 44px;
 }
 
-/* Top strip on mobile screens (<640px) with touch-friendly targets that fit without clipping */
-@media (max-width: 639px) {
-  .play-top-strip button:not(.play-top-strip-left) {
-    min-width: 36px !important;
-    min-height: 38px !important;
-    width: 36px !important;
-    height: 38px !important;
-    padding: 0 !important;
-    position: relative;
-  }
-  .play-top-strip button:not(.play-top-strip-left)::after {
-    content: '';
-    position: absolute;
-    inset: -4px -3px;
-    pointer-events: auto;
-  }
-  .play-top-strip .play-top-strip-left {
-    min-width: 40px !important;
-    width: auto !important;
-    height: 38px !important;
-    min-height: 38px !important;
-    display: inline-flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    padding: 0 6px 0 6px !important;
-  }
+/* Top strip buttons maintain at least 44x44 CSS px touch target across all viewports */
+.studio-top-strip button {
+  min-width: 44px !important;
+  min-height: 44px !important;
 }
 
 .paperrocket-ui button:focus-visible,
@@ -157,34 +135,6 @@ canvas {
 }
 
 .paperrocket-model-upload > div > p:last-child {
-  display: none;
-}
-
-.paperrocket-toybox-list {
-  grid-template-columns: 1fr !important;
-}
-
-.paperrocket-toybox-item {
-  min-height: 48px;
-  padding: 7px 4px !important;
-  flex-direction: row !important;
-  align-items: center;
-  background: transparent !important;
-  border: 0 !important;
-  border-bottom: 1px solid rgb(255 255 255 / 0.1) !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-
-.paperrocket-toybox-item > :first-child {
-  width: 34px !important;
-  height: 34px !important;
-  aspect-ratio: 1;
-  flex: 0 0 auto;
-  border-radius: 9px !important;
-}
-
-.paperrocket-toybox-item > :last-child > :last-child {
   display: none;
 }
 
@@ -283,7 +233,7 @@ canvas {
 }
 
 @media (min-width: 500px) {
-  .paperrocket-play-sheet {
+  .paperrocket-studio-sheet {
     left: auto !important;
     right: 20px !important;
     bottom: 20px !important;
@@ -294,7 +244,7 @@ canvas {
     border-radius: 16px !important;
   }
 
-  .paperrocket-play-sheet[data-sheet-id="settings"] {
+  .paperrocket-studio-sheet[data-sheet-id="settings"] {
     width: min(410px, calc(100vw - 40px)) !important;
   }
 }
@@ -452,7 +402,7 @@ html.low-power-ui .animate-spin {
 
 /* =============================================================
    UNIFIED FLOATING SURFACE — one look for every menu, sheet,
-   panel and pop-up (Play + Pro). A surface opts in by adding the
+   panel and pop-up. A surface opts in by adding the
    class `pr-surface` to its outermost card element. ALL visual
    work happens here; components only add that one class.
    ============================================================= */
@@ -620,14 +570,14 @@ html.light .pr-surface input:not([type]){
    Menus use the same visual restraint as the canvas chrome: one
    quiet plane, hairline groups and cyan only for active state.
    ============================================================= */
-.paperrocket-play-sheet,
+.paperrocket-studio-sheet,
 .paperrocket-pro-panel,
 .paperrocket-context-panel,
 .paperrocket-color-studio {
   border-radius: 16px !important;
 }
 
-.paperrocket-play-sheet {
+.paperrocket-studio-sheet {
   overflow: hidden;
 }
 
@@ -638,7 +588,7 @@ html.light .pr-surface input:not([type]){
 }
 
 html.light .paperrocket-sheet-header,
-.paperrocket-play-sheet[data-theme="light"] .paperrocket-sheet-header {
+.paperrocket-studio-sheet[data-theme="light"] .paperrocket-sheet-header {
   border-bottom-color: rgb(17 24 39 / .10);
 }
 
@@ -659,7 +609,7 @@ html.light .paperrocket-sheet-header,
 }
 
 /* Preferences is intentionally narrower and denser than content browsers. */
-.paperrocket-play-sheet[data-sheet-id="settings"] .paperrocket-sheet-body {
+.paperrocket-studio-sheet[data-sheet-id="settings"] .paperrocket-sheet-body {
   padding-inline: 14px !important;
 }
 
@@ -734,7 +684,7 @@ html.light .paperrocket-sheet-header,
 
 /* Every floating dialog must remain recoverable on a compressed viewport. */
 @media (max-width: 499px) {
-  .paperrocket-play-sheet {
+  .paperrocket-studio-sheet {
     left: 8px !important;
     right: 8px !important;
     bottom: max(8px, env(safe-area-inset-bottom)) !important;
@@ -785,7 +735,7 @@ html.light .paperrocket-sheet-header,
 }
 
 @media (max-height: 540px) {
-  .paperrocket-play-sheet,
+  .paperrocket-studio-sheet,
   .paperrocket-color-studio {
     top: 8px !important;
     bottom: 8px !important;

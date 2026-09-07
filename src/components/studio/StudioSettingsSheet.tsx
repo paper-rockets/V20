@@ -24,12 +24,12 @@ import {
   ChevronDown,
   FolderArchive,
 } from 'lucide-react';
-import { PlaySheet } from './PlaySheet';
-import { closeSheet } from './sheetStore';
+import { StudioSheet } from './StudioSheet';
+import { closeSheet } from './panelStore';
 import { haptics } from '../../utils/haptics';
 import { StorageEstimateInfo, AutoSaveMetaInfo } from '../../utils/storagePermission';
 
-export interface PlaySettingsSheetProps {
+export interface StudioSettingsSheetProps {
   theme: 'light' | 'dark';
   onSetTheme: (t: 'light' | 'dark') => void;
   // UI Scale
@@ -139,7 +139,7 @@ const Toggle: React.FC<{ on: boolean; onChange: (v: boolean) => void; label: str
   </button>
 );
 
-export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
+export const StudioSettingsSheet: React.FC<StudioSettingsSheetProps> = ({
   theme,
   onSetTheme,
   uiScale = 1.0,
@@ -194,7 +194,7 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
   };
 
   const pill = (active: boolean) =>
-    `flex-1 min-h-[36px] h-9 px-2.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+    `flex-1 min-h-[44px] h-11 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
       active
         ? isLight ? 'bg-neutral-900 text-white shadow-sm' : 'bg-white text-zinc-950 shadow-sm'
         : isLight
@@ -202,14 +202,14 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
           : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
     }`;
 
-  const actionBtn = `min-h-[38px] px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-2 border transition-all active:scale-98 cursor-pointer ${
+  const actionBtn = `min-h-[44px] px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 border transition-all active:scale-98 cursor-pointer ${
     isLight
       ? 'bg-neutral-100 hover:bg-neutral-200 border-neutral-300 text-neutral-800'
       : 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 text-neutral-200'
   }`;
 
   return (
-    <PlaySheet id="settings" title="Preferences" theme={theme} tall>
+    <StudioSheet id="settings" title="Preferences" theme={theme} tall>
       <div className="paperrocket-preferences">
       {/* 1. STUDIO */}
       <SectionHeader title="Studio" isLight={isLight} />
@@ -248,7 +248,7 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
                 haptics.trigger('light');
                 onUiScaleChange(Math.max(0.7, uiScale - 0.1));
               }}
-              className={`min-h-[36px] min-w-[36px] px-2 rounded-lg border text-sm font-bold flex items-center justify-center transition-colors ${
+              className={`min-h-[44px] min-w-[44px] px-2 rounded-lg border text-sm font-bold flex items-center justify-center transition-colors ${
                 isLight ? 'bg-neutral-100 hover:bg-neutral-200 border-neutral-300 text-neutral-800' : 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 text-white'
               }`}
             >
@@ -260,7 +260,7 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
                 haptics.trigger('light');
                 onUiScaleChange(1.0);
               }}
-              className={`min-h-[36px] px-2.5 rounded-lg border text-[11px] font-mono font-bold flex items-center justify-center transition-colors ${
+              className={`min-h-[44px] px-3 rounded-lg border text-xs font-mono font-bold flex items-center justify-center transition-colors ${
                 isLight ? 'bg-neutral-100 hover:bg-neutral-200 border-neutral-300 text-neutral-700' : 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 text-neutral-300'
               }`}
             >
@@ -272,7 +272,7 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
                 haptics.trigger('light');
                 onUiScaleChange(Math.min(1.5, uiScale + 0.1));
               }}
-              className={`min-h-[36px] min-w-[36px] px-2 rounded-lg border text-sm font-bold flex items-center justify-center transition-colors ${
+              className={`min-h-[44px] min-w-[44px] px-2 rounded-lg border text-sm font-bold flex items-center justify-center transition-colors ${
                 isLight ? 'bg-neutral-100 hover:bg-neutral-200 border-neutral-300 text-neutral-800' : 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 text-white'
               }`}
             >
@@ -323,11 +323,11 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
                     haptics.trigger('light');
                     onSensitivityChange(s);
                   }}
-                  className={`flex-1 min-h-[36px] py-1 text-[11px] font-mono rounded-lg border transition-all ${
+                  className={`flex-1 min-h-[44px] py-1 text-xs font-mono font-bold rounded-lg border transition-all ${
                     Math.abs(navigatorSensitivity - s) < 0.05
                       ? isLight
-                        ? 'bg-neutral-900 border-neutral-900 text-white font-bold'
-                        : 'bg-white border-white text-zinc-950 font-bold'
+                        ? 'bg-neutral-900 border-neutral-900 text-white'
+                        : 'bg-white border-white text-zinc-950'
                       : isLight
                       ? 'bg-neutral-100 border-neutral-300 text-neutral-700 hover:bg-neutral-200'
                       : 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700'
@@ -581,6 +581,6 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
       )}
 
       </div>
-    </PlaySheet>
+    </StudioSheet>
   );
 };

@@ -11,11 +11,11 @@ import {
   IcSessions as FolderArchive,
 } from '../pro/StudioIcons';
 import { Square } from 'lucide-react';
-import { toggleSheet } from './sheetStore';
+import { toggleSheet } from './panelStore';
 
-interface PlayTopStripProps {
+interface StudioTopStripProps {
   projectName: string;
-  onOpenToybox: () => void;
+  onOpenModelLibrary: () => void;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
@@ -26,9 +26,9 @@ interface PlayTopStripProps {
   onOpenSessions?: () => void;
 }
 
-export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
+export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
   projectName,
-  onOpenToybox,
+  onOpenModelLibrary,
   onUndo,
   onRedo,
   canUndo,
@@ -39,7 +39,7 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
   onOpenSessions,
 }) => {
   const ink = theme === 'light' ? 'text-neutral-800' : 'text-white/90';
-  const button = `pointer-events-auto min-w-[34px] min-h-[38px] w-[34px] h-[38px] sm:min-w-[44px] sm:min-h-[44px] sm:w-11 sm:h-11 grid place-items-center rounded-lg sm:rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`;
+  const button = `pointer-events-auto shrink-0 min-w-[44px] min-h-[44px] w-11 h-11 grid place-items-center rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`;
 
   const isCurrentlyFullscreen = (): boolean => {
     if (typeof document === 'undefined') return false;
@@ -126,11 +126,11 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
   }, [simulatedFs]);
 
   return (
-    <header className="play-top-strip fixed inset-x-0 top-0 z-30 flex h-14 sm:h-16 items-center justify-between px-1.5 sm:px-4 pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pointer-events-none select-none">
+    <header className="studio-top-strip fixed inset-x-0 top-0 z-30 flex h-14 sm:h-16 items-center justify-between px-1.5 sm:px-4 pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pointer-events-none select-none">
       <button
         type="button"
-        onClick={onOpenToybox}
-        className={`pointer-events-auto play-top-strip-left shrink inline-flex items-center gap-1 sm:gap-2 h-9 sm:h-11 min-h-[38px] sm:min-h-[44px] px-2 sm:px-3 rounded-lg sm:rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`}
+        onClick={onOpenModelLibrary}
+        className={`pointer-events-auto studio-top-strip-left shrink inline-flex items-center gap-1.5 sm:gap-2 h-11 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`}
         aria-label="Open model library"
       >
         <Box className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" strokeWidth={1.35} />
@@ -138,7 +138,7 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
           {projectName || 'Model'}
         </span>
       </button>
-      <nav className="flex items-center gap-0.5 sm:gap-1.5 pointer-events-auto shrink-0 py-0.5" aria-label="History and settings">
+      <nav className="flex items-center gap-0.5 sm:gap-1.5 pointer-events-auto shrink-0 py-0.5 overflow-x-auto no-scrollbar" aria-label="History and settings">
         <button
           type="button"
           onClick={onUndo}

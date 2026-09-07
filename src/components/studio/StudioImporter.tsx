@@ -23,7 +23,7 @@ import { haptics } from '../../utils/haptics';
 import { Model3DPreview, Model3DStats } from '../common/Model3DPreview';
 import { StudioCloseButton } from '../common/StudioCloseButton';
 
-interface PlayImporterProps {
+interface StudioImporterProps {
   isOpen: boolean;
   engine: StudioEngine | null;
   onClose: () => void;
@@ -34,7 +34,7 @@ interface PlayImporterProps {
 
 type Stage = 'choose' | 'adjusting' | 'saving';
 
-export const PlayImporter: React.FC<PlayImporterProps> = ({
+export const StudioImporter: React.FC<StudioImporterProps> = ({
   isOpen,
   engine,
   onClose,

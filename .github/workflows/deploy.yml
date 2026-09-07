@@ -35,7 +35,16 @@ jobs:
           enablement: true
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Code quality and lint check
+        run: npm run lint
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run automated smoke tests
+        run: npm test
 
       - name: Build production bundle
         run: npm run build

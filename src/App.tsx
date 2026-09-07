@@ -28,13 +28,15 @@ import { Option3SphereNavigator } from './components/TransformNavigator/Option3S
 import { FpsCounter } from './components/FpsCounter';
 import { DeferredPanel } from './components/DeferredPanel';
 import { publishCameraPose, publishFps } from './core/telemetryStore';
-import { useHasOnboarded } from './core/uiModeStore';
+import { useHasOnboarded } from './core/onboardingStore';
 import { ProShell } from './components/pro/ProShell';
-import { useOpenSheet, openSheetId, closeSheet, toggleSheet } from './components/play/sheetStore';
-import { PlayTopStrip } from './components/play/PlayTopStrip';
-import { PlaySettingsSheet } from './components/play/PlaySettingsSheet';
-import { PlayImporter } from './components/play/PlayImporter';
-import { ShapesSheet } from './components/play/ShapesSheet';
+import { useOpenSheet, openSheetId, closeSheet, toggleSheet } from './components/studio/panelStore';
+import { StudioTopStrip } from './components/studio/StudioTopStrip';
+import { StudioSettingsSheet } from './components/studio/StudioSettingsSheet';
+const StudioImporter = lazy(() =>
+  import('./components/studio/StudioImporter').then((m) => ({ default: m.StudioImporter }))
+);
+import { ShapesSheet } from './components/studio/ShapesSheet';
 import { Compass } from 'lucide-react';
 import { CameraRecoveryPill } from './components/CameraRecoveryPill';
 import { AutoSaveToast, AutoSaveStatus } from './components/AutoSaveToast';
@@ -85,7 +87,9 @@ const CustomMirrorModal = lazy(() =>
 );
 const BentGuideModal = lazy(() => import('./components/BentGuideModal').then((m) => ({ default: m.BentGuideModal })));
 const ARViewerModal = lazy(() => import('./components/ARViewerModal').then((m) => ({ default: m.ARViewerModal })));
-import { ColorStudioModal } from './components/CompactColorStudioModal';
+const ColorStudioModal = lazy(() =>
+  import('./components/CompactColorStudioModal').then((m) => ({ default: m.ColorStudioModal }))
+);
 const HolisticDNAInspector = lazy(() =>
   import('./components/HolisticDNAInspector').then((m) => ({ default: m.HolisticDNAInspector }))
 );
@@ -196,9 +200,9 @@ export function App() {
 
   const openSheet = useOpenSheet();
   const hasOnboarded = useHasOnboarded();
-  const [showPlayStats, setShowPlayStats] = useState<boolean>(false);
-  const [showPlayNavigator, setShowPlayNavigator] = useState<boolean>(true);
-  const [isPlayImporterOpen, setIsPlayImporterOpen] = useState<boolean>(false);
+  const [showPerformanceStats, setShowPerformanceStats] = useState<boolean>(false);
+  const [showStudioNavigator, setShowStudioNavigator] = useState<boolean>(true);
+  const [isModelImporterOpen, setIsModelImporterOpen] = useState<boolean>(false);
   const [tool, setTool] = useState<ToolType>('brush');
   const [brushSettings, setBrushSettings] = useState<BrushSettings>(DEFAULT_BRUSH_SETTINGS);
   const [postSettings, setPostSettings] = useState<PostProcessSettings>(DEFAULT_POST_SETTINGS);
@@ -846,9 +850,8 @@ export function App() {
           case 'settings': toggleSheet('settings'); break;
           case 'sessions': setIsSessionModalOpen(true); break;
           case 'illumination': setIsIlluminationOpen(true); break;
-          case 'toybox': setIsModelsOpen(true); break;
           case 'models': setIsModelsOpen(true); break;
-          case 'importer': setIsPlayImporterOpen(true); break;
+          case 'importer': setIsModelImporterOpen(true); break;
           case 'colorStudio': setIsColorStudioOpen(true); break;
           case 'renderSettings': setIsRenderSettingsOpen(true); break;
           case 'export': setIsExportOpen(true); break;
@@ -880,7 +883,7 @@ export function App() {
         setIsSessionModalOpen(false);
         setIsIlluminationOpen(false);
         setIsModelsOpen(false);
-        setIsPlayImporterOpen(false);
+        setIsModelImporterOpen(false);
         setIsColorStudioOpen(false);
         setIsRenderSettingsOpen(false);
         setIsExportOpen(false);
@@ -1124,7 +1127,7 @@ export function App() {
   const isAnyModalActive =
     isIlluminationOpen ||
     isColorStudioOpen ||
-    isPlayImporterOpen ||
+    isModelImporterOpen ||
     isModelsOpen ||
     isSessionModalOpen ||
     isExportOpen ||
@@ -1175,9 +1178,9 @@ export function App() {
       />
 
       {/* Top Strip (Studio Workspace Surface) */}
-      <PlayTopStrip
+      <StudioTopStrip
         projectName={activeModelName}
-        onOpenToybox={() => setIsModelsOpen(true)}
+        onOpenModelLibrary={() => setIsModelsOpen(true)}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={canUndo}
@@ -1192,13 +1195,15 @@ export function App() {
       <CameraRecoveryPill engine={engine} theme={theme} />
 
       {/* Shared 3D Model Importer */}
-      <PlayImporter
-        isOpen={isPlayImporterOpen}
-        engine={engine}
-        onClose={() => setIsPlayImporterOpen(false)}
-        onSaved={(n) => setActiveModelName(n)}
-        theme={theme}
-      />
+      <DeferredPanel active={isModelImporterOpen}>
+        <StudioImporter
+          isOpen={isModelImporterOpen}
+          engine={engine}
+          onClose={() => setIsModelImporterOpen(false)}
+          onSaved={(n) => setActiveModelName(n)}
+          theme={theme}
+        />
+      </DeferredPanel>
 
       {/* Studio Workspace Shell */}
       <ProShell
@@ -1231,7 +1236,7 @@ export function App() {
             }}
             onOpenImporter={() => {
               closeSheet();
-              setIsPlayImporterOpen(true);
+              setIsModelImporterOpen(true);
             }}
             liquifySettings={liquifySettings}
             setLiquifySettings={setLiquifySettings}
@@ -1282,12 +1287,14 @@ export function App() {
           />
 
       {/* FPS & Input Lag Diagnostics Counter */}
-      <FpsCounter
-        uiScale={uiScale}
-        theme={theme}
-        fullDebug={showPlayStats}
-        onToggleFullDebug={() => setShowPlayStats((prev) => !prev)}
-      />
+      {showPerformanceStats && (
+        <FpsCounter
+          uiScale={uiScale}
+          theme={theme}
+          fullDebug={showPerformanceStats}
+          onToggleFullDebug={() => setShowPerformanceStats((prev) => !prev)}
+        />
+      )}
 
       {/* Dynamic Screen Center Crosshair Reticle */}
       <ScreenCenterCrosshair
@@ -1299,7 +1306,7 @@ export function App() {
 
 
       {/* 3D Navigation Controller: Option 3 Sphere Navigator */}
-      {gizmoMode !== 'Hidden' && activeController !== 'hidden' && showPlayNavigator &&
+      {gizmoMode !== 'Hidden' && activeController !== 'hidden' && showStudioNavigator &&
         !isModelsOpen && !isExportOpen &&
         !isIlluminationOpen && !isColorStudioOpen && !isARViewerOpen && !isClipboardOpen && (
           <Option3SphereNavigator
@@ -1503,21 +1510,23 @@ export function App() {
       </DeferredPanel>
 
       {/* Advanced Color Studio Modal (HSV + OKLCh Polar + 1-Click Shaders) */}
-      <ColorStudioModal
-        isOpen={isColorStudioOpen}
-        onClose={() => setIsColorStudioOpen(false)}
-        currentColor={brushSettings.color || '#38bdf8'}
-        onChangeColor={(hex) => setBrushSettings((prev) => ({ ...prev, color: hex }))}
-        onApplyBrushSettings={(newSettings) =>
-          setBrushSettings((prev) => ({ ...prev, ...newSettings }))
-        }
-        onApplyToModel={(mat) => engine?.setModelCustomMaterial(mat)}
-        onSampleFromScreen={() => {
-          setIsColorStudioOpen(false);
-          setTool('eyedropper');
-        }}
-        theme={theme}
-      />
+      <DeferredPanel active={isColorStudioOpen}>
+        <ColorStudioModal
+          isOpen={isColorStudioOpen}
+          onClose={() => setIsColorStudioOpen(false)}
+          currentColor={brushSettings.color || '#38bdf8'}
+          onChangeColor={(hex) => setBrushSettings((prev) => ({ ...prev, color: hex }))}
+          onApplyBrushSettings={(newSettings) =>
+            setBrushSettings((prev) => ({ ...prev, ...newSettings }))
+          }
+          onApplyToModel={(mat) => engine?.setModelCustomMaterial(mat)}
+          onSampleFromScreen={() => {
+            setIsColorStudioOpen(false);
+            setTool('eyedropper');
+          }}
+          theme={theme}
+        />
+      </DeferredPanel>
 
       {/* Holistic DNA Inspector & Injector Popup */}
       <DeferredPanel active={activeDNA !== null}>
@@ -1578,7 +1587,7 @@ export function App() {
       )}
 
       {/* Consolidated Shared Settings Sheet (Preferences) */}
-      <PlaySettingsSheet
+      <StudioSettingsSheet
         theme={theme}
         onSetTheme={handleSetTheme}
         uiScale={uiScale}
@@ -1611,10 +1620,10 @@ export function App() {
         storageEstimate={storageEstimate}
         autoSaveMeta={autoSaveMeta}
         onRestoreAutoSave={handleRestoreAutoSave}
-        showNavigator={showPlayNavigator}
-        onToggleNavigator={setShowPlayNavigator}
-        showStats={showPlayStats}
-        onToggleStats={setShowPlayStats}
+        showNavigator={showStudioNavigator}
+        onToggleNavigator={setShowStudioNavigator}
+        showStats={showPerformanceStats}
+        onToggleStats={setShowPerformanceStats}
       />
 
       {/* Shape Snapping (Auto-Shapes) Sheet accessible from top menu */}

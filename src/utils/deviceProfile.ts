@@ -42,11 +42,11 @@ export interface QualityProfile {
   shadows: boolean;
   shadowMapSize: number;
   /**
-   * THREE shadow map constant (BasicShadowMap 0 | PCFShadowMap 1 | PCFSoftShadowMap 2).
+   * THREE shadow map constant (BasicShadowMap 0 | PCFShadowMap 1).
    * Typed as a literal union so it assigns to THREE.ShadowMapType without a cast,
    * while keeping this module free of a three import.
    */
-  shadowMapType: 0 | 1 | 2;
+  shadowMapType: 0 | 1;
   /** Max simultaneous shadow-casting directional lights. */
   maxShadowCasters: number;
 
@@ -282,11 +282,10 @@ function classify(signals: DetectionSignals): { tier: PerformanceTier; isS6Lite:
 
 /**
  * Shadow map type constants mirrored from three so this module stays dependency-free
- * and tree-shakeable (THREE.BasicShadowMap = 0, PCFShadowMap = 1, PCFSoftShadowMap = 2).
+ * and tree-shakeable (THREE.BasicShadowMap = 0, PCFShadowMap = 1).
  */
 const BASIC_SHADOW_MAP = 0;
 const PCF_SHADOW_MAP = 1;
-const PCF_SOFT_SHADOW_MAP = 2;
 
 function buildProfile(tier: PerformanceTier, isS6Lite: boolean, reason: string, dpr: number): QualityProfile {
   if (tier === 'low') {
@@ -388,7 +387,7 @@ function buildProfile(tier: PerformanceTier, isS6Lite: boolean, reason: string, 
 
     shadows: true,
     shadowMapSize: 2048,
-    shadowMapType: PCF_SOFT_SHADOW_MAP,
+    shadowMapType: PCF_SHADOW_MAP,
     maxShadowCasters: 2,
 
     materialTier: 'full',

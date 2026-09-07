@@ -22,10 +22,10 @@ export const StudioCloseButton: React.FC<StudioCloseButtonProps> = ({
 
   const sizeClasses =
     size === 'sm'
-      ? 'w-7 h-7 min-w-[28px] min-h-[28px] rounded-lg'
+      ? 'w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg'
       : size === 'lg'
-      ? 'w-10 h-10 min-w-[40px] min-h-[40px] rounded-xl'
-      : 'w-8 h-8 min-w-[32px] min-h-[32px] rounded-xl';
+      ? 'w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl'
+      : 'w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl';
 
   const iconSize =
     size === 'sm'

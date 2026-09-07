@@ -205,6 +205,7 @@ function MatCapShaderTabContent({
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
+      if (document.hidden) return;
       const elapsedTime = clockRef.current.getElapsedTime();
 
       if (autoRotate && meshRef.current && !isDragging) {

@@ -99,7 +99,7 @@ export const Model3DPreview: React.FC<Model3DPreviewProps> = ({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
 
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
@@ -159,8 +159,21 @@ export const Model3DPreview: React.FC<Model3DPreviewProps> = ({
     const defaultCamTarget = new THREE.Vector3(0, 0, 0);
 
     let animId = 0;
+    let isVisible = true;
+
+    const onVisChange = () => {
+      isVisible = !document.hidden;
+    };
+    document.addEventListener('visibilitychange', onVisChange);
+
+    const intersectObs = new IntersectionObserver((entries) => {
+      isVisible = (entries[0]?.isIntersecting ?? true) && !document.hidden;
+    }, { threshold: 0.05 });
+    intersectObs.observe(container);
+
     const animate = () => {
       animId = requestAnimationFrame(animate);
+      if (!isVisible) return;
       controls.update();
 
       if (sceneRef.current?.pivotGroup && isSpinning) {
@@ -202,6 +215,8 @@ export const Model3DPreview: React.FC<Model3DPreviewProps> = ({
     return () => {
       cancelAnimationFrame(animId);
       resizeObs.disconnect();
+      intersectObs.disconnect();
+      document.removeEventListener('visibilitychange', onVisChange);
       controls.dispose();
       renderer.dispose();
       clayMaterial.dispose();

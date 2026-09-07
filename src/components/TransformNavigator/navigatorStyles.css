@@ -396,11 +396,7 @@
   background: var(--nv-accent, var(--nv-up));
 }
 
-#nv[data-ui-mode="play"] .nv-opt[aria-selected="true"] .nv-swatch {
-  background: var(--nv-up);
-}
-
-#nv[data-ui-mode="pro"] .nv-opt[aria-selected="true"] .nv-swatch {
+#nv .nv-opt[aria-selected="true"] .nv-swatch {
   background: var(--nv-accent);
 }
 
@@ -496,4 +492,3 @@
   pointer-events: auto !important;
   touch-action: none !important;
 }
-

@@ -26,9 +26,9 @@ This file contains only technical issues previously confirmed through source ins
 
 **Required fix:** Add a dirty-work check and a real confirmation dialog with Save, Replace, and Cancel choices. Loading a model should become an undoable project operation or create a new project instead of clearing history.
 
-### 2. [P1] The Play-mode Toybox also clears strokes before loading
+### 2. [P1] The model library also clears strokes before loading
 
-**Evidence:** `src/components/play/Toybox.tsx:125-138` calls `engine.clearAllStrokes()` before loading a blank canvas, preset, or saved model. The Toybox displays warning text when work exists, but warning text is not equivalent to a blocking confirmation.
+**Evidence:** the model-library loading flow calls `engine.clearAllStrokes()` before loading a blank canvas, preset, or saved model. Warning text when work exists is not equivalent to a blocking confirmation.
 
 **Impact:** A mistaken tap can replace work. Touch devices make accidental activation more likely.
 
@@ -44,7 +44,7 @@ This file contains only technical issues previously confirmed through source ins
 
 **Impact:** Core operations such as drawing, undo, save, model replacement, modal opening, export, and mobile layout can regress without the deployment pipeline noticing.
 
-**Required fix:** Add smoke tests for initial render, draw/undo/redo, save/restore, safe model replacement, Play/Pro navigation if both remain, export, and key mobile breakpoints.
+**Required fix:** Add smoke tests for initial render, draw/undo/redo, save/restore, safe model replacement, Studio navigation, export, and key mobile breakpoints.
 
 ### 4. [P1] Deployment checks only whether the application bundles
 
@@ -303,6 +303,6 @@ After cleanup:
 
 - The V20 production build and TypeScript check passed. Passing those checks does not prove behavioral correctness.
 - Direct V20 checks covered desktop initial render, browser warnings, and a 412 × 915 mobile light-theme pass of the initial canvas, brush shelf, and Preferences panel.
-- Some interaction and performance observations were made against V19. Source comparison established that the core engine, `App.tsx`, model library, Toybox, export system, and storage system carried into V20 unchanged; only a small set of navigator/dock styling files differed initially.
+- Some interaction and performance observations were made against V19. Source comparison established that the core engine, `App.tsx`, model library, export system, and storage system carried into V20 unchanged; only a small set of navigator/dock styling files differed initially.
 - A full dark-theme matrix, real Android hardware battery profile, corrupted-storage migration test, offline cold-start test, complete keyboard traversal, every import format, and every export target were not completed. They are intentionally not reported above as confirmed failures.
 - The attempted Impeccable helper binary was flagged by Windows Security and removed. That was an installation-environment event, not a V20 application defect, so it is not included as an app issue.

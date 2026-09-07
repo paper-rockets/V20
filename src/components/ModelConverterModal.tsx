@@ -222,6 +222,7 @@ export const ModelConverterModal: React.FC<ModelConverterModalProps> = ({
     let animId = 0;
     const animate = () => {
       animId = requestAnimationFrame(animate);
+      if (document.hidden) return;
       if (controls) controls.update();
       if (threeStateRef.current?.modelContainer && turntableActive) {
         threeStateRef.current.modelContainer.rotation.y += 0.01;

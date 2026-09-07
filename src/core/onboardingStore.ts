@@ -1,24 +1,12 @@
 /**
- * UI Mode Store
+ * First-run onboarding store.
  *
- * The app ships two surfaces over one engine:
- *
- *   'play' - the default. Four tools, sixteen colours, six effects, one navigator.
- *   'pro'  - everything: the full 83-button dock, the colour studio, the converter.
- *
- * Nothing about the engine changes between them; only what is rendered. The flag
- * lives here rather than in App state because Toolbar already takes ~70 props and
- * threading a 71st through every panel would be worse than a module-level signal.
- *
- * Same tiny synchronous pub/sub as telemetryStore.ts: components that care
- * subscribe with useSyncExternalStore, nothing above them re-renders.
+ * This uses the same tiny synchronous pub/sub pattern as telemetryStore.ts, so
+ * subscribers update without pushing onboarding state through the app shell.
  */
 
 import { useSyncExternalStore } from 'react';
 
-export type UiMode = 'pro';
-
-const MODE_KEY = 'remix3d.uiMode';
 const ONBOARDED_KEY = 'remix3d.hasOnboarded';
 
 type Listener = () => void;
@@ -49,23 +37,10 @@ function notify(listeners: Set<Listener>): void {
     try {
       listener();
     } catch (e) {
-      console.warn('UI mode listener error:', e);
+      console.warn('Onboarding listener error:', e);
     }
   }
 }
-
-// --- Mode (Studio Shell) ------------------------------------------------
-
-export function getUiMode(): UiMode {
-  return 'pro';
-}
-
-/** Reactive read. Maintained for Option3SphereNavigator gizmo compatibility */
-export function useUiMode(): UiMode {
-  return 'pro';
-}
-
-// --- First run / Onboarding ---------------------------------------------
 
 let hasOnboarded: boolean = readStored(ONBOARDED_KEY) !== 'false';
 const onboardedListeners = new Set<Listener>();

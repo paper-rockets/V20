@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StrokeProfile, MaterialType } from '../../types';
 import { resolveAssetUrl } from '../../utils/assetUrl';
 
@@ -18,7 +18,7 @@ export interface BrushShapeGlyphProps {
 
 const bImg = (name: string) => resolveAssetUrl(`assets/brushes/${name}`);
 
-const BRUSH_IMAGES: Record<string, string> = {
+export const BRUSH_IMAGES: Record<string, string> = {
   clay: bImg('clay.png'),
   build: bImg('build.png'),
   move: bImg('move.png'),
@@ -53,6 +53,7 @@ export const BrushShapeGlyph: React.FC<BrushShapeGlyphProps> = ({
   boxSize = 44,
   className = '',
 }) => {
+  const [loadError, setLoadError] = useState(false);
   const imageSrc = BRUSH_IMAGES[brushId] || BRUSH_IMAGES.clay;
   const scale = getScaleFactor(size);
 
@@ -61,28 +62,27 @@ export const BrushShapeGlyph: React.FC<BrushShapeGlyphProps> = ({
       className={`relative flex items-center justify-center overflow-hidden shrink-0 select-none ${className}`}
       style={{ width: boxSize, height: boxSize }}
     >
-      <img
-        src={imageSrc}
-        alt={brushId}
-        draggable={false}
-        className="object-contain pointer-events-none transition-transform duration-100 ease-out"
-        style={{
-          width: `${Math.round(boxSize * 0.9)}px`,
-          height: `${Math.round(boxSize * 0.9)}px`,
-          transform: `scale(${scale.toFixed(2)})`,
-        }}
-        onError={(e) => {
-          const target = e.currentTarget;
-          target.style.display = 'none';
-          const parent = target.parentElement;
-          if (parent && !parent.querySelector('.glyph-fallback')) {
-            const fallback = document.createElement('div');
-            fallback.className = 'glyph-fallback w-full h-full rounded-full border border-current opacity-30 flex items-center justify-center text-[10px] font-bold';
-            fallback.innerText = brushId.slice(0, 2).toUpperCase();
-            parent.appendChild(fallback);
-          }
-        }}
-      />
+      {!loadError ? (
+        <img
+          src={imageSrc}
+          alt={brushId}
+          draggable={false}
+          className="object-contain pointer-events-none transition-transform duration-100 ease-out"
+          style={{
+            width: `${Math.round(boxSize * 0.9)}px`,
+            height: `${Math.round(boxSize * 0.9)}px`,
+            transform: `scale(${scale.toFixed(2)})`,
+          }}
+          onError={() => setLoadError(true)}
+        />
+      ) : (
+        <div
+          data-testid="glyph-fallback"
+          className="glyph-fallback w-full h-full rounded-full border border-current opacity-40 flex items-center justify-center text-[10px] font-bold"
+        >
+          {brushId.slice(0, 2).toUpperCase()}
+        </div>
+      )}
     </div>
   );
 };

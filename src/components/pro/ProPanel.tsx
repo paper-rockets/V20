@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { ProMode, closeSheet, useOpenSheet } from '../play/sheetStore';
+import { ProMode, closeSheet, useOpenSheet } from '../studio/panelStore';
 import { useDismissibleSurface } from '../../hooks/useDismissibleSurface';
 import { StudioCloseButton } from '../common/StudioCloseButton';
 import { haptics } from '../../utils/haptics';

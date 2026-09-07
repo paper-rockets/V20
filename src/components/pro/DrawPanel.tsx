@@ -35,7 +35,7 @@ import {
   getBrushesForTab,
   BrushCategoryTab,
 } from '../../presets/curatedBrushes';
-import { BrushShapeGlyph } from '../play/BrushShapeGlyph';
+import { BrushShapeGlyph } from '../studio/BrushShapeGlyph';
 import { RealBrushSizeControl } from '../common/RealBrushSizeControl';
 import { haptics } from '../../utils/haptics';
 
