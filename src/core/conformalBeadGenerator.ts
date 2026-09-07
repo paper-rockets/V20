@@ -268,8 +268,8 @@ export class ConformalBeadGenerator {
   }
 
   /**
-   * Computes Bishop Rotation Minimizing Frames (RMF) along curve using the Double Reflection Method (Wang et al. 2008).
-   * Eliminates unwanted twist and inflection flipping along arbitrary 3D spatial splines.
+   * Computes continuous surface-aligned orthogonal frames (Darboux/Bishop) along curve.
+   * Eliminates unwanted twist, ribbon self-intersection (hourglass knots), and inflection flips.
    */
   public static computeBishopRMF(
     positions: THREE.Vector3[],
@@ -298,59 +298,47 @@ export class ConformalBeadGenerator {
       tangents.push(t);
     }
 
-    // Initialize first reference normal r0 orthogonal to t0
-    const r0 = _vecPool.get().copy(initialNormals[0] || _scratchV1.set(0, 1, 0));
-    // Project r0 orthogonal to t0
-    r0.sub(_scratchV1.copy(tangents[0]).multiplyScalar(tangents[0].dot(r0)));
-    if (r0.lengthSq() < 1e-4) {
-      r0.crossVectors(tangents[0], _scratchV1.set(0, 1, 0));
-      if (r0.lengthSq() < 1e-4) {
-        r0.crossVectors(tangents[0], _scratchV1.set(1, 0, 0));
-      }
-    }
-    r0.normalize();
+    const normals: THREE.Vector3[] = [];
+    const binormals: THREE.Vector3[] = [];
 
-    const normals: THREE.Vector3[] = [r0];
-    const b0 = _vecPool.get().crossVectors(tangents[0], r0).normalize();
-    const binormals: THREE.Vector3[] = [b0];
+    // Continuous surface-aligned frame construction
+    for (let i = 0; i < n; i++) {
+      const t = tangents[i];
+      const targetNorm = initialNormals[i] || _scratchV1.set(0, 1, 0);
 
-    // Double Reflection Method (Wang et al. 2008)
-    for (let i = 0; i < n - 1; i++) {
-      const x_i = positions[i];
-      const x_next = positions[i + 1];
-      const t_i = tangents[i];
-      const t_next = tangents[i + 1];
-      const r_i = normals[i];
+      // Project surface normal orthogonal to curve tangent
+      const norm = _vecPool.get().copy(targetNorm);
+      norm.sub(_scratchV1.copy(t).multiplyScalar(t.dot(norm)));
 
-      const v1 = _scratchV1.subVectors(x_next, x_i);
-      const c1 = v1.dot(v1);
-
-      const r_next = _vecPool.get();
-
-      if (c1 > 1e-8) {
-        // First reflection across bisecting plane of xi and x_{i+1}
-        const r_i_L = _scratchV2.copy(r_i).sub(_scratchV3.copy(v1).multiplyScalar((2.0 / c1) * v1.dot(r_i)));
-        const t_i_L = _scratchV4.copy(t_i).sub(_scratchV3.copy(v1).multiplyScalar((2.0 / c1) * v1.dot(t_i)));
-
-        // Second reflection across bisecting plane of t_i^L and t_{i+1}
-        const v2 = _scratchV3.subVectors(t_next, t_i_L);
-        const c2 = v2.dot(v2);
-
-        if (c2 > 1e-8) {
-          r_next.copy(r_i_L).sub(_scratchV4.copy(v2).multiplyScalar((2.0 / c2) * v2.dot(r_i_L)));
-        } else {
-          r_next.copy(r_i_L);
+      if (norm.lengthSq() < 1e-4) {
+        // Degenerate: tangent is parallel to surface normal.
+        // Fallback to previous frame normal projected onto tangent plane
+        if (i > 0 && normals[i - 1]) {
+          norm.copy(normals[i - 1]).sub(_scratchV1.copy(t).multiplyScalar(t.dot(normals[i - 1])));
         }
-      } else {
-        r_next.copy(r_i);
+        if (norm.lengthSq() < 1e-4) {
+          norm.crossVectors(t, _scratchV1.set(0, 1, 0));
+          if (norm.lengthSq() < 1e-4) {
+            norm.crossVectors(t, _scratchV1.set(1, 0, 0));
+          }
+        }
+      }
+      norm.normalize();
+
+      // Compute binormal as tangent cross surface normal
+      const binorm = _vecPool.get().crossVectors(t, norm).normalize();
+
+      // Smooth phase continuity: prevent sudden 180-degree flipping between consecutive samples
+      if (i > 0) {
+        const prevBinorm = binormals[i - 1];
+        if (binorm.dot(prevBinorm) < 0) {
+          binorm.negate();
+          norm.crossVectors(binorm, t).normalize();
+        }
       }
 
-      // Gram-Schmidt orthogonalization against tangent[i+1]
-      r_next.sub(_scratchV1.copy(t_next).multiplyScalar(t_next.dot(r_next))).normalize();
-      normals.push(r_next);
-
-      const s_next = _vecPool.get().crossVectors(t_next, r_next).normalize();
-      binormals.push(s_next);
+      normals.push(norm);
+      binormals.push(binorm);
     }
 
     return { tangents, normals, binormals };
@@ -869,9 +857,9 @@ export class ConformalBeadGenerator {
     const vectorPoints = points.map((p) => p.position);
     const curve = new THREE.CatmullRomCurve3(vectorPoints, false, 'centripetal', 0.5);
 
-    const stepSize = Math.max(0.005, brushSize * 0.35);
+    const stepSize = Math.max(0.008, brushSize * 0.35);
     const length = curve.getLength();
-    const divisions = Math.max(4, Math.min(180, Math.ceil(length / stepSize)));
+    const divisions = Math.max(4, Math.min(64, Math.ceil(length / stepSize)));
 
     const rawPoints = curve.getPoints(divisions);
     const sampledPositions: THREE.Vector3[] = [];

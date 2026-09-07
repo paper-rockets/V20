@@ -79,35 +79,80 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
     });
   }, [savedModels, searchQuery]);
 
-  const handleSelectPreset = async (preset: PresetModelDefinition) => {
-    if (!engine) return;
-    setLoading(true);
-    setLoadingMessage(`Loading ${preset.name}…`);
-    setError(null);
+  const [pendingPrompt, setPendingPrompt] = useState<{
+    modelName: string;
+    onConfirm: (loadMode: 'add' | 'clear') => Promise<void>;
+  } | null>(null);
+
+  const [loadChoice, setLoadChoice] = useState<'ask' | 'add' | 'clear'>(() => {
     try {
-      await engine.loadPresetModel(preset.id, loadDisplayMode);
-      onClose();
-    } catch (err: any) {
-      setError(err?.message || `Failed to load ${preset.name}.`);
-    } finally {
-      setLoading(false);
+      return (localStorage.getItem('remix3d.modelLoadChoice') as any) || 'ask';
+    } catch {
+      return 'ask';
     }
+  });
+
+  const handleSetLoadChoice = (choice: 'ask' | 'add' | 'clear') => {
+    setLoadChoice(choice);
+    try {
+      localStorage.setItem('remix3d.modelLoadChoice', choice);
+    } catch {}
   };
 
-  const handleSelectSavedModel = async (model: Saved3DModel) => {
-    if (!engine) return;
-    setLoading(true);
-    setLoadingMessage(`Loading ${model.name}…`);
-    setError(null);
-    try {
-      await engine.loadGLTF(model.blob, model.name);
-      engine.setModelDisplayMode(loadDisplayMode);
-      onClose();
-    } catch (err: any) {
-      setError(err?.message || `Failed to load ${model.name}.`);
-    } finally {
-      setLoading(false);
+  const executeOrPrompt = (modelName: string, doLoad: (loadMode: 'add' | 'clear') => Promise<void>) => {
+    if (loadChoice === 'add') {
+      void doLoad('add');
+      return;
     }
+    if (loadChoice === 'clear') {
+      void doLoad('clear');
+      return;
+    }
+    // If the scene currently has drawings, ask the user so their work is never lost
+    if (engine && engine.hasActiveDrawings()) {
+      setPendingPrompt({
+        modelName,
+        onConfirm: doLoad,
+      });
+      return;
+    }
+    // If empty, proceed directly
+    void doLoad('clear');
+  };
+
+  const handleSelectPreset = (preset: PresetModelDefinition) => {
+    executeOrPrompt(preset.name, async (loadMode) => {
+      if (!engine) return;
+      setLoading(true);
+      setLoadingMessage(`Loading ${preset.name}…`);
+      setError(null);
+      try {
+        await engine.loadPresetModel(preset.id, loadDisplayMode, loadMode);
+        onClose();
+      } catch (err: any) {
+        setError(err?.message || `Failed to load ${preset.name}.`);
+      } finally {
+        setLoading(false);
+      }
+    });
+  };
+
+  const handleSelectSavedModel = (model: Saved3DModel) => {
+    executeOrPrompt(model.name, async (loadMode) => {
+      if (!engine) return;
+      setLoading(true);
+      setLoadingMessage(`Loading ${model.name}…`);
+      setError(null);
+      try {
+        await engine.loadGLTF(model.blob, model.name, undefined, loadMode);
+        engine.setModelDisplayMode(loadDisplayMode);
+        onClose();
+      } catch (err: any) {
+        setError(err?.message || `Failed to load ${model.name}.`);
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
   const handleDeleteSavedModel = async (id: string, e: React.MouseEvent) => {
@@ -122,63 +167,68 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
 
   const handleUrlLoad = async () => {
     if (!engine || !urlInput.trim()) return;
-    setLoading(true);
-    setLoadingMessage('Fetching & generating Auto Preview…');
-    setError(null);
-    try {
-      const url = urlInput.trim();
-      const modelName = url.split('/').pop()?.split('?')[0] || 'Remote Model';
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
+    const url = urlInput.trim();
+    const modelName = url.split('/').pop()?.split('?')[0] || 'Remote Model';
 
-      await engine.loadGLTF(arrayBuffer, modelName);
-      engine.setModelDisplayMode(loadDisplayMode);
-
-      let snapshot: string | null = null;
+    executeOrPrompt(modelName, async (loadMode) => {
+      setLoading(true);
+      setLoadingMessage('Fetching & generating Auto Preview…');
+      setError(null);
       try {
-        snapshot = engine.captureSnapshot();
-      } catch (e) {
-        console.warn('captureSnapshot failed:', e);
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+
+        await engine.loadGLTF(arrayBuffer, modelName, undefined, loadMode);
+        engine.setModelDisplayMode(loadDisplayMode);
+
+        let snapshot: string | null = null;
+        try {
+          snapshot = engine.captureSnapshot();
+        } catch (e) {
+          console.warn('captureSnapshot failed:', e);
+        }
+
+        await AutoPreviewGenerator.autoPreviewAndSaveBuffer(arrayBuffer, modelName, 'glb', snapshot);
+        await refreshSavedModels();
+
+        onClose();
+      } catch (err: any) {
+        setError(err?.message || 'Failed to download or parse remote 3D model.');
+      } finally {
+        setLoading(false);
       }
-
-      await AutoPreviewGenerator.autoPreviewAndSaveBuffer(arrayBuffer, modelName, 'glb', snapshot);
-      await refreshSavedModels();
-
-      onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to download or parse remote 3D model.');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
-  const handleFileUpload = async (file: File) => {
-    if (!engine) return;
-    setLoading(true);
-    setLoadingMessage('Generating Auto Preview & saving model…');
-    setError(null);
+  const handleFileUpload = (file: File) => {
+    executeOrPrompt(file.name, async (loadMode) => {
+      if (!engine) return;
+      setLoading(true);
+      setLoadingMessage('Generating Auto Preview & saving model…');
+      setError(null);
 
-    try {
-      await engine.loadUniversalFiles([file], file.name);
-      engine.setModelDisplayMode(loadDisplayMode);
-
-      let snapshot: string | null = null;
       try {
-        snapshot = engine.captureSnapshot();
-      } catch (e) {
-        console.warn('captureSnapshot failed:', e);
+        await engine.loadUniversalFiles([file], file.name, loadMode);
+        engine.setModelDisplayMode(loadDisplayMode);
+
+        let snapshot: string | null = null;
+        try {
+          snapshot = engine.captureSnapshot();
+        } catch (e) {
+          console.warn('captureSnapshot failed:', e);
+        }
+
+        await AutoPreviewGenerator.autoPreviewAndSaveFile(file, snapshot);
+        await refreshSavedModels();
+
+        onClose();
+      } catch (err: any) {
+        setError(err?.message || 'Failed to parse 3D model file.');
+      } finally {
+        setLoading(false);
       }
-
-      await AutoPreviewGenerator.autoPreviewAndSaveFile(file, snapshot);
-      await refreshSavedModels();
-
-      onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Failed to parse 3D model file.');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -249,7 +299,7 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
         </div>
 
         {/* Navigation Tabs: Curated Presets vs My Saved Models */}
-        <div className={`flex items-center justify-between pt-3 pb-1 border-b ${isLight ? 'border-black/5' : 'border-zinc-800/80'}`}>
+        <div className={`flex flex-wrap items-center justify-between gap-2 pt-3 pb-2 border-b ${isLight ? 'border-black/5' : 'border-zinc-800/80'}`}>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -285,41 +335,101 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
             </button>
           </div>
 
-          <div className={`flex items-center gap-1 p-0.5 rounded-xl border ${
-            isLight ? 'bg-neutral-100 border-black/10' : 'bg-zinc-950 border-zinc-800'
-          }`}>
-            <button
-              type="button"
-              onClick={() => setLoadDisplayMode('texture')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                loadDisplayMode === 'texture'
-                  ? isLight
-                    ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
-                    : 'bg-white text-zinc-950 font-bold shadow-sm'
-                  : isLight
-                  ? 'text-neutral-600 hover:text-neutral-900'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Palette className="w-3 h-3" />
-              <span>Original</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setLoadDisplayMode('clay')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                loadDisplayMode === 'clay'
-                  ? isLight
-                    ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
-                    : 'bg-white text-zinc-950 font-bold shadow-sm'
-                  : isLight
-                  ? 'text-neutral-600 hover:text-neutral-900'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Sparkles className="w-3 h-3" />
-              <span>White clay</span>
-            </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* On Load behavior switch */}
+            <div className={`flex items-center gap-0.5 p-0.5 rounded-xl border ${
+              isLight ? 'bg-neutral-100 border-black/10' : 'bg-zinc-950 border-zinc-800'
+            }`}>
+              <span className={`px-2 text-[11px] font-medium ${isLight ? 'text-neutral-500' : 'text-zinc-500'}`}>
+                On load:
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSetLoadChoice('ask')}
+                className={`px-2 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  loadChoice === 'ask'
+                    ? isLight
+                      ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
+                      : 'bg-white text-zinc-950 font-bold shadow-sm'
+                    : isLight
+                    ? 'text-neutral-600 hover:text-neutral-900'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="Ask whether to keep drawings or start fresh"
+              >
+                Ask
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetLoadChoice('add')}
+                className={`px-2 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  loadChoice === 'add'
+                    ? isLight
+                      ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
+                      : 'bg-white text-zinc-950 font-bold shadow-sm'
+                    : isLight
+                    ? 'text-neutral-600 hover:text-neutral-900'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="Always add to scene (keep drawings)"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetLoadChoice('clear')}
+                className={`px-2 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  loadChoice === 'clear'
+                    ? isLight
+                      ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
+                      : 'bg-white text-zinc-950 font-bold shadow-sm'
+                    : isLight
+                    ? 'text-neutral-600 hover:text-neutral-900'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="Always clear scene & start fresh"
+              >
+                Clear
+              </button>
+            </div>
+
+            {/* Display Mode (Original vs White clay) */}
+            <div className={`flex items-center gap-1 p-0.5 rounded-xl border ${
+              isLight ? 'bg-neutral-100 border-black/10' : 'bg-zinc-950 border-zinc-800'
+            }`}>
+              <button
+                type="button"
+                onClick={() => setLoadDisplayMode('texture')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  loadDisplayMode === 'texture'
+                    ? isLight
+                      ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
+                      : 'bg-white text-zinc-950 font-bold shadow-sm'
+                    : isLight
+                    ? 'text-neutral-600 hover:text-neutral-900'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Palette className="w-3 h-3" />
+                <span>Original</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoadDisplayMode('clay')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  loadDisplayMode === 'clay'
+                    ? isLight
+                      ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
+                      : 'bg-white text-zinc-950 font-bold shadow-sm'
+                    : isLight
+                    ? 'text-neutral-600 hover:text-neutral-900'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>White clay</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -581,6 +691,55 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Ask: Keep Drawing or Start Fresh confirmation prompt */}
+        {pendingPrompt && (
+          <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className={`w-full max-w-sm p-5 rounded-2xl shadow-2xl border animate-in fade-in zoom-in-95 duration-150 ${
+              isLight ? 'bg-white text-neutral-900 border-neutral-200' : 'bg-[#18191d] text-white border-white/10'
+            }`}>
+              <h3 className="text-base font-bold mb-1.5">Keep existing drawings?</h3>
+              <p className={`text-xs mb-4 leading-relaxed ${isLight ? 'text-neutral-600' : 'text-neutral-300'}`}>
+                You have an active drawing in your scene. Loading <strong>{pendingPrompt.modelName}</strong> can either keep your drawing and add the model alongside, or clear everything and start fresh.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const prompt = pendingPrompt;
+                    setPendingPrompt(null);
+                    await prompt.onConfirm('add');
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-neutral-900 dark:bg-white text-white dark:text-neutral-950 hover:opacity-90 shadow-sm transition-all cursor-pointer"
+                >
+                  Add to Scene (Keep Drawing)
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const prompt = pendingPrompt;
+                    setPendingPrompt(null);
+                    await prompt.onConfirm('clear');
+                  }}
+                  className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                    isLight
+                      ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300'
+                      : 'bg-white/10 hover:bg-white/15 text-white border-white/10'
+                  }`}
+                >
+                  Clear & Start Fresh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingPrompt(null)}
+                  className="w-full py-2 px-4 rounded-xl text-xs font-medium text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer mt-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

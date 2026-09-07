@@ -48,7 +48,7 @@ export const BLEND_MODES: Array<{
   id: LayerBlendMode;
   label: string;
   desc: string;
-  category: 'Normal' | 'Darken' | 'Lighten' | 'Contrast' | 'Special';
+  category: 'Normal';
   icon: React.FC<{ className?: string }>;
   colorClass: string;
 }> = [
@@ -59,46 +59,6 @@ export const BLEND_MODES: Array<{
     category: 'Normal',
     icon: Sliders,
     colorClass: 'text-neutral-300',
-  },
-  {
-    id: 'multiply',
-    label: 'Multiply',
-    desc: 'Dst × Src (Darkens & enriches ink/shadows)',
-    category: 'Darken',
-    icon: Moon,
-    colorClass: 'text-neutral-700 dark:text-zinc-300',
-  },
-  {
-    id: 'screen',
-    label: 'Screen',
-    desc: '1 - (1 - Dst) × (1 - Src) (Lightens & illuminates)',
-    category: 'Lighten',
-    icon: Sun,
-    colorClass: 'text-neutral-800 dark:text-zinc-300',
-  },
-  {
-    id: 'overlay',
-    label: 'Overlay',
-    desc: 'Dual-slope contrast blend for highlights & shadows',
-    category: 'Contrast',
-    icon: Sparkles,
-    colorClass: 'text-neutral-700 dark:text-zinc-300',
-  },
-  {
-    id: 'add',
-    label: 'Add (Linear Dodge)',
-    desc: 'min(1, Dst + Src) (High-energy glow & emission)',
-    category: 'Lighten',
-    icon: Zap,
-    colorClass: 'text-neutral-700 dark:text-zinc-300',
-  },
-  {
-    id: 'subtract',
-    label: 'Subtract',
-    desc: 'max(0, Dst - Src) (Deep shadows & negative cut)',
-    category: 'Special',
-    icon: Minus,
-    colorClass: 'text-neutral-700 dark:text-zinc-300',
   },
 ];
 
@@ -125,8 +85,6 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
   theme = 'dark',
 }) => {
   const isLight = theme === 'light';
-  const [openBlendMenuId, setOpenBlendMenuId] = useState<string | null>(null);
-  const [blendMenuPosition, setBlendMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [openTagMenuId, setOpenTagMenuId] = useState<string | null>(null);
   const [tagMenuPosition, setTagMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
@@ -306,13 +264,6 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
     );
   };
 
-  const handleSetBlendMode = (id: string, blendMode: LayerBlendMode) => {
-    setLayers((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, blendMode } : l))
-    );
-    setOpenBlendMenuId(null);
-  };
-
   const handleSetColorTag = (id: string, colorTag: string) => {
     setLayers((prev) =>
       prev.map((l) => (l.id === id ? { ...l, colorTag: colorTag === 'none' ? undefined : colorTag } : l))
@@ -394,16 +345,27 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
       className={
         inline
           ? `pr-surface w-full select-none space-y-2 font-sans ${isLight ? 'text-neutral-800' : 'text-neutral-200'}`
-          : `pr-surface fixed top-14 sm:top-16 right-2 sm:right-6 z-50 w-[calc(100vw-16px)] sm:w-96 max-w-[400px] select-none shadow-2xl rounded-2xl border p-4 space-y-3 font-sans animate-in fade-in slide-in-from-right-2 duration-150 ${
+          : `pr-surface fixed z-50 select-none shadow-2xl border font-sans animate-in fade-in duration-150 flex flex-col overflow-hidden
+             /* Mobile: bottom sheet anchored at bottom */
+             inset-x-2 bottom-2 max-h-[74dvh] rounded-2xl p-3.5 space-y-3 slide-in-from-bottom-3
+             /* Desktop: top-right floating */
+             sm:inset-x-auto sm:bottom-auto sm:top-16 sm:right-6 sm:w-96 sm:max-w-[400px] sm:max-h-[80vh] sm:rounded-2xl sm:p-4 sm:space-y-3 sm:slide-in-from-right-2 ${
               isLight
                 ? 'bg-white border-black/10 text-neutral-800 shadow-[0_20px_50px_rgba(0,0,0,0.12)]'
                 : 'bg-[#18191d] border-[#2c2e36] text-neutral-200 shadow-2xl shadow-black/50'
             }`
       }
     >
+      {/* Mobile grab handle */}
+      {!inline && (
+        <div className="flex justify-center pt-0.5 pb-0.5 sm:hidden shrink-0">
+          <div className={`w-9 h-1 rounded-full ${isLight ? 'bg-black/20' : 'bg-white/20'}`} />
+        </div>
+      )}
+
       {/* Header (floating only; ProPanel already provides its own header) */}
       {!inline && (
-        <div className={`flex items-center justify-between pb-2 border-b ${isLight ? 'border-black/10' : 'border-neutral-800'}`}>
+        <div className={`flex items-center justify-between pb-2 border-b shrink-0 ${isLight ? 'border-black/10' : 'border-neutral-800'}`}>
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-neutral-700 dark:text-zinc-300" />
             <span className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-neutral-900' : 'text-neutral-200'}`}>
@@ -549,55 +511,12 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
                   )}
                 </div>
 
-                {/* Top Action Icons */}
+                {/* Primary Quick Actions: Visibility & Lock (compact, leaves room for title) */}
                 <div className="flex items-center gap-1 shrink-0">
-                  {/* Indent / Outdent buttons */}
-                  {depth > 0 && (
-                    <button
-                      onClick={(e) => handleOutdent(item, e)}
-                      title="Outdent (Move out of group)"
-                      className={`p-1 rounded transition-colors ${isLight ? 'text-neutral-400 hover:text-neutral-800' : 'text-neutral-500 hover:text-neutral-300'}`}
-                    >
-                      <ArrowUp className="w-3 h-3 -rotate-45" />
-                    </button>
-                  )}
-                  {rawIdx > 0 && (
-                    <button
-                      onClick={(e) => handleIndent(item, e)}
-                      title="Indent (Move into preceding group)"
-                      className={`p-1 rounded transition-colors ${isLight ? 'text-neutral-400 hover:text-neutral-800' : 'text-neutral-500 hover:text-neutral-300'}`}
-                    >
-                      <ArrowDown className="w-3 h-3 -rotate-45" />
-                    </button>
-                  )}
-
-                  {/* Color Tag Selector */}
-                  <div className="relative">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (openTagMenuId === item.id) {
-                          setOpenTagMenuId(null);
-                        } else {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setTagMenuPosition({
-                            top: rect.bottom + 4,
-                            left: Math.max(8, Math.min(window.innerWidth - 180, rect.right - 160)),
-                          });
-                          setOpenTagMenuId(item.id);
-                        }
-                      }}
-                      className={`p-1 rounded transition-colors ${isLight ? 'hover:bg-neutral-200 text-neutral-500' : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'}`}
-                      title="Color Tag"
-                    >
-                      <Tag className="w-3 h-3" />
-                    </button>
-                  </div>
-
                   {/* Visibility Toggle */}
                   <button
                     onClick={(e) => handleToggleVisibility(item.id, e)}
-                    className={`p-1 rounded transition-colors ${
+                    className={`p-1.5 rounded-lg transition-colors ${
                       isLight ? 'hover:bg-neutral-200' : 'hover:bg-neutral-800'
                     } ${
                       item.visible && effVisible
@@ -616,7 +535,7 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
                   {/* Lock Toggle */}
                   <button
                     onClick={(e) => handleToggleLock(item.id, e)}
-                    className={`p-1 rounded transition-colors ${
+                    className={`p-1.5 rounded-lg transition-colors ${
                       isLight ? 'hover:bg-neutral-200' : 'hover:bg-neutral-800'
                     } ${
                       item.locked || effLocked ? 'text-neutral-700 dark:text-zinc-300' : isLight ? 'text-neutral-400' : 'text-neutral-400'
@@ -629,32 +548,83 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
                       <Unlock className="w-3.5 h-3.5" />
                     )}
                   </button>
-
-                  {/* Duplicate */}
-                  <button
-                    onClick={(e) => handleDuplicate(item, e)}
-                    className={`p-1 rounded transition-colors ${isLight ? 'hover:bg-neutral-200 text-neutral-500' : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'}`}
-                    title="Duplicate"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Delete */}
-                  {layers.length > 1 && (
-                    <button
-                      onClick={(e) => handleDelete(item.id, e)}
-                      className={`p-1 rounded transition-colors ${isLight ? 'hover:bg-neutral-200 text-neutral-500 hover:text-neutral-700 dark:text-zinc-300' : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:text-zinc-300'}`}
-                      title="Delete"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                 </div>
               </div>
 
-              {/* Controls: Opacity & Blend Mode (when selected) */}
+              {/* Secondary actions & Controls (when layer is selected) */}
               {isActive && (
                 <div className={`mt-2 pt-2 border-t space-y-2 animate-in fade-in duration-100 ${isLight ? 'border-black/10' : 'border-neutral-800/80'}`}>
+                  {/* Action Strip: Indent, Outdent, Tag, Duplicate, Delete */}
+                  <div className="flex items-center justify-between gap-1 pb-1">
+                    <div className="flex items-center gap-1">
+                      {depth > 0 && (
+                        <button
+                          onClick={(e) => handleOutdent(item, e)}
+                          title="Outdent (Move out of group)"
+                          className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
+                            isLight ? 'border-black/10 hover:bg-neutral-200 text-neutral-700' : 'border-white/10 hover:bg-neutral-800 text-neutral-300'
+                          }`}
+                        >
+                          <ArrowUp className="w-3 h-3 -rotate-45" />
+                        </button>
+                      )}
+                      {rawIdx > 0 && (
+                        <button
+                          onClick={(e) => handleIndent(item, e)}
+                          title="Indent (Move into preceding group)"
+                          className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
+                            isLight ? 'border-black/10 hover:bg-neutral-200 text-neutral-700' : 'border-white/10 hover:bg-neutral-800 text-neutral-300'
+                          }`}
+                        >
+                          <ArrowDown className="w-3 h-3 -rotate-45" />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (openTagMenuId === item.id) {
+                            setOpenTagMenuId(null);
+                          } else {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setTagMenuPosition({
+                              top: rect.bottom + 4,
+                              left: Math.max(8, Math.min(window.innerWidth - 180, rect.right - 160)),
+                            });
+                            setOpenTagMenuId(item.id);
+                          }
+                        }}
+                        className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
+                          isLight ? 'border-black/10 hover:bg-neutral-200 text-neutral-700' : 'border-white/10 hover:bg-neutral-800 text-neutral-300'
+                        }`}
+                        title="Color Tag"
+                      >
+                        <Tag className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => handleDuplicate(item, e)}
+                        className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
+                          isLight ? 'border-black/10 hover:bg-neutral-200 text-neutral-700' : 'border-white/10 hover:bg-neutral-800 text-neutral-300'
+                        }`}
+                        title="Duplicate"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                      {layers.length > 1 && (
+                        <button
+                          onClick={(e) => handleDelete(item.id, e)}
+                          className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
+                            isLight ? 'border-red-200 hover:bg-red-50 text-red-600' : 'border-red-900/40 hover:bg-red-950/40 text-red-400'
+                          }`}
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   {/* Opacity Slider */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-[10px] font-mono">
@@ -674,45 +644,15 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
                     />
                   </div>
 
-                  {/* Blend Mode & Add Child Shortcut */}
-                  <div className="flex items-center justify-between gap-1.5 pt-0.5">
-                    {/* Blend Mode Dropdown */}
-                    <div className="relative flex-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (openBlendMenuId === item.id) {
-                            setOpenBlendMenuId(null);
-                          } else {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const popoverHeight = 220;
-                            const top = rect.top - popoverHeight > 10 ? rect.top - popoverHeight : rect.bottom + 4;
-                            setBlendMenuPosition({
-                              top,
-                              left: Math.max(8, Math.min(window.innerWidth - 210, rect.left)),
-                            });
-                            setOpenBlendMenuId(item.id);
-                          }
-                        }}
-                        className={`w-full py-1 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-between transition-colors ${
-                          isLight
-                            ? 'bg-white border-black/10 text-neutral-800 hover:bg-neutral-100'
-                            : 'bg-neutral-800/90 border-neutral-700 text-neutral-200 hover:bg-neutral-750'
-                        }`}
-                      >
-                        <span className="capitalize">{item.blendMode || 'normal'}</span>
-                        <ChevronDown className="w-3 h-3 opacity-60" />
-                      </button>
-                    </div>
-
-                    {/* If group, button to add layer inside this group */}
-                    {isGroup && (
+                  {/* If group, button to add layer inside this group */}
+                  {isGroup && (
+                    <div className="pt-0.5">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleAddLayer(item.id);
                         }}
-                        className={`py-1 px-2 rounded-lg border text-[11px] font-semibold flex items-center gap-1 transition-colors ${
+                        className={`w-full py-1 px-2 rounded-lg border text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors ${
                           isLight
                             ? 'bg-neutral-100 dark:bg-white/10 border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-white hover:bg-neutral-200'
                             : 'bg-neutral-900 dark:bg-white/30 border-neutral-900 dark:border-white/40 text-neutral-800 dark:text-zinc-300 hover:bg-neutral-900 dark:bg-white/50'
@@ -720,10 +660,10 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
                         title="Add child layer inside this group"
                       >
                         <Plus className="w-3 h-3" />
-                        <span>Inside</span>
+                        <span>Add Layer Inside Group</span>
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -756,49 +696,6 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
                 style={{ backgroundColor: t.color === 'transparent' ? (isLight ? '#e5e5e5' : '#262626') : t.color }}
                 title={t.name}
               />
-            ))}
-          </div>
-        </>,
-        document.body
-      )}
-
-      {openBlendMenuId && blendMenuPosition && typeof document !== 'undefined' && createPortal(
-        <>
-          <div
-            className="fixed inset-0 z-[9998]"
-            onClick={() => setOpenBlendMenuId(null)}
-          />
-          <div
-            style={{ top: blendMenuPosition.top, left: blendMenuPosition.left }}
-            className={`fixed w-48 rounded-xl shadow-2xl p-1 z-[9999] space-y-0.5 border animate-in fade-in zoom-in-95 duration-100 ${
-              isLight
-                ? 'bg-white border-black/10 text-neutral-800 shadow-xl'
-                : 'bg-[#141519] border-neutral-700 text-neutral-200 shadow-2xl'
-            }`}
-          >
-            {BLEND_MODES.map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => {
-                  handleSetBlendMode(openBlendMenuId, b.id);
-                  setOpenBlendMenuId(null);
-                }}
-                className={`w-full px-2 py-1.5 rounded-lg text-left text-xs flex items-center justify-between transition-colors ${
-                  layers.find((l) => l.id === openBlendMenuId)?.blendMode === b.id
-                    ? isLight
-                      ? 'bg-neutral-100 text-neutral-900 font-bold'
-                      : 'bg-white/15 text-white font-bold'
-                    : isLight
-                    ? 'hover:bg-neutral-100 text-neutral-700'
-                    : 'hover:bg-white/10 text-neutral-300'
-                }`}
-              >
-                <span>{b.label}</span>
-                {layers.find((l) => l.id === openBlendMenuId)?.blendMode === b.id && (
-                  <Check className="w-3.5 h-3.5 text-neutral-900 dark:text-white" />
-                )}
-              </button>
             ))}
           </div>
         </>,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { StrokeProfile, MaterialType } from '../../types';
+import { resolveAssetUrl } from '../../utils/assetUrl';
 
 export interface BrushShapeGlyphProps {
   brushId?: string;
@@ -15,24 +16,26 @@ export interface BrushShapeGlyphProps {
   className?: string;
 }
 
+const bImg = (name: string) => resolveAssetUrl(`assets/brushes/${name}`);
+
 const BRUSH_IMAGES: Record<string, string> = {
-  clay: '/assets/brushes/clay.png',
-  build: '/assets/brushes/build.png',
-  move: '/assets/brushes/move.png',
-  inflate: '/assets/brushes/inflate.png',
-  pinch: '/assets/brushes/pinch.png',
-  crease: '/assets/brushes/crease.png',
-  flatten: '/assets/brushes/flatten.png',
-  smooth: '/assets/brushes/smooth.png',
+  clay: bImg('clay.png'),
+  build: bImg('build.png'),
+  move: bImg('move.png'),
+  inflate: bImg('inflate.png'),
+  pinch: bImg('pinch.png'),
+  crease: bImg('crease.png'),
+  flatten: bImg('flatten.png'),
+  smooth: bImg('smooth.png'),
   // Legacy / Surface fallbacks
-  streamline_ink: '/assets/brushes/clay.png',
-  spatial_pipe: '/assets/brushes/build.png',
-  chisel_marker: '/assets/brushes/pinch.png',
-  drafting_wire: '/assets/brushes/crease.png',
-  neon_cable: '/assets/brushes/inflate.png',
-  conformal_bead: '/assets/brushes/flatten.png',
-  stipple_texture: '/assets/brushes/smooth.png',
-  matte_clay: '/assets/brushes/flatten.png',
+  streamline_ink: bImg('clay.png'),
+  spatial_pipe: bImg('build.png'),
+  chisel_marker: bImg('pinch.png'),
+  drafting_wire: bImg('crease.png'),
+  neon_cable: bImg('inflate.png'),
+  conformal_bead: bImg('flatten.png'),
+  stipple_texture: bImg('smooth.png'),
+  matte_clay: bImg('flatten.png'),
 };
 
 /**
@@ -69,8 +72,15 @@ export const BrushShapeGlyph: React.FC<BrushShapeGlyphProps> = ({
           transform: `scale(${scale.toFixed(2)})`,
         }}
         onError={(e) => {
-          // Fallback if image not yet loaded
-          (e.target as HTMLElement).style.display = 'none';
+          const target = e.currentTarget;
+          target.style.display = 'none';
+          const parent = target.parentElement;
+          if (parent && !parent.querySelector('.glyph-fallback')) {
+            const fallback = document.createElement('div');
+            fallback.className = 'glyph-fallback w-full h-full rounded-full border border-current opacity-30 flex items-center justify-center text-[10px] font-bold';
+            fallback.innerText = brushId.slice(0, 2).toUpperCase();
+            parent.appendChild(fallback);
+          }
         }}
       />
     </div>

@@ -1,10 +1,13 @@
 import { BrushSettings, StrokeProfile, MaterialType } from '../types';
 import { DEFAULT_BRUSH_PRESETS, applyBrushPresetToSettings } from './brushPresets';
+import { resolveAssetUrl } from '../utils/assetUrl';
+
+const brushIcon = (filename: string) => resolveAssetUrl(`assets/brushes/${filename}`);
 
 export interface CuratedBrush {
   id: string;
   name: string;
-  category: 'Sculpt' | 'Surface' | 'Polish' | 'Favorites';
+  category: 'Core' | 'Textures' | 'Surface' | 'Favorites';
   description: string;
   profile: StrokeProfile;
   materialType: MaterialType;
@@ -17,184 +20,177 @@ export interface CuratedBrush {
   smoothingStrength?: number;
 }
 
-export const SCULPT_BRUSHES: CuratedBrush[] = [
+export const FEATHER_CORE_BRUSHES: CuratedBrush[] = [
   {
-    id: 'clay',
-    name: 'Soft Clay',
-    category: 'Sculpt',
-    description: 'Smooth sculptural clay stroke',
-    profile: 'ribbon',
-    materialType: 'shaded',
-    defaultSize: 0.04,
-    iconUrl: '/assets/brushes/clay.png',
-    roughness: 0.7,
-    domeFactor: 0.35,
-    smoothingStrength: 0.8,
-  },
-  {
-    id: 'build',
-    name: 'Add Volume',
-    category: 'Sculpt',
-    description: 'Layered volumetric clay buildup',
+    id: 'spatial_pipe',
+    name: '3D Tube',
+    category: 'Core',
+    description: 'Volumetric cylindrical 3D spline tube in free space',
     profile: 'tube',
     materialType: 'shaded',
-    defaultSize: 0.045,
-    iconUrl: '/assets/brushes/build.png',
-    roughness: 0.65,
+    defaultSize: 0.04,
+    iconUrl: brushIcon('build.png'),
+    roughness: 0.35,
     smoothingStrength: 0.75,
   },
   {
-    id: 'move',
-    name: 'Drag Surface',
-    category: 'Sculpt',
-    description: 'Dynamic sweeping combed stroke',
-    profile: 'ribbon',
-    materialType: 'shaded',
-    defaultSize: 0.05,
-    iconUrl: '/assets/brushes/move.png',
-    roughness: 0.5,
-    smoothingStrength: 0.9,
-  },
-  {
-    id: 'inflate',
-    name: 'Inflate',
-    category: 'Sculpt',
-    description: 'Expanding bulbous volume',
-    profile: 'tube',
-    materialType: 'shaded',
-    defaultSize: 0.06,
-    iconUrl: '/assets/brushes/inflate.png',
-    domeFactor: 0.5,
-    roughness: 0.6,
-  },
-  {
-    id: 'pinch',
-    name: 'Pinch',
-    category: 'Sculpt',
-    description: 'Sharp crest and ridge profile',
-    profile: 'marker',
-    materialType: 'shaded',
-    defaultSize: 0.035,
-    iconUrl: '/assets/brushes/pinch.png',
-    chiselAngle: 45,
-    roughness: 0.45,
-  },
-  {
-    id: 'crease',
-    name: 'Crease',
-    category: 'Sculpt',
-    description: 'Carved fine shadow groove',
-    profile: 'tube',
-    materialType: 'shadeless',
-    defaultSize: 0.015,
-    iconUrl: '/assets/brushes/crease.png',
-    roughness: 0.9,
-  },
-  {
-    id: 'flatten',
-    name: 'Flatten',
-    category: 'Sculpt',
-    description: 'Planar beveled flat surface',
-    profile: 'conformal',
-    materialType: 'shaded',
-    defaultSize: 0.045,
-    iconUrl: '/assets/brushes/flatten.png',
-    roughness: 0.4,
-  },
-  {
-    id: 'smooth',
-    name: 'Smooth',
-    category: 'Sculpt',
-    description: 'Polishing surface blend',
-    profile: 'conformal',
-    materialType: 'shaded',
-    defaultSize: 0.05,
-    iconUrl: '/assets/brushes/smooth.png',
-    roughness: 0.25,
-    smoothingStrength: 0.95,
-  },
-];
-
-export const SURFACE_BRUSHES: CuratedBrush[] = [
-  {
     id: 'streamline_ink',
-    name: 'Ribbon',
-    category: 'Surface',
-    description: 'Silky smooth flat band',
+    name: 'Flat Ribbon',
+    category: 'Core',
+    description: 'Silky smooth spatial ribbon band with Bishop rotation frames',
     profile: 'ribbon',
     materialType: 'shaded',
     defaultSize: 0.035,
-    iconUrl: '/assets/brushes/clay.png',
-  },
-  {
-    id: 'spatial_pipe',
-    name: 'Tube',
-    category: 'Surface',
-    description: 'Free-space 3D tube',
-    profile: 'tube',
-    materialType: 'shaded',
-    defaultSize: 0.04,
-    iconUrl: '/assets/brushes/build.png',
+    iconUrl: brushIcon('clay.png'),
+    roughness: 0.4,
+    domeFactor: 0.2,
+    smoothingStrength: 0.85,
   },
   {
     id: 'chisel_marker',
-    name: 'Marker',
-    category: 'Surface',
-    description: 'Calligraphic chisel marker',
+    name: 'Chisel Marker',
+    category: 'Core',
+    description: 'Calligraphic flat marker with sharp angular cross-section',
     profile: 'marker',
     materialType: 'shadeless',
     defaultSize: 0.045,
-    iconUrl: '/assets/brushes/pinch.png',
+    iconUrl: brushIcon('pinch.png'),
+    chiselAngle: 45,
+    roughness: 0.6,
+    smoothingStrength: 0.65,
   },
   {
     id: 'drafting_wire',
-    name: 'Wire',
-    category: 'Surface',
-    description: 'Architectural detail wire',
+    name: 'Precision Wire',
+    category: 'Core',
+    description: 'Ultra-thin architectural wire for fine details and ink work',
     profile: 'tube',
     materialType: 'shadeless',
     defaultSize: 0.012,
-    iconUrl: '/assets/brushes/crease.png',
+    iconUrl: brushIcon('crease.png'),
+    roughness: 0.2,
+    smoothingStrength: 0.9,
+  },
+  {
+    id: 'conformal_bead',
+    name: 'Surface Decal',
+    category: 'Surface',
+    description: 'Conformal surface-hugging decal conforming to 3D geometry',
+    profile: 'conformal',
+    materialType: 'shaded',
+    defaultSize: 0.04,
+    iconUrl: brushIcon('flatten.png'),
+    roughness: 0.4,
+    smoothingStrength: 0.8,
   },
   {
     id: 'neon_cable',
-    name: 'Neon',
-    category: 'Surface',
-    description: 'Self-luminous light beam',
+    name: 'Neon Glow',
+    category: 'Core',
+    description: 'Self-luminous emissive neon light beam with bloom',
     profile: 'tube',
     materialType: 'glow',
-    defaultSize: 0.035,
-    iconUrl: '/assets/brushes/inflate.png',
+    defaultSize: 0.03,
+    iconUrl: brushIcon('inflate.png'),
+    roughness: 0.1,
+    smoothingStrength: 0.8,
+  },
+  {
+    id: 'mask_cutout',
+    name: 'Cutout Mask',
+    category: 'Core',
+    description: 'Negative-space masking curve for clean stencil cutouts',
+    profile: 'ribbon',
+    materialType: 'cutout',
+    defaultSize: 0.04,
+    iconUrl: brushIcon('smooth.png'),
+    roughness: 0.5,
+    smoothingStrength: 0.85,
+  },
+];
+
+export const FEATHER_TEXTURE_BRUSHES: CuratedBrush[] = [
+  {
+    id: 'halftone_dot',
+    name: 'Halftone Dot',
+    category: 'Textures',
+    description: 'Procedural manga screentone dot matrix pattern',
+    profile: 'ribbon',
+    materialType: 'shaded',
+    patternType: 'dot',
+    defaultSize: 0.055,
+    iconUrl: brushIcon('smooth.png'),
   },
   {
     id: 'stipple_texture',
-    name: 'Stipple',
-    category: 'Surface',
-    description: 'Sparkling particle spray',
+    name: 'Stipple Spray',
+    category: 'Textures',
+    description: 'Fine procedural stippling and particle spray pattern',
     profile: 'ribbon',
     materialType: 'shaded',
     patternType: 'stipple',
     defaultSize: 0.055,
-    iconUrl: '/assets/brushes/smooth.png',
+    iconUrl: brushIcon('smooth.png'),
+  },
+  {
+    id: 'line_hatch',
+    name: 'Line Hatch',
+    category: 'Textures',
+    description: 'Directional parallel line hatching for comic shadows',
+    profile: 'ribbon',
+    materialType: 'shaded',
+    patternType: 'line',
+    defaultSize: 0.05,
+    iconUrl: brushIcon('clay.png'),
+  },
+  {
+    id: 'crosshatch',
+    name: 'Crosshatch',
+    category: 'Textures',
+    description: 'Dense architectural and comic crosshatching screentone',
+    profile: 'ribbon',
+    materialType: 'shaded',
+    patternType: 'cross',
+    defaultSize: 0.05,
+    iconUrl: brushIcon('pinch.png'),
+  },
+  {
+    id: 'terrazzo_fleck',
+    name: 'Terrazzo Fleck',
+    category: 'Textures',
+    description: 'Stylized multi-tone terrazzo stone flecks',
+    profile: 'ribbon',
+    materialType: 'shaded',
+    patternType: 'terrazzo',
+    defaultSize: 0.06,
+    iconUrl: brushIcon('build.png'),
   },
 ];
 
-export const CURATED_BRUSHES: CuratedBrush[] = SCULPT_BRUSHES;
+export const ALL_FEATHER_BRUSHES: CuratedBrush[] = [
+  ...FEATHER_CORE_BRUSHES,
+  ...FEATHER_TEXTURE_BRUSHES,
+];
 
-export type BrushCategoryTab = 'Favorites' | 'Sculpt' | 'Surface' | 'Polish';
+// Compatibility export
+export const SCULPT_BRUSHES: CuratedBrush[] = FEATHER_CORE_BRUSHES;
+export const SURFACE_BRUSHES: CuratedBrush[] = ALL_FEATHER_BRUSHES;
+export const CURATED_BRUSHES: CuratedBrush[] = ALL_FEATHER_BRUSHES;
+
+export type BrushCategoryTab = 'Favorites' | 'Core' | 'Textures' | 'Surface';
 
 export function getBrushesForTab(tab: BrushCategoryTab): CuratedBrush[] {
   switch (tab) {
     case 'Favorites':
-      return [SCULPT_BRUSHES[0], SCULPT_BRUSHES[1], SCULPT_BRUSHES[5], SCULPT_BRUSHES[7]];
-    case 'Sculpt':
-      return SCULPT_BRUSHES;
+      return [FEATHER_CORE_BRUSHES[0], FEATHER_CORE_BRUSHES[1], FEATHER_CORE_BRUSHES[2], FEATHER_TEXTURE_BRUSHES[0]];
+    case 'Core':
+      return FEATHER_CORE_BRUSHES;
+    case 'Textures':
+      return FEATHER_TEXTURE_BRUSHES;
     case 'Surface':
-      return SURFACE_BRUSHES;
-    case 'Polish':
-      return [SCULPT_BRUSHES[7], SCULPT_BRUSHES[6], SCULPT_BRUSHES[0]];
+      return ALL_FEATHER_BRUSHES;
     default:
-      return SCULPT_BRUSHES;
+      return FEATHER_CORE_BRUSHES;
   }
 }
 
@@ -203,35 +199,50 @@ export function getBrushesForTab(tab: BrushCategoryTab): CuratedBrush[] {
  */
 export function getActiveCuratedBrush(settings: BrushSettings): CuratedBrush {
   if (settings.brushPresetId) {
-    const all = [...SCULPT_BRUSHES, ...SURFACE_BRUSHES];
-    const found = all.find((b) => b.id === settings.brushPresetId);
+    const found = ALL_FEATHER_BRUSHES.find((b) => b.id === settings.brushPresetId);
     if (found) return found;
   }
 
   // Deduce from settings
   if (settings.materialType === 'glow') {
-    return SURFACE_BRUSHES.find((b) => b.id === 'neon_cable') || SCULPT_BRUSHES[0];
+    return FEATHER_CORE_BRUSHES.find((b) => b.id === 'neon_cable') || FEATHER_CORE_BRUSHES[0];
+  }
+  if (settings.materialType === 'cutout') {
+    return FEATHER_CORE_BRUSHES.find((b) => b.id === 'mask_cutout') || FEATHER_CORE_BRUSHES[0];
+  }
+  if (settings.patternType === 'dot') {
+    return FEATHER_TEXTURE_BRUSHES.find((b) => b.id === 'halftone_dot') || FEATHER_TEXTURE_BRUSHES[0];
   }
   if (settings.patternType === 'stipple') {
-    return SURFACE_BRUSHES.find((b) => b.id === 'stipple_texture') || SCULPT_BRUSHES[7];
+    return FEATHER_TEXTURE_BRUSHES.find((b) => b.id === 'stipple_texture') || FEATHER_TEXTURE_BRUSHES[0];
   }
+  if (settings.patternType === 'line') {
+    return FEATHER_TEXTURE_BRUSHES.find((b) => b.id === 'line_hatch') || FEATHER_TEXTURE_BRUSHES[0];
+  }
+  if (settings.patternType === 'cross') {
+    return FEATHER_TEXTURE_BRUSHES.find((b) => b.id === 'crosshatch') || FEATHER_TEXTURE_BRUSHES[0];
+  }
+  if (settings.patternType === 'terrazzo') {
+    return FEATHER_TEXTURE_BRUSHES.find((b) => b.id === 'terrazzo_fleck') || FEATHER_TEXTURE_BRUSHES[0];
+  }
+
   if (settings.profile === 'marker') {
-    return SCULPT_BRUSHES.find((b) => b.id === 'pinch')!;
+    return FEATHER_CORE_BRUSHES.find((b) => b.id === 'chisel_marker')!;
   }
   if (settings.profile === 'conformal') {
-    return SCULPT_BRUSHES.find((b) => b.id === 'flatten')!;
+    return FEATHER_CORE_BRUSHES.find((b) => b.id === 'conformal_bead')!;
   }
   if (settings.profile === 'tube') {
     if ((settings.size ?? 0.035) <= 0.018) {
-      return SCULPT_BRUSHES.find((b) => b.id === 'crease')!;
+      return FEATHER_CORE_BRUSHES.find((b) => b.id === 'drafting_wire')!;
     }
-    return SCULPT_BRUSHES.find((b) => b.id === 'build')!;
+    return FEATHER_CORE_BRUSHES.find((b) => b.id === 'spatial_pipe')!;
   }
   if (settings.profile === 'ribbon') {
-    return SCULPT_BRUSHES.find((b) => b.id === 'clay')!;
+    return FEATHER_CORE_BRUSHES.find((b) => b.id === 'streamline_ink')!;
   }
 
-  return SCULPT_BRUSHES[0];
+  return FEATHER_CORE_BRUSHES[0];
 }
 
 /**

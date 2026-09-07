@@ -201,7 +201,6 @@ export const Viewport: React.FC<ViewportProps> = ({
   const lastToastFovRef = useRef<number>(-1);
 
   const showGestureToast = (title: string, subtitle?: string) => {
-    if (uiMode === 'play') return;
     if (gestureToastTimerRef.current) {
       clearTimeout(gestureToastTimerRef.current);
     }
@@ -1254,78 +1253,74 @@ export const Viewport: React.FC<ViewportProps> = ({
         </div>
       )}
 
-      {/* Invisible Hover-Wakeup Zone near bottom-right corner (Pro Mode Only) */}
-      {uiMode === 'pro' && (
-        <div
-          onPointerEnter={() => showNavPod(3500)}
-          className="absolute bottom-0 right-0 w-28 h-72 z-10 pointer-events-auto"
-          aria-hidden="true"
-        />
-      )}
+      {/* Invisible Hover-Wakeup Zone near bottom-right corner */}
+      <div
+        onPointerEnter={() => showNavPod(3500)}
+        className="absolute bottom-0 right-0 w-28 h-72 z-10 pointer-events-auto"
+        aria-hidden="true"
+      />
 
-      {/* Floating Viewport Navigation Control Pod with Smooth Auto-Hide (Pro Mode Only) */}
-      {uiMode === 'pro' && (
-        <div
-          id="viewport-camera-control-pod"
-          onPointerEnter={() => {
-            if (navPodTimerRef.current) clearTimeout(navPodTimerRef.current);
-            setIsNavPodVisible(true);
+      {/* Floating Viewport Navigation Control Pod with Smooth Auto-Hide */}
+      <div
+        id="viewport-camera-control-pod"
+        onPointerEnter={() => {
+          if (navPodTimerRef.current) clearTimeout(navPodTimerRef.current);
+          setIsNavPodVisible(true);
+        }}
+        onPointerLeave={() => {
+          showNavPod(1500);
+        }}
+        className={`absolute bottom-6 right-6 z-20 flex flex-col items-center gap-1.5 bg-neutral-900/90 border border-neutral-800 p-1.5 rounded-2xl shadow-xl transition-all duration-300 ease-out ${
+          isNavPodVisible
+            ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
+            : 'opacity-0 translate-y-3 scale-95 pointer-events-none'
+        }`}
+      >
+        <button
+          onClick={() => {
+            handleZoomIn();
+            showNavPod(3000);
           }}
-          onPointerLeave={() => {
-            showNavPod(1500);
-          }}
-          className={`absolute bottom-6 right-6 z-20 flex flex-col items-center gap-1.5 bg-neutral-900/90 border border-neutral-800 p-1.5 rounded-2xl shadow-xl transition-all duration-300 ease-out ${
-            isNavPodVisible
-              ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
-              : 'opacity-0 translate-y-3 scale-95 pointer-events-none'
-          }`}
+          className="shrink-0 min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center rounded-xl hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors"
+          title="Zoom In"
         >
-          <button
-            onClick={() => {
-              handleZoomIn();
-              showNavPod(3000);
-            }}
-            className="p-2 rounded-xl hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors"
-            title="Zoom In"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              handleZoomOut();
-              showNavPod(3000);
-            }}
-            className="p-2 rounded-xl hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors"
-            title="Zoom Out"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              handleResetView();
-              showNavPod(3000);
-            }}
-            className="p-2 rounded-xl hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors"
-            title="Reset Camera View"
-          >
-            <Compass className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setIsPanMode(!isPanMode);
-              showNavPod(3000);
-            }}
-            className={`p-2 rounded-xl border transition-all ${
-              isPanMode
-                ? 'bg-neutral-900 dark:bg-white border-neutral-900 dark:border-white text-white dark:text-zinc-950'
-                : 'border-transparent text-neutral-400 hover:bg-neutral-800 hover:text-white'
-            }`}
-            title="Pan Mode Toggle"
-          >
-            <Move className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => {
+            handleZoomOut();
+            showNavPod(3000);
+          }}
+          className="shrink-0 min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center rounded-xl hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors"
+          title="Zoom Out"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => {
+            handleResetView();
+            showNavPod(3000);
+          }}
+          className="shrink-0 min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center rounded-xl hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors"
+          title="Reset Camera View"
+        >
+          <Compass className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => {
+            setIsPanMode(!isPanMode);
+            showNavPod(3000);
+          }}
+          className={`shrink-0 min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center rounded-xl border transition-all ${
+            isPanMode
+              ? 'bg-neutral-900 dark:bg-white border-neutral-900 dark:border-white text-white dark:text-zinc-950'
+              : 'border-transparent text-neutral-400 hover:bg-neutral-800 hover:text-white'
+          }`}
+          title="Pan Mode Toggle"
+        >
+          <Move className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* S-Pen Hardware Radial Context Menu (At Stylus Tip) */}
       <StylusRadialMenu

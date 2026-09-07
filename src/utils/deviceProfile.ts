@@ -90,9 +90,9 @@ export interface QualityProfile {
 
 /** Entry-level / bandwidth-limited mobile GPUs that need the low-power path. */
 const LOW_POWER_GPU_PATTERNS: RegExp[] = [
-  /mali-?g7[12]/i, // Mali-G71, Mali-G72 (Tab S6 Lite, Exynos 9611)
-  /mali-?g5[27]/i, // Mali-G52, Mali-G57
-  /mali-?g3[16]/i, // Mali-G31, Mali-G36
+  /mali-?g7[12]\b/i, // Mali-G71, Mali-G72 (Tab S6 Lite, Exynos 9611)
+  /mali-?g5[27]\b/i, // Mali-G52, Mali-G57
+  /mali-?g3[16]\b/i, // Mali-G31, Mali-G36
   /mali-?t\d/i, // Legacy Midgard
   /adreno.*\b6(0[589]|1[02358]|2[0])\b/i, // Adreno 605/608/609/610/612/613/615/618/620
   /adreno.*\b5(0[3-9]|1[0-9])\b/i, // Adreno 50x/51x
@@ -101,8 +101,19 @@ const LOW_POWER_GPU_PATTERNS: RegExp[] = [
   /swiftshader|llvmpipe|software|basic render/i, // Software rasterizers
 ];
 
-/** Specifically S6 Lite silicon (Exynos 9611 / Snapdragon 720G variants). */
-const S6_LITE_GPU_PATTERNS: RegExp[] = [/mali-?g72/i, /adreno.*\b618\b/i];
+/** Flagship modern mobile GPUs (e.g. Snapdragon 8 series, Dimensity 9000, Apple A/M series). */
+const FLAGSHIP_GPU_PATTERNS: RegExp[] = [
+  /adreno.*\b(7\d\d|8\d\d)\b/i, // Adreno 730/740/750/830 (S22/S23/S24/S25 Ultra, Snapdragon 8 Gen 1-3 / Elite)
+  /apple\s*(gpu|m\d|a1[4-9])/i, // Apple Silicon A14-A18, M1-M4
+  /mali-?g7[1-9]\d|immortalis/i, // Mali-G710, G715, G720, Immortalis-G715/G720/G925
+  /nvidia|geforce|rtx|gtx|radeon|intel.*(arc|iris|xe)/i, // Desktop / high-performance laptop GPUs
+];
+
+/** Specifically Galaxy Tab S6 Lite models & silicon (Exynos 9611 / Snapdragon 720G). */
+const S6_LITE_PATTERNS: RegExp[] = [
+  /SM-P61[0-9]/i, // SM-P610, SM-P613, SM-P615, SM-P619 (Galaxy Tab S6 Lite)
+  /mali-?g72/i,
+];
 
 let cachedProfile: QualityProfile | null = null;
 let cachedRendererString: string | null = null;
@@ -216,44 +227,57 @@ function gatherSignals(): DetectionSignals {
 function classify(signals: DetectionSignals): { tier: PerformanceTier; isS6Lite: boolean; reason: string } {
   const { renderer, cores, memoryGB, isTouch, isMobileUA, ua, screenPixels } = signals;
 
-  const isTablet =
-    /Tablet|iPad|PlayBook|Silk|SM-P\d|SM-T\d|GT-P\d|GT-N\d|Lenovo|Tab/i.test(ua) ||
-    (isMobileUA && !/Mobile/i.test(ua));
-
-  const isS6LiteGPU = S6_LITE_GPU_PATTERNS.some((re) => re.test(renderer)) || /SM-P\d|SM-T\d/i.test(ua);
-  if (isS6LiteGPU || isTablet) {
-    return { tier: 'low', isS6Lite: true, reason: `Tablet or entry-tier mobile device detected (${renderer || ua.slice(0, 30)})` };
+  // 1. Check specifically for Galaxy Tab S6 Lite (SM-P610/P613/P615/P619 or Mali-G72)
+  const isS6Lite = S6_LITE_PATTERNS.some((re) => re.test(ua) || re.test(renderer));
+  if (isS6Lite) {
+    return {
+      tier: 'low',
+      isS6Lite: true,
+      reason: `Galaxy Tab S6 Lite detected (${renderer || ua.slice(0, 30)})`,
+    };
   }
 
+  // 2. Check for known Flagship mobile/desktop GPUs (e.g. S25 Ultra Adreno 830, S24 Adreno 750, Apple Silicon)
+  const isFlagshipGPU = FLAGSHIP_GPU_PATTERNS.some((re) => re.test(renderer));
+  const isFlagshipModel = /SM-S9[0-9]{2}/i.test(ua); // Samsung Galaxy S22/S23/S24/S25 series flagships
+  if (isFlagshipGPU || isFlagshipModel) {
+    return {
+      tier: 'high',
+      isS6Lite: false,
+      reason: `Flagship hardware detected (${renderer || 'Galaxy S-Series Flagship'})`,
+    };
+  }
+
+  // 3. Known budget / constrained mobile GPUs
   if (LOW_POWER_GPU_PATTERNS.some((re) => re.test(renderer))) {
     return { tier: 'low', isS6Lite: false, reason: `Low-power GPU detected (${renderer})` };
   }
 
-  // Explicit memory signal is the most reliable non-GPU indicator.
+  // 4. Explicit memory signal: devices with <= 4GB RAM on mobile are entry tier
   if (memoryGB > 0 && memoryGB <= 4 && (isMobileUA || isTouch)) {
     return { tier: 'low', isS6Lite: false, reason: `Constrained device memory (${memoryGB} GB)` };
   }
 
+  // 5. Very low core count mobile CPUs (<= 4 cores)
   if (isMobileUA && cores <= 4) {
     return { tier: 'low', isS6Lite: false, reason: `Mobile CPU with ${cores} cores` };
   }
 
-  // High-resolution touch panel driven by a modest core count is the classic
-  // fill-rate trap even when the GPU string is unavailable (privacy modes).
-  if ((isMobileUA || isTouch) && !renderer && screenPixels > 3_000_000 && cores <= 6) {
-    return { tier: 'low', isS6Lite: false, reason: 'High-resolution touch panel with unknown GPU' };
+  // 6. High-end devices with >= 6GB RAM or >= 8 cores on modern mobile
+  if ((memoryGB >= 6 || cores >= 8) && (isMobileUA || isTouch)) {
+    return {
+      tier: 'high',
+      isS6Lite: false,
+      reason: `High-end mobile device (${cores} cores, ${memoryGB ? memoryGB + 'GB RAM' : 'Fast SoC'})`,
+    };
   }
 
-  // Mobile touch devices with 8 or fewer cores default to low-power tier for responsive drawing
-  if (isMobileUA || isTouch) {
-    return { tier: 'low', isS6Lite: false, reason: `Mobile / touch device (${cores} cores)` };
-  }
-
+  // 7. Modest desktop or tablet hardware
   if (cores <= 4 || (memoryGB > 0 && memoryGB <= 4)) {
-    return { tier: 'medium', isS6Lite: false, reason: `Modest desktop hardware (${cores} cores)` };
+    return { tier: 'medium', isS6Lite: false, reason: `Modest hardware (${cores} cores)` };
   }
 
-  return { tier: 'high', isS6Lite: false, reason: `Desktop-class hardware (${cores} cores)` };
+  return { tier: 'high', isS6Lite: false, reason: `Standard high-performance hardware (${cores} cores)` };
 }
 
 /**
@@ -272,11 +296,12 @@ function buildProfile(tier: PerformanceTier, isS6Lite: boolean, reason: string, 
       isS6LiteClass: isS6Lite,
       reason,
 
-      // Never render above 1.0 DPR on a 1200x2000 panel: at native 2.0 the GPU
-      // fills 4x the fragments for a difference the 224 ppi screen barely shows.
-      maxPixelRatio: 1.0,
+      // Enable MSAA antialiasing even on low-tier: WebGL default framebuffer hardware MSAA
+      // operates in tile cache on Mali/Adreno and eliminates jagged pixelated edges at zero cost.
+      // Clamp DPR to 1.25 on S6 Lite so text and lines are crisp without fill-rate saturation.
+      maxPixelRatio: isS6Lite ? Math.min(dpr, 1.25) : Math.min(dpr, 1.33),
       renderScale: 1.0,
-      antialias: false,
+      antialias: true,
       precision: 'mediump',
       powerPreference: 'high-performance',
 
@@ -303,8 +328,8 @@ function buildProfile(tier: PerformanceTier, isS6Lite: boolean, reason: string, 
       seamBridging: false,
 
       targetFps: 60,
-      idleFps: 20,
-      idleAfterMs: 900,
+      idleFps: 24,
+      idleAfterMs: 3500,
     };
   }
 

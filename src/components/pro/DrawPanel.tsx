@@ -59,7 +59,7 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
   theme = 'dark',
 }) => {
   const isLight = theme === 'light';
-  const [activeTab, setActiveTab] = useState<BrushCategoryTab>('Sculpt');
+  const [activeTab, setActiveTab] = useState<BrushCategoryTab>('Core');
   const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean>(false);
   const activeBrush = getActiveCuratedBrush(brushSettings);
   const displayedBrushes = getBrushesForTab(activeTab);
@@ -337,7 +337,7 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
         <div className="flex items-center justify-between border-b pb-1.5 border-black/10 dark:border-white/10">
           <div className="text-xs font-bold tracking-tight text-current">Brushes</div>
           <div className="flex items-center gap-2 text-[10.5px] font-semibold">
-            {(['Favorites', 'Sculpt', 'Surface', 'Polish'] as BrushCategoryTab[]).map((tab) => {
+            {(['Favorites', 'Core', 'Textures', 'Surface'] as BrushCategoryTab[]).map((tab) => {
               const isTabActive = activeTab === tab;
               return (
                 <button

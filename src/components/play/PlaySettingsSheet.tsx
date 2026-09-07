@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Sun,
   Moon,
-  Wrench,
   Gauge,
   Compass,
   Hand,
@@ -60,7 +59,6 @@ export interface PlaySettingsSheetProps {
   modelDisplayMode: 'texture' | 'clay';
   onSetModelDisplayMode: (mode: 'texture' | 'clay') => void;
   onOpenIllumination?: () => void;
-  onOpenSkyEnvironment?: () => void;
   onOpenRenderSettings?: () => void;
   // Share & Export
   onOpenSessions?: () => void;
@@ -164,7 +162,6 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
   modelDisplayMode,
   onSetModelDisplayMode,
   onOpenIllumination,
-  onOpenSkyEnvironment,
   onOpenRenderSettings,
   onOpenSessions,
   onOpenExport,
@@ -450,15 +447,6 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
             </Row>
           )}
 
-          {onOpenSkyEnvironment && (
-            <Row icon={Sun} label="Skybox" hint="Atmosphere and background environment lighting" isLight={isLight}>
-              <button type="button" onClick={onOpenSkyEnvironment} className={actionBtn}>
-                <Sun className="w-4 h-4" />
-                <span>Configure Skybox</span>
-              </button>
-            </Row>
-          )}
-
           {onOpenRenderSettings && (
             <Row icon={Sparkles} label="Picture Quality" hint="Visual fidelity, glow, and viewport rendering" isLight={isLight}>
               <button type="button" onClick={onOpenRenderSettings} className={actionBtn}>
@@ -591,25 +579,6 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
               <Toggle on={showStats} onChange={onToggleStats} label="Performance Diagnostics" isLight={isLight} />
             </Row>
           )}
-
-          {/* 6. INTERFACE MODE */}
-          <SectionHeader title="Interface Mode" isLight={isLight} />
-          <Row
-            icon={Wrench}
-            label="Pro Mode Interface"
-            hint="Switch to five-mode professional 3D studio workbench"
-            isLight={isLight}
-          >
-            <Toggle
-              on={uiMode === 'pro'}
-              onChange={(v) => {
-                haptics.trigger('mode-switch');
-                setUiMode(v ? 'pro' : 'play');
-              }}
-              label="Pro Mode Interface"
-              isLight={isLight}
-            />
-          </Row>
         </>
       )}
 

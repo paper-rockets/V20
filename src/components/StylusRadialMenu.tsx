@@ -362,27 +362,10 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
           >
             <div className="flex items-center justify-between text-[11px] font-semibold text-neutral-400">
               <span>Stroke Radius</span>
-              <button
-                onClick={() => {
-                  if (onOpenNumpad) {
-                    onOpenNumpad({
-                      id: 'brush_size_radial',
-                      title: 'Brush Size (Radius)',
-                      value: brushSettings.size,
-                      min: 0.002,
-                      max: 0.5,
-                      step: 0.005,
-                      unit: 'm',
-                      onConfirm: (val) => onUpdateBrushSettings({ size: val }),
-                    });
-                    onClose();
-                  }
-                }}
-                className="flex items-center gap-0.5 font-mono text-neutral-900 dark:text-zinc-300 hover:underline underline"
-              >
+              <span className="flex items-center gap-0.5 font-mono text-neutral-900 dark:text-zinc-300">
                 <Hash className="w-2.5 h-2.5" />
                 <span>{(brushSettings.size * 1000).toFixed(1)}mm</span>
-              </button>
+              </span>
             </div>
             <input
               type="range"

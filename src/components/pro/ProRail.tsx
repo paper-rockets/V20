@@ -57,7 +57,7 @@ export const ProRail: React.FC<ProRailProps> = ({
   const rootRef = useRef<HTMLElement>(null);
 
   const [panel, setPanel] = useState<'color' | 'size' | 'brush' | null>(null);
-  const [activeTab, setActiveTab] = useState<BrushCategoryTab>('Sculpt');
+  const [activeTab, setActiveTab] = useState<BrushCategoryTab>('Core');
 
   useDismissibleSurface({
     isOpen: panel !== null,
@@ -286,7 +286,7 @@ export const ProRail: React.FC<ProRailProps> = ({
                     Brushes
                   </h3>
                   <div className={`flex items-center gap-3.5 text-xs font-medium border-b pb-1.5 ${isLight ? 'border-black/10' : 'border-white/[0.08]'}`}>
-                    {(['Favorites', 'Sculpt', 'Surface', 'Polish'] as BrushCategoryTab[]).map((tab) => {
+                    {(['Favorites', 'Core', 'Textures', 'Surface'] as BrushCategoryTab[]).map((tab) => {
                       const isTabActive = activeTab === tab;
                       return (
                         <button

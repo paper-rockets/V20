@@ -181,22 +181,54 @@
   font-weight: 600;
 }
 
+.nv-drag-handle {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--nv-panel);
+  border: 1px solid var(--nv-edge);
+  box-shadow: 0 2px 8px rgba(51, 46, 40, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  pointer-events: auto;
+  z-index: 10;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.nv-drag-handle:active {
+  cursor: grabbing;
+  background: var(--nv-btn-on);
+  transform: translateX(-50%) scale(0.96);
+}
+
+.nv-drag-grip {
+  width: 22px;
+  height: 3.5px;
+  border-radius: 2px;
+  background: var(--nv-ink-35);
+}
+
 .nv-tab {
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 14px;
+  top: -6px;
+  right: -6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
   padding: 0;
   cursor: pointer;
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1;
   color: var(--nv-ink-60);
   background: var(--nv-panel);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
   border: 1px solid var(--nv-edge);
   box-shadow: 0 4px 14px rgba(51, 46, 40, 0.14);
   transition: opacity 0.18s ease, color 0.18s ease;
@@ -204,10 +236,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
+  z-index: 10;
 }
 
 .nv-tab:hover {
   color: var(--nv-ink);
+}
+
+.nv-tab:active {
+  transform: scale(0.94);
 }
 
 .nv-tab[aria-expanded="true"] {

@@ -4,6 +4,7 @@ import {
   X,
   Save,
   FolderArchive,
+  FolderDown,
   Download,
   Upload,
   Trash2,
@@ -22,6 +23,7 @@ interface ProjectSessionModalProps {
   onClose: () => void;
   onSaveSession: (name: string) => Promise<void>;
   onLoadSession: (session: SavedProjectSession) => Promise<void>;
+  onSaveToFolder?: (name?: string) => Promise<void>;
   onExportFile: () => void;
   onImportFile: (file: File) => void;
   theme?: 'light' | 'dark';
@@ -33,6 +35,7 @@ export const ProjectSessionModal: React.FC<ProjectSessionModalProps> = ({
   onClose,
   onSaveSession,
   onLoadSession,
+  onSaveToFolder,
   onExportFile,
   onImportFile,
   theme = 'dark',
@@ -42,6 +45,7 @@ export const ProjectSessionModal: React.FC<ProjectSessionModalProps> = ({
   const [sessions, setSessions] = useState<SavedProjectSession[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
+  const [savingToFolder, setSavingToFolder] = useState<boolean>(false);
   const [sessionName, setSessionName] = useState<string>('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,6 +86,25 @@ export const ProjectSessionModal: React.FC<ProjectSessionModalProps> = ({
       setFeedback('Failed to save session.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveToFolder = async () => {
+    if (!onSaveToFolder) return;
+    const name = sessionName.trim() || 'Untitled Session';
+    setSavingToFolder(true);
+    try {
+      await onSaveToFolder(name);
+      haptics.trigger('success');
+      setFeedback('Session saved to chosen folder!');
+      setTimeout(() => setFeedback(null), 3500);
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('Save to folder error:', err);
+        setFeedback('Failed to save to folder.');
+      }
+    } finally {
+      setSavingToFolder(false);
     }
   };
 
@@ -219,8 +242,29 @@ export const ProjectSessionModal: React.FC<ProjectSessionModalProps> = ({
                 <span>{saving ? 'Saving…' : 'Save Session'}</span>
               </button>
             </div>
+
+            {onSaveToFolder && (
+              <button
+                type="button"
+                onClick={handleSaveToFolder}
+                disabled={saving || savingToFolder}
+                className={`w-full min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border transition-all active:scale-98 cursor-pointer ${
+                  isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 border-neutral-300 text-neutral-800'
+                    : 'bg-white/5 hover:bg-white/10 border-white/10 text-neutral-200'
+                } disabled:opacity-50`}
+              >
+                {savingToFolder ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FolderDown className="w-4 h-4" />
+                )}
+                <span>{savingToFolder ? 'Saving to folder…' : 'Save Session to Chosen Folder…'}</span>
+              </button>
+            )}
+
             <p className="text-[11px] text-neutral-400">
-              Saves all raw 3D curves, layers, and full undo/redo history into your device storage.
+              Saves all raw 3D curves, layers, and full undo/redo history into your device storage or chosen folder.
             </p>
           </div>
 
@@ -328,7 +372,7 @@ export const ProjectSessionModal: React.FC<ProjectSessionModalProps> = ({
             <div className="text-xs font-bold uppercase tracking-wider text-neutral-400">
               Physical Project File (.remix3d)
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <button
                 type="button"
                 onClick={() => {
@@ -342,8 +386,28 @@ export const ProjectSessionModal: React.FC<ProjectSessionModalProps> = ({
                 }`}
               >
                 <Download className="w-4 h-4" />
-                <span>Export .remix3d File</span>
+                <span>Export File</span>
               </button>
+
+              {onSaveToFolder && (
+                <button
+                  type="button"
+                  onClick={handleSaveToFolder}
+                  disabled={savingToFolder}
+                  className={`min-h-[44px] p-3 rounded-2xl text-xs font-semibold flex items-center justify-center gap-2 border transition-all active:scale-98 cursor-pointer ${
+                    isLight
+                      ? 'bg-neutral-100 hover:bg-neutral-200 border-neutral-300 text-neutral-800'
+                      : 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 text-neutral-200'
+                  }`}
+                >
+                  {savingToFolder ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FolderDown className="w-4 h-4" />
+                  )}
+                  <span>Save to Folder…</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -355,7 +419,7 @@ export const ProjectSessionModal: React.FC<ProjectSessionModalProps> = ({
                 }`}
               >
                 <Upload className="w-4 h-4" />
-                <span>Open .remix3d File</span>
+                <span>Open File</span>
               </button>
               <input
                 ref={fileInputRef}

@@ -43,7 +43,7 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
   onOpenSessions,
 }) => {
   const ink = theme === 'light' ? 'text-neutral-800' : 'text-white/90';
-  const button = `pointer-events-auto min-w-[30px] w-8 h-8 sm:w-10 sm:h-10 sm:min-w-[40px] grid place-items-center rounded-lg sm:rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`;
+  const button = `pointer-events-auto min-w-[44px] min-h-[44px] w-11 h-11 sm:w-11 sm:h-11 grid place-items-center rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`;
 
   const isCurrentlyFullscreen = (): boolean => {
     if (typeof document === 'undefined') return false;
@@ -134,7 +134,7 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
       <button
         type="button"
         onClick={onOpenToybox}
-        className={`pointer-events-auto play-top-strip-left shrink-0 inline-flex items-center gap-1.5 sm:gap-2 h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg sm:rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`}
+        className={`pointer-events-auto play-top-strip-left shrink-0 inline-flex items-center gap-1.5 sm:gap-2 h-11 min-h-[44px] px-2.5 sm:px-3 rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`}
         aria-label="Open model library"
       >
         <Box className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" strokeWidth={1.35} />
@@ -225,20 +225,6 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
             <Maximize className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.35} />
           )}
         </button>
-        {uiMode === 'pro' && onSwitchUiMode && (
-          <button
-            type="button"
-            onClick={onSwitchUiMode}
-            className={`play-top-strip-mode-btn h-8 sm:h-9 px-1.5 sm:px-3 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-semibold flex items-center gap-1 active:scale-95 transition-all shrink-0 ml-0.5 sm:ml-1 ${
-              theme === 'light'
-                ? 'hover:bg-black/[0.035] text-neutral-700'
-                : 'hover:bg-white/[0.045] text-neutral-300'
-            }`}
-            title="Back to Play mode"
-          >
-            <span>Play</span>
-          </button>
-        )}
       </nav>
     </header>
   );

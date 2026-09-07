@@ -38,33 +38,26 @@ canvas {
   min-width: 44px;
 }
 
-/* Compact top strip on mobile screens (<640px) so all options (Fullscreen, Sessions, etc.) fit comfortably */
+/* Top strip on mobile screens (<640px) ensuring 44x44px touch targets */
 @media (max-width: 639px) {
   .play-top-strip button,
   .play-top-strip button:has(> svg:only-child),
   .play-top-strip button[aria-label]:not(:has(span)) {
-    min-width: 32px !important;
-    min-height: 32px !important;
-    width: 32px !important;
-    height: 32px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    width: 44px !important;
+    height: 44px !important;
     padding: 0 !important;
   }
   .play-top-strip .play-top-strip-left {
-    min-width: auto !important;
+    min-width: 44px !important;
     width: auto !important;
-    height: 32px !important;
-    min-height: 32px !important;
+    height: 44px !important;
+    min-height: 44px !important;
     display: inline-flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    padding: 0 8px 0 6px !important;
-  }
-  .play-top-strip .play-top-strip-mode-btn {
-    min-width: auto !important;
-    width: auto !important;
-    height: 32px !important;
-    min-height: 32px !important;
-    padding: 0 8px !important;
+    padding: 0 10px 0 8px !important;
   }
 }
 

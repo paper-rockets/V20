@@ -43,15 +43,8 @@ interface ColorStudioModalProps {
   theme?: 'light' | 'dark';
 }
 
-type TabType = 'wheel' | 'oklch' | 'harmonies' | 'shaders' | 'gradients';
-type HarmonyMode =
-  | 'complementary'
-  | 'analogous'
-  | 'triadic'
-  | 'tetradic'
-  | 'splitComplementary'
-  | 'monochromaticRamp'
-  | 'tonalChromaRamp';
+type TabType = 'wheel' | 'oklch' | 'harmonies' | 'shaders';
+type HarmonyMode = 'complementary' | 'analogous';
 
 const WHEEL_SIZE = 176;
 const RING_WIDTH = 18;
@@ -357,7 +350,6 @@ export const ColorStudioModal: React.FC<ColorStudioModalProps> = ({
     { id: 'oklch', label: 'OKLCh', icon: Sliders },
     { id: 'harmonies', label: 'Harmony', icon: SunMedium },
     { id: 'shaders', label: 'Shader', icon: Sparkles },
-    { id: 'gradients', label: 'Gradient', icon: Zap },
   ];
   const activeTitle = tabs.find((tab) => tab.id === activeTab)?.label ?? 'Color';
   const shell = isLight
@@ -442,9 +434,9 @@ export const ColorStudioModal: React.FC<ColorStudioModalProps> = ({
           </div>}
 
           {activeTab === 'harmonies' && <div className="space-y-4 py-1">
-            <div className={`grid grid-cols-3 border-b ${divider}`}>{([['complementary', 'Complement'], ['analogous', 'Analogous'], ['triadic', 'Triad']] as Array<[HarmonyMode, string]>).map(([mode, label]) => <button key={mode} type="button" onClick={() => setHarmonyMode(mode)} className={`h-11 border-b-2 text-[11px] font-semibold ${harmonyMode === mode ? (isLight ? 'border-neutral-900 text-neutral-950 font-bold' : 'border-white text-white font-bold') : `border-transparent ${ghostButton}`}`}>{label}</button>)}</div>
+            <div className={`grid grid-cols-2 border-b ${divider}`}>{([['complementary', 'Complementary'], ['analogous', 'Analogous']] as Array<[HarmonyMode, string]>).map(([mode, label]) => <button key={mode} type="button" onClick={() => setHarmonyMode(mode)} className={`h-11 border-b-2 text-[11px] font-semibold ${harmonyMode === mode ? (isLight ? 'border-neutral-900 text-neutral-950 font-bold' : 'border-white text-white font-bold') : `border-transparent ${ghostButton}`}`}>{label}</button>)}</div>
             <div className="grid min-h-20 gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(harmonyColors.length, 7)}, minmax(0, 1fr))` }}>{harmonyColors.slice(0, 7).map((color, index) => <button key={`${color}-${index}`} type="button" onClick={() => applyColor(color)} className={`min-h-20 rounded-xl border ${color.toLowerCase() === currentColor.toLowerCase() ? 'border-neutral-900 ring-2 ring-neutral-900/35 dark:border-white dark:ring-white/35' : isLight ? 'border-black/15' : 'border-white/15'}`} style={{ backgroundColor: color }} aria-label={`Use ${color}`} />)}</div>
-            <select value={harmonyMode} onChange={(event) => setHarmonyMode(event.target.value as HarmonyMode)} className={`h-11 w-full rounded-xl border px-3 text-xs outline-none ${field}`} aria-label="Harmony mode"><option value="complementary">Complementary</option><option value="analogous">Analogous</option><option value="triadic">Triadic</option><option value="tetradic">Tetradic</option><option value="splitComplementary">Split complementary</option><option value="monochromaticRamp">Monochromatic ramp</option><option value="tonalChromaRamp">Tonal chroma ramp</option></select>
+            <select value={harmonyMode} onChange={(event) => setHarmonyMode(event.target.value as HarmonyMode)} className={`h-11 w-full rounded-xl border px-3 text-xs outline-none ${field}`} aria-label="Harmony mode"><option value="complementary">Complementary (Graphic Contrast)</option><option value="analogous">Analogous (Harmonious Palette)</option></select>
           </div>}
 
           {activeTab === 'shaders' && (
@@ -614,14 +606,9 @@ export const ColorStudioModal: React.FC<ColorStudioModalProps> = ({
             </div>
           )}
 
-          {activeTab === 'gradients' && <div className="space-y-4 py-1">
-            <div className="flex items-center justify-between"><span className={`text-xs font-semibold ${isLight ? 'text-neutral-700' : quietText}`}>Target color</span><label className={`flex h-11 items-center gap-2 rounded-xl border px-2 ${field}`}><input type="color" value={secondaryColor} onChange={(event) => setSecondaryColor(event.target.value)} className="h-8 w-8 cursor-pointer border-0 bg-transparent" aria-label="Gradient target color" /><span className="font-mono text-[10px] font-bold">{secondaryColor.toUpperCase()}</span></label></div>
-            <div className={`grid h-20 grid-cols-9 overflow-hidden rounded-xl border ${isLight ? 'border-black/15' : 'border-white/15'}`}>{gradient.map((color, index) => <button key={`${color}-${index}`} type="button" onClick={() => applyColor(color)} style={{ backgroundColor: color }} className="h-full" aria-label={`Use gradient color ${color}`} />)}</div>
-            <div className="flex items-center justify-between text-[10px] font-mono font-bold"><span>{normalizeHexColor(currentColor, '#38bdf8').toUpperCase()}</span><span className={isLight ? 'text-neutral-600 font-semibold' : quietText}>OKLCh blend</span><span>{secondaryColor.toUpperCase()}</span></div>
-          </div>}
         </div>
 
-        <nav className={`grid grid-cols-5 border-t px-1 py-1 ${divider}`} aria-label="Color modes">{tabs.map((tab) => { const Icon = tab.icon; const selected = activeTab === tab.id; return <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[9px] font-medium transition-all ${selected ? (isLight ? 'bg-black/10 text-neutral-950 font-bold' : 'bg-white/15 text-white font-bold') : ghostButton}`} aria-current={selected ? 'page' : undefined}><Icon className="h-4 w-4" /><span>{tab.label}</span></button>; })}</nav>
+        <nav className={`grid grid-cols-4 border-t px-1 py-1 ${divider}`} aria-label="Color modes">{tabs.map((tab) => { const Icon = tab.icon; const selected = activeTab === tab.id; return <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[9px] font-medium transition-all ${selected ? (isLight ? 'bg-black/10 text-neutral-950 font-bold' : 'bg-white/15 text-white font-bold') : ghostButton}`} aria-current={selected ? 'page' : undefined}><Icon className="h-4 w-4" /><span>{tab.label}</span></button>; })}</nav>
       </section>
     </div>,
     document.body,

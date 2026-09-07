@@ -23,6 +23,7 @@ import {
 import { modelLoader } from './modelLoader';
 import { modelExporter } from './modelExporter';
 import { modelNormalization } from './modelNormalization';
+import { resolveAssetUrl } from '../utils/assetUrl';
 import { ModelStorage } from './modelStorage';
 import { DRACOExporter } from 'three/examples/jsm/exporters/DRACOExporter.js';
 
@@ -51,8 +52,7 @@ export class ModelConverterEngine {
   public static getDRACOLoader(): DRACOLoader {
     if (!this.dracoLoader) {
       this.dracoLoader = new DRACOLoader();
-      this.dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
-      this.dracoLoader.setDecoderConfig({ type: 'js' });
+      this.dracoLoader.setDecoderPath(resolveAssetUrl('draco/'));
       this.dracoLoader.preload();
     }
     return this.dracoLoader;

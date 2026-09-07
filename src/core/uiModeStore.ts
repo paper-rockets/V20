@@ -16,7 +16,7 @@
 
 import { useSyncExternalStore } from 'react';
 
-export type UiMode = 'play' | 'pro';
+export type UiMode = 'pro';
 
 const MODE_KEY = 'remix3d.uiMode';
 const ONBOARDED_KEY = 'remix3d.hasOnboarded';
@@ -56,17 +56,16 @@ function notify(listeners: Set<Listener>): void {
 
 // --- Mode ---------------------------------------------------------------
 
-let uiMode: UiMode = readStored(MODE_KEY) === 'play' ? 'play' : 'pro';
+let uiMode: UiMode = 'pro';
 const modeListeners = new Set<Listener>();
 
 export function getUiMode(): UiMode {
-  return uiMode;
+  return 'pro';
 }
 
-export function setUiMode(mode: UiMode): void {
-  if (uiMode === mode) return;
-  uiMode = mode;
-  writeStored(MODE_KEY, mode);
+export function setUiMode(_mode: any): void {
+  uiMode = 'pro';
+  writeStored(MODE_KEY, 'pro');
   notify(modeListeners);
 }
 

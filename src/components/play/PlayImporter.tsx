@@ -28,7 +28,7 @@ interface PlayImporterProps {
   engine: StudioEngine | null;
   onClose: () => void;
   onSaved: (name: string) => void;
-  onOpenFineTuning: () => void;
+  onOpenFineTuning?: () => void;
   theme?: 'light' | 'dark';
 }
 
@@ -535,17 +535,19 @@ export const PlayImporter: React.FC<PlayImporterProps> = ({
           <div className={`shrink-0 px-5 py-4 border-t flex items-center gap-3 ${
             isLight ? 'border-neutral-200 bg-neutral-50/50' : 'border-zinc-800 bg-zinc-950/50'
           }`}>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenFineTuning();
-              }}
-              className={`h-12 px-4 rounded-2xl flex items-center gap-2 text-xs font-bold border transition-all active:scale-95 cursor-pointer ${softBg}`}
-            >
-              <Sliders className="w-4 h-4" />
-              <span>Advanced Tuning</span>
-            </button>
+            {onOpenFineTuning && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenFineTuning();
+                }}
+                className={`h-12 px-4 rounded-2xl flex items-center gap-2 text-xs font-bold border transition-all active:scale-95 cursor-pointer ${softBg}`}
+              >
+                <Sliders className="w-4 h-4" />
+                <span>Advanced Tuning</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => void keepAndLoad()}

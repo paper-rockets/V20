@@ -485,32 +485,10 @@ export interface ConversionResult {
   savedModel: Saved3DModel;
 }
 
-export type TransformMode = '2d' | '3d' | 'tactile';
-
-export type AccessibilityMode = 'standard' | 'finger-pen' | 'touch-boost';
-
-export interface Vector2D {
-  x: number;
-  y: number;
-}
-
 export interface Vector3D {
   x: number;
   y: number;
   z: number;
-}
-
-export interface Rotation3D {
-  rx: number; // Pitch in degrees
-  ry: number; // Yaw in degrees
-  rz: number; // Roll in degrees
-}
-
-export interface Scale3D {
-  sx: number;
-  sy: number;
-  sz: number;
-  uniform: number;
 }
 
 export interface TranslationEventPayload {
@@ -556,67 +534,7 @@ export interface LoadedModelInfo {
   isDrawingPlane: boolean;
 }
 
-export interface TransformNavigatorProps {
-  initialMode?: TransformMode;
-  isLocked?: boolean;
-  onLockChange?: (locked: boolean) => void;
-  onModeChange?: (mode: TransformMode) => void;
-  onTranslate?: (data: TranslationEventPayload) => void;
-  onRotate?: (data: RotationEventPayload) => void;
-  onScale?: (data: ScaleEventPayload) => void;
-  onInteractionStart?: (handleName: string) => void;
-  onInteractionEnd?: (handleName: string) => void;
-  onReset?: () => void;
-  onClose?: () => void;
-  onCopy?: () => void;
-  onPaste?: () => void;
-  clipboardCount?: number;
-  activeTargetName?: string;
-  layers?: Layer[];
-  activeLayerId?: string;
-  onSelectLayer?: (layerId: string) => void;
-  models?: LoadedModelInfo[];
-  activeModelId?: string | null;
-  onSelectModel?: (modelId: string | null) => void;
-  targetScope?: TransformTargetScope;
-  onSelectTargetScope?: (scope: TransformTargetScope) => void;
-  accessibilityMode?: AccessibilityMode;
-  onAccessibilityModeChange?: (mode: AccessibilityMode) => void;
-  className?: string;
-  soundEnabled?: boolean;
-  onToggleSound?: () => void;
-  dockPosition?: 'bottom-right' | 'bottom-left' | 'top-right' | 'floating';
-  uiScale?: number;
-  engine?: any;
-  sensitivity?: number;
-  onSensitivityChange?: (s: number) => void;
-  theme?: 'light' | 'dark';
-}
-
-export interface TelemetryLogEntry {
-  id: string;
-  type: 'translate' | 'rotate' | 'scale' | 'mode' | 'lock' | 'reset';
-  label: string;
-  data: Record<string, number | string | boolean>;
-  timestamp: string;
-}
-
 export type ActiveControllerType = 'navigator' | 'tactile' | 'both' | 'hidden';
-
-export type SpatialMode = '2d' | '3d' | 'tactile_ball';
-
-export type SubWheelMode = 'joystick' | 'ball' | 'dial';
-
-export interface SpatialState {
-  x: number;
-  y: number;
-  z: number;
-  pitch: number;
-  yaw: number;
-  roll: number;
-  scale: number;
-  brushSize: number;
-}
 
 export interface ProjectSaveData {
   version: string;

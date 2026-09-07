@@ -100,6 +100,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const labelRef = useRef<HTMLDivElement | null>(null);
   const numRef = useRef<HTMLDivElement | null>(null);
+  const dragHandleRef = useRef<HTMLDivElement | null>(null);
 
   const axesRef = useRef<AxisDef[]>((isPro ? PRO_AXES : PLAY_AXES).map(a => ({ ...a })));
 
@@ -122,17 +123,30 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   const anchorRef = useRef({ ax: 1, ay: 1 });
 
   const camRef = useRef({
-    radius: 11,
-    theta: 0.78,
-    phi: 1.05,
-    target: new THREE.Vector3(0, 1.1, 0)
+    radius: engine?.cameraSpherical?.radius ?? 7.85,
+    theta: engine?.cameraSpherical?.theta ?? 0.78,
+    phi: engine?.cameraSpherical?.phi ?? 1.05,
+    target: engine?.cameraTarget ? engine.cameraTarget.clone() : new THREE.Vector3(0, 1.1, 0)
   });
 
   const selBoxRef = useRef(new THREE.Box3());
   const localBoxRef = useRef(new THREE.Box3());
   const outlineRef = useRef<THREE.Box3Helper | null>(null);
   const historyRef = useRef<Array<{ o: THREE.Object3D; p: THREE.Vector3; q: THREE.Quaternion }>>([]);
-  const flightRef = useRef<{ p0: number; t0: number; p1: number; t1: number; start: number; ms: number } | null>(null);
+  const flightRef = useRef<{
+    p0: number;
+    t0: number;
+    r0: number;
+    target0: THREE.Vector3;
+    p1: number;
+    t1: number;
+    r1: number;
+    target1: THREE.Vector3;
+    hasRadiusChange: boolean;
+    hasTargetChange: boolean;
+    start: number;
+    ms: number;
+  } | null>(null);
   const tourRef = useRef<any>(null);
   const themeRef = useRef<any>({
     up: '#e0822a',
@@ -318,11 +332,11 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     }
   }, [positionMenu]);
 
-  // Outline for active target
+  // Outline for active target (only show during active Transform Move/Rotate, never in Look mode)
   const markSelection = useCallback(() => {
     const targetObj = targetObjRef.current;
     const outline = outlineRef.current;
-    if (!targetObj || !outline) {
+    if (!targetObj || !outline || gzRef.current.mode === 'look') {
       if (outline) outline.visible = false;
       return;
     }
@@ -516,34 +530,25 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
 
     ctx.save();
     ctx.shadowColor = T.shadow;
-    ctx.shadowBlur = 7;
+    ctx.shadowBlur = 6;
     ctx.shadowOffsetY = 1.5;
 
+    // 1. Draw solid stems ONLY for front-facing positive axes (no dashed spider webs)
     hs.forEach((h: any) => {
       const front = h.p.depth >= -0.04;
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(m.c, m.c);
-      ctx.lineTo(h.p.x, h.p.y);
-      if (h.sign > 0 && front) { ctx.strokeStyle = h.a.tone; ctx.lineWidth = 3; }
-      else { ctx.strokeStyle = T.ghost; ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]); }
-      ctx.stroke();
-      ctx.restore();
+      if (h.sign > 0 && front) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(m.c, m.c);
+        ctx.lineTo(h.p.x, h.p.y);
+        ctx.strokeStyle = h.a.tone;
+        ctx.lineWidth = 2.8;
+        ctx.stroke();
+        ctx.restore();
+      }
     });
 
-    // ghosts and back-facing dots first
-    hs.forEach((h: any) => {
-      const front = h.p.depth >= -0.04;
-      if (h.sign > 0 && front) return;
-      const on = live && gz.active && gz.active.type === 'axis' && gz.active.i === h.i && gz.active.sign === h.sign;
-      const hov = live && gz.hover && gz.hover.i === h.i && gz.hover.sign === h.sign;
-      ctx.beginPath();
-      ctx.arc(h.p.x, h.p.y, m.hand * (h.sign < 0 ? 0.58 : 0.72), 0, Math.PI * 2);
-      ctx.fillStyle = (on || hov) ? T.ink : T.ghost;
-      ctx.fill();
-    });
-
-    // the hub goes UNDER the live handles, so it can never hide one
+    // 2. Center Hub (placed under front handles so it never obstructs them)
     ctx.beginPath();
     ctx.arc(m.c, m.c, m.hub, 0, Math.PI * 2);
     ctx.fillStyle = T.hub;
@@ -555,9 +560,33 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
 
     hubIcon(ctx, m.c, m.c, m.hub * 0.72);
 
+    // 3. Negative / Back-facing axes: render ONLY subtle small pips on hover/active (zero idle dark blotches)
+    hs.forEach((h: any) => {
+      const front = h.p.depth >= -0.04;
+      if (h.sign > 0 && front) return;
+      const on = live && gz.active && gz.active.type === 'axis' && gz.active.i === h.i && gz.active.sign === h.sign;
+      const hov = live && gz.hover && gz.hover.i === h.i && gz.hover.sign === h.sign;
+      if (on || hov) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(h.p.x, h.p.y, m.hand * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = h.a.tone;
+        ctx.globalAlpha = 0.85;
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#ffffff';
+        labelFont(ctx, h.sign < 0 ? h.a.back : h.a.lbl, m.hand * 0.65);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(h.sign < 0 ? h.a.back : h.a.lbl, h.p.x, h.p.y + 0.5);
+        ctx.restore();
+      }
+    });
+
+    // 4. Front-facing vibrant handles (+X, +Y, +Z)
     ctx.save();
     ctx.shadowColor = T.shadow;
-    ctx.shadowBlur = 7;
+    ctx.shadowBlur = 6;
     ctx.shadowOffsetY = 1.5;
 
     hs.forEach((h: any) => {
@@ -571,7 +600,8 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
         ctx.save();
         ctx.translate(h.p.x, h.p.y);
         ctx.rotate(Math.atan2(uy, ux));
-        ctx.fillStyle = h.a.tone; ctx.strokeStyle = h.a.tone;
+        ctx.fillStyle = h.a.tone;
+        ctx.strokeStyle = h.a.tone;
         if (gz.mode === 'rotate') {
           ctx.lineWidth = 2.6;
           ctx.beginPath();
@@ -579,15 +609,19 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
           ctx.stroke();
           const ax = Math.cos(0.92) * m.hand * 1.4, ay = Math.sin(0.92) * m.hand * 1.4;
           ctx.beginPath();
-          ctx.moveTo(ax + 3.6, ay + 1.2); ctx.lineTo(ax - 3, ay + 3.8); ctx.lineTo(ax - 1.2, ay - 2.9);
-          ctx.closePath(); ctx.fill();
+          ctx.moveTo(ax + 3.6, ay + 1.2);
+          ctx.lineTo(ax - 3, ay + 3.8);
+          ctx.lineTo(ax - 1.2, ay - 2.9);
+          ctx.closePath();
+          ctx.fill();
         } else {
           const base = m.hand * 1.02, wide = m.hand * 0.56;
           ctx.beginPath();
           ctx.moveTo(base + m.hand * 0.98, 0);
           ctx.lineTo(base, -wide);
           ctx.lineTo(base, wide);
-          ctx.closePath(); ctx.fill();
+          ctx.closePath();
+          ctx.fill();
         }
         ctx.restore();
       }
@@ -631,10 +665,17 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     drawGizmo();
   }, [jumpDisplay, drawGizmo]);
 
-  const applyCamera = useCallback(() => {
+  const applyCamera = useCallback((instant: boolean = true, overrideRadius?: number) => {
     const cam = camRef.current;
     if (engine) {
-      engine.setCameraView(cam.theta, cam.phi, cam.radius, true);
+      if (overrideRadius !== undefined) {
+        cam.radius = overrideRadius;
+        engine.setCameraView(cam.theta, cam.phi, overrideRadius, instant);
+      } else {
+        cam.radius = engine.cameraSpherical.radius;
+        // Never pass radius when not explicitly overriding, so setCameraView never snaps user's zoom!
+        engine.setCameraView(cam.theta, cam.phi, undefined, instant);
+      }
       engine.cameraTarget.copy(cam.target);
       engine.markDirty();
     }
@@ -733,18 +774,53 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     say(isPro ? 'undo' : 'Undone', true);
   };
 
-  const flyTo = (phi: number, theta: number, ms?: number) => {
+  const flyTo = (
+    phi: number,
+    theta: number,
+    targetRadius?: number,
+    targetPos?: THREE.Vector3,
+    ms?: number
+  ) => {
+    if (engine) {
+      camRef.current.radius = engine.cameraSpherical.radius;
+      camRef.current.target.copy(engine.cameraTarget);
+    }
     const cam = camRef.current;
     let t = theta;
     while (t - cam.theta > Math.PI) t -= Math.PI * 2;
     while (t - cam.theta < -Math.PI) t += Math.PI * 2;
     const p1 = Math.max(0.06, Math.min(Math.PI - 0.06, phi));
+    const r0 = cam.radius;
+    const r1 = targetRadius !== undefined ? Math.max(0.4, Math.min(25.0, targetRadius)) : r0;
+    const hasRadiusChange = targetRadius !== undefined && Math.abs(r1 - r0) > 0.01;
+
+    const t0 = cam.target.clone();
+    const t1 = targetPos ? targetPos.clone() : cam.target.clone();
+    const hasTargetChange = targetPos !== undefined && t0.distanceToSquared(t1) > 1e-4;
+
     if (reduceMotionRef.current) {
-      cam.phi = p1; cam.theta = t;
-      applyCamera();
+      cam.phi = p1;
+      cam.theta = t;
+      if (hasRadiusChange) cam.radius = r1;
+      if (hasTargetChange) cam.target.copy(t1);
+      applyCamera(true, hasRadiusChange ? r1 : undefined);
       return;
     }
-    flightRef.current = { p0: cam.phi, t0: cam.theta, p1, t1: t, start: performance.now(), ms: ms || 500 };
+
+    flightRef.current = {
+      p0: cam.phi,
+      t0: cam.theta,
+      r0,
+      target0: t0,
+      p1,
+      t1: t,
+      r1,
+      target1: t1,
+      hasRadiusChange,
+      hasTargetChange,
+      start: performance.now(),
+      ms: ms || 500
+    };
   };
 
   const stepFlight = (now: number) => {
@@ -754,13 +830,21 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
     camRef.current.phi = flight.p0 + (flight.p1 - flight.p0) * e;
     camRef.current.theta = flight.t0 + (flight.t1 - flight.t0) * e;
-    applyCamera();
+    if (flight.hasTargetChange) {
+      camRef.current.target.lerpVectors(flight.target0, flight.target1, e);
+    }
+    if (flight.hasRadiusChange) {
+      camRef.current.radius = flight.r0 + (flight.r1 - flight.r0) * e;
+      applyCamera(true, camRef.current.radius);
+    } else {
+      applyCamera(true, undefined);
+    }
     if (k >= 1) flightRef.current = null;
   };
 
   const faceDirection = (dir: THREE.Vector3, label?: string) => {
     const d = dir.clone().normalize();
-    flyTo(Math.acos(Math.max(-1, Math.min(1, d.y))), Math.atan2(d.x, d.z));
+    flyTo(Math.acos(Math.max(-1, Math.min(1, d.y))), Math.atan2(d.x, d.z), undefined, undefined, 500);
     if (label) say(isPro ? ('view · ' + label) : ('Looking from the ' + label.toLowerCase() + ' side'), true);
     if (navigator.vibrate) { try { navigator.vibrate(8); } catch (_) {} }
   };
@@ -790,6 +874,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     gzRef.current.mode = m;
     setModeState(m);
     if (nvRef.current) nvRef.current.dataset.mode = m;
+    markSelection();
     idleHint();
     drawGizmo();
     saveLayout();
@@ -804,8 +889,21 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
 
   const lookAtIt = () => {
     stopTour();
-    camRef.current.target.copy(objRef.current.pos);
-    faceDirection(new THREE.Vector3(0, 1, 0).applyQuaternion(objRef.current.quat), '');
+    const targetObj = targetObjRef.current;
+    let center = objRef.current.pos.clone();
+    let desiredRadius: number | undefined = undefined;
+
+    if (targetObj) {
+      targetObj.updateWorldMatrix(true, false);
+      const box = new THREE.Box3().setFromObject(targetObj);
+      if (!box.isEmpty()) {
+        box.getCenter(center);
+        const sphere = box.getBoundingSphere(new THREE.Sphere());
+        desiredRadius = Math.max(1.5, Math.min(20.0, sphere.radius * 2.2));
+      }
+    }
+
+    flyTo(camRef.current.phi, camRef.current.theta, desiredRadius, center, 600);
     say(isPro ? 'framed' : 'Looking straight at it', true);
   };
 
@@ -820,8 +918,8 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       targetObj.quaternion.copy(home.q);
     }
     syncFromTarget();
-    camRef.current.target.copy(objRef.current.pos);
-    applyObject(); applyCamera();
+    applyObject();
+    flyTo(camRef.current.phi, camRef.current.theta, undefined, objRef.current.pos, 500);
     say(isPro ? 'reset' : ((targets[current] ? targets[current].name : 'It') + ' back to the start'), true);
   };
 
@@ -845,14 +943,14 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     const s = tour.save;
     objRef.current.pos.copy(s.pos);
     objRef.current.quat.copy(s.quat);
-    camRef.current.phi = s.phi;
-    camRef.current.theta = s.theta;
     flightRef.current = null;
     gzRef.current.ring = null;
     tourRef.current = null;
     setIsTourRunning(false);
     setMode(s.mode);
-    applyObject(); applyCamera(); idleHint();
+    applyObject();
+    flyTo(s.phi, s.theta, s.radius, s.target, 500);
+    idleHint();
   };
 
   const startTour = () => {
@@ -865,6 +963,8 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
         quat: objRef.current.quat.clone(),
         phi: camRef.current.phi,
         theta: camRef.current.theta,
+        radius: engine ? engine.cameraSpherical.radius : camRef.current.radius,
+        target: (engine ? engine.cameraTarget : camRef.current.target).clone(),
         mode: gzRef.current.mode
       }
     };
@@ -1021,49 +1121,69 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   }, [activeLayerId, selectTarget]);
 
   const sizeToBox = useCallback(() => {
-    gzRef.current.size = window.innerWidth < 420 ? 190 : 210;
+    gzRef.current.size = window.innerWidth < 640 ? 160 : 190;
     fitGizmo(gzRef.current.size);
     drawGizmo();
   }, [drawGizmo]);
 
-  // Tab dragging & click handling
+  // Dock dragging handling for repositioning smoothly anywhere on screen with finger or stylus
   useEffect(() => {
     const tab = tabRef.current;
     const dock = dockRef.current;
-    if (!tab || !dock) return;
+    const dragHandle = dragHandleRef.current;
+    if (!dock) return;
 
-    let d: any = null;
-    const onDown = (e: PointerEvent) => {
-      e.preventDefault();
+    let d: { x: number; y: number; left: number; top: number; moved: boolean; source: 'tab' | 'handle' } | null = null;
+
+    const startDrag = (clientX: number, clientY: number, source: 'tab' | 'handle') => {
       const r = dock.getBoundingClientRect();
-      d = { x: e.clientX, y: e.clientY, left: r.left, top: r.top, moved: false };
-      try { tab.setPointerCapture(e.pointerId); } catch (_) {}
+      d = { x: clientX, y: clientY, left: r.left, top: r.top, moved: false, source };
     };
-    const onMove = (e: PointerEvent) => {
+
+    const onTabDown = (e: PointerEvent) => {
+      e.preventDefault();
+      startDrag(e.clientX, e.clientY, 'tab');
+      try { tab?.setPointerCapture(e.pointerId); } catch (_) {}
+    };
+
+    const onHandleDown = (e: PointerEvent) => {
+      e.preventDefault();
+      startDrag(e.clientX, e.clientY, 'handle');
+      try { dragHandle?.setPointerCapture(e.pointerId); } catch (_) {}
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
       if (!d) return;
-      if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) return;
+      if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return;
       if (!d.moved) setMenu(false);
       d.moved = true;
       place(d.left + e.clientX - d.x, d.top + e.clientY - d.y, true);
     };
-    const onUp = (e: PointerEvent) => {
+
+    const onPointerUp = (e: PointerEvent) => {
       if (!d) return;
       const moved = d.moved;
+      const source = d.source;
       d = null;
-      try { tab.releasePointerCapture(e.pointerId); } catch (_) {}
-      if (!moved) {
+      try { tab?.releasePointerCapture(e.pointerId); } catch (_) {}
+      try { dragHandle?.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (!moved && source === 'tab') {
         setMenu(nvRef.current?.dataset.menu !== 'open');
       }
     };
 
-    tab.addEventListener('pointerdown', onDown);
-    tab.addEventListener('pointermove', onMove);
-    tab.addEventListener('pointerup', onUp);
+    tab?.addEventListener('pointerdown', onTabDown);
+    dragHandle?.addEventListener('pointerdown', onHandleDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
 
     return () => {
-      tab.removeEventListener('pointerdown', onDown);
-      tab.removeEventListener('pointermove', onMove);
-      tab.removeEventListener('pointerup', onUp);
+      tab?.removeEventListener('pointerdown', onTabDown);
+      dragHandle?.removeEventListener('pointerdown', onHandleDown);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
     };
   }, [place, setMenu]);
 
@@ -1073,12 +1193,39 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     if (!gzc) return;
 
     const onDown = (e: PointerEvent) => {
-      e.preventDefault(); e.stopPropagation();
       stopTour();
       const pt = gzPoint(e);
       const m = metrics(gzRef.current.size);
       const r = Math.hypot(pt.x - m.c, pt.y - m.c);
       const hit = pickHandle(pt);
+
+      // If user touched the outer rim/background of the canvas, start dragging the dock!
+      if (!hit && r > m.arm * 1.3) {
+        const dock = dockRef.current;
+        if (dock) {
+          e.preventDefault();
+          e.stopPropagation();
+          const rDock = dock.getBoundingClientRect();
+          let d = { x: e.clientX, y: e.clientY, left: rDock.left, top: rDock.top, moved: false };
+          const onDocDragMove = (me: PointerEvent) => {
+            if (!d.moved && Math.hypot(me.clientX - d.x, me.clientY - d.y) < 4) return;
+            if (!d.moved) setMenu(false);
+            d.moved = true;
+            place(d.left + me.clientX - d.x, d.top + me.clientY - d.y, true);
+          };
+          const onDocDragUp = (ue: PointerEvent) => {
+            window.removeEventListener('pointermove', onDocDragMove);
+            window.removeEventListener('pointerup', onDocDragUp);
+            window.removeEventListener('pointercancel', onDocDragUp);
+          };
+          window.addEventListener('pointermove', onDocDragMove);
+          window.addEventListener('pointerup', onDocDragUp);
+          window.addEventListener('pointercancel', onDocDragUp);
+          return;
+        }
+      }
+
+      e.preventDefault(); e.stopPropagation();
       if (hit) gzRef.current.active = { type: 'axis', i: hit.i, sign: hit.sign };
       else if (r <= m.hub * 1.7) gzRef.current.active = { type: 'hub' };
       else gzRef.current.active = { type: 'orbit' };
@@ -1114,7 +1261,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       if (act.type === 'orbit' || gzRef.current.mode === 'look') {
         camRef.current.theta = drag.theta - dx * 0.0062;
         camRef.current.phi = Math.max(0.06, Math.min(Math.PI - 0.06, drag.phi - dy * 0.0062));
-        applyCamera();
+        applyCamera(true, undefined);
         say(isPro ? 'orbit' : 'Walking around it', true);
         return;
       }
@@ -1193,18 +1340,30 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       setHistoryLen(historyRef.current.length);
     };
 
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (engine) {
+        engine.zoom(e.deltaY * 0.8);
+        camRef.current.radius = engine.cameraSpherical.radius;
+        drawGizmo();
+      }
+    };
+
     gzc.addEventListener('pointerdown', onDown);
     gzc.addEventListener('pointermove', onMove);
     gzc.addEventListener('pointerup', onUp);
     gzc.addEventListener('pointercancel', onUp);
+    gzc.addEventListener('wheel', onWheel, { passive: false });
 
     return () => {
       gzc.removeEventListener('pointerdown', onDown);
       gzc.removeEventListener('pointermove', onMove);
       gzc.removeEventListener('pointerup', onUp);
       gzc.removeEventListener('pointercancel', onUp);
+      gzc.removeEventListener('wheel', onWheel);
     };
-  }, [drawGizmo, applyCamera, applyObject, idleHint, say]);
+  }, [drawGizmo, applyCamera, applyObject, idleHint, say, engine]);
 
   // Stepping aside while drawing on main canvas
   useEffect(() => {
@@ -1277,10 +1436,11 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
 
       if (!dragRef.current && !flightRef.current && !tourRef.current && engine) {
         const engCam = engine.cameraSpherical;
-        if (
-          Math.abs(camRef.current.theta - engCam.theta) > 1e-4 ||
-          Math.abs(camRef.current.phi - engCam.phi) > 1e-4
-        ) {
+        const thetaDiff = Math.abs(camRef.current.theta - engCam.theta);
+        const phiDiff = Math.abs(camRef.current.phi - engCam.phi);
+        const radiusDiff = Math.abs(camRef.current.radius - engCam.radius);
+        const targetDiff = camRef.current.target.distanceToSquared(engine.cameraTarget);
+        if (thetaDiff > 1e-4 || phiDiff > 1e-4 || radiusDiff > 1e-4 || targetDiff > 1e-4) {
           camRef.current.theta = engCam.theta;
           camRef.current.phi = engCam.phi;
           camRef.current.radius = engCam.radius;
@@ -1334,10 +1494,9 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     axesRef.current = (isPro ? PRO_AXES : PLAY_AXES).map(a => ({ ...a }));
     readTheme();
     applyObject();
-    applyCamera();
     idleHint();
     drawGizmo();
-  }, [isPro, readTheme, applyObject, applyCamera, idleHint, drawGizmo]);
+  }, [isPro, readTheme, applyObject, idleHint, drawGizmo]);
 
   const currentTarget = targetsList[currentIdx];
 
@@ -1351,6 +1510,15 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       data-ui-mode={effectiveUiMode}
     >
       <div className="nv-dock" id="nv-dock" ref={dockRef}>
+        <div
+          className="nv-drag-handle"
+          id="nv-drag-handle"
+          ref={dragHandleRef}
+          title="Drag to reposition navigator"
+          aria-label="Drag to reposition navigator"
+        >
+          <span className="nv-drag-grip" />
+        </div>
         <canvas className="nv-canvas" id="nv-canvas" ref={canvasRef}></canvas>
         <button
           className="nv-tab"

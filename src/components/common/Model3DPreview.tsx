@@ -327,7 +327,6 @@ export const Model3DPreview: React.FC<Model3DPreviewProps> = ({
       const loader = new GLTFLoader();
       const dracoLoader = new DRACOLoader();
       dracoLoader.setDecoderPath(resolveAssetUrl('draco/'));
-      dracoLoader.setDecoderConfig({ type: 'wasm' });
       loader.setDRACOLoader(dracoLoader);
 
       loader.parse(
@@ -347,7 +346,6 @@ export const Model3DPreview: React.FC<Model3DPreviewProps> = ({
       const loader = new GLTFLoader();
       const dracoLoader = new DRACOLoader();
       dracoLoader.setDecoderPath(resolveAssetUrl('draco/'));
-      dracoLoader.setDecoderConfig({ type: 'wasm' });
       loader.setDRACOLoader(dracoLoader);
 
       loader.load(

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Minus } from 'lucide-react';
 import {
   IcPointer as MousePointer2,
   IcLasso as CircleDashed,
-  IcOrigin as Crosshair,
   IcReset as RotateCcw,
   IcSnapGround as ArrowDownToLine,
   IcCopy as Copy,
@@ -13,8 +12,6 @@ import {
   IcEye as Eye,
   IcEyeOff as EyeOff,
   IcSparkle as Sparkles,
-  IcRefresh as RefreshCw,
-  IcCheck as Check,
   IcCompass as Compass,
 } from './StudioIcons';
 import { StudioEngine } from '../../core/studioEngine';
@@ -22,7 +19,6 @@ import {
   ToolType,
   BrushSettings,
   TransformTargetScope,
-  NumpadTarget,
 } from '../../types';
 import { haptics } from '../../utils/haptics';
 
@@ -36,7 +32,7 @@ interface SelectPanelProps {
   onToggleGizmo: () => void;
   isGizmoLocked: boolean;
   onToggleLock: () => void;
-  onOpenNumpad?: (target: NumpadTarget) => void;
+  onOpenNumpad?: any;
   targetScope: TransformTargetScope;
   onSelectTargetScope: (scope: TransformTargetScope) => void;
   onGizmoReset?: () => void;
@@ -53,7 +49,6 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
   onToggleGizmo,
   isGizmoLocked,
   onToggleLock,
-  onOpenNumpad,
   targetScope,
   onSelectTargetScope,
   onGizmoReset,
@@ -62,10 +57,8 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
   const [selectionMode, setSelectionMode] = useState<'pointer' | 'lasso'>('pointer');
   const [softSelection, setSoftSelection] = useState<boolean>(false);
   const [showTransformDetails, setShowTransformDetails] = useState<boolean>(false);
-  const [showAdvancedSnapping, setShowAdvancedSnapping] = useState<boolean>(false);
-  const [recalcFeedback, setRecalcFeedback] = useState<string | null>(null);
 
-  // Track relative transform values for display & numeric input
+  // Track relative transform values for display
   const [transformValues, setTransformValues] = useState({
     posX: 0,
     posY: 0,
@@ -77,10 +70,6 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
   });
 
   const isLight = theme === 'light';
-
-  const updateBrushSetting = <K extends keyof BrushSettings>(key: K, value: BrushSettings[K]) => {
-    setBrushSettings((prev) => ({ ...prev, [key]: value }));
-  };
 
   const handlePointerSelect = () => {
     haptics.trigger('light');
@@ -112,61 +101,27 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
     });
   };
 
-  const handleOpenNumpadValue = (
-    field: 'posX' | 'posY' | 'posZ' | 'rotX' | 'rotY' | 'rotZ' | 'scale',
-    title: string,
-    unit: string,
-    min: number,
-    max: number,
-    step: number
-  ) => {
-    if (!onOpenNumpad) return;
+  const handleNudgePos = (axis: 'posX' | 'posY' | 'posZ', delta: number) => {
     haptics.trigger('light');
-
-    const currentValue = transformValues[field];
-    onOpenNumpad({
-      id: `transform-${field}`,
-      title,
-      value: currentValue,
-      min,
-      max,
-      step,
-      unit,
-      onConfirm: (val: number) => {
-        if (!engine) return;
-        if (field === 'posX') {
-          engine.translateAxis3D('x', val - currentValue, targetScope);
-          setTransformValues((prev) => ({ ...prev, posX: val }));
-        } else if (field === 'posY') {
-          engine.translateAxis3D('y', val - currentValue, targetScope);
-          setTransformValues((prev) => ({ ...prev, posY: val }));
-        } else if (field === 'posZ') {
-          engine.translateAxis3D('z', val - currentValue, targetScope);
-          setTransformValues((prev) => ({ ...prev, posZ: val }));
-        } else if (field === 'rotX') {
-          engine.rotateAxis3D('x', ((val - currentValue) * Math.PI) / 180, targetScope, isGizmoLocked);
-          setTransformValues((prev) => ({ ...prev, rotX: val }));
-        } else if (field === 'rotY') {
-          engine.rotateAxis3D('y', ((val - currentValue) * Math.PI) / 180, targetScope, isGizmoLocked);
-          setTransformValues((prev) => ({ ...prev, rotY: val }));
-        } else if (field === 'rotZ') {
-          engine.rotateAxis3D('z', ((val - currentValue) * Math.PI) / 180, targetScope, isGizmoLocked);
-          setTransformValues((prev) => ({ ...prev, rotZ: val }));
-        } else if (field === 'scale') {
-          const factor = val / (currentValue || 1.0);
-          engine.scaleAxis('uniform', factor, targetScope, isGizmoLocked);
-          setTransformValues((prev) => ({ ...prev, scale: val }));
-        }
-      },
-    });
+    if (!engine) return;
+    const ax = axis === 'posX' ? 'x' : axis === 'posY' ? 'y' : 'z';
+    engine.translateAxis3D(ax, delta, targetScope);
+    setTransformValues((prev) => ({ ...prev, [axis]: Math.round((prev[axis] + delta) * 100) / 100 }));
   };
 
-  const handleManualRecalculate = () => {
-    if (engine) {
-      const count = engine.recalculateMeshNormals();
-      setRecalcFeedback(typeof count === 'number' ? `Updated ${count} meshes` : 'Normals smoothed');
-      setTimeout(() => setRecalcFeedback(null), 2500);
-    }
+  const handleNudgeRot = (axis: 'rotX' | 'rotY' | 'rotZ', deltaDeg: number) => {
+    haptics.trigger('light');
+    if (!engine) return;
+    const ax = axis === 'rotX' ? 'x' : axis === 'rotY' ? 'y' : 'z';
+    engine.rotateAxis3D(ax, (deltaDeg * Math.PI) / 180, targetScope, isGizmoLocked);
+    setTransformValues((prev) => ({ ...prev, [axis]: (prev[axis] + deltaDeg + 360) % 360 }));
+  };
+
+  const handleNudgeScale = (multiplier: number) => {
+    haptics.trigger('light');
+    if (!engine) return;
+    engine.scaleAxis('uniform', multiplier, targetScope, isGizmoLocked);
+    setTransformValues((prev) => ({ ...prev, scale: Math.max(0.05, Math.round(prev.scale * multiplier * 100) / 100) }));
   };
 
   const cardClass = isLight
@@ -179,9 +134,9 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
 
   return (
     <div className="space-y-2 text-xs select-none">
-      {/* 1. SELECTION MODE: Pointer / Lasso toggle */}
+      {/* 1. SELECTION TOOLS: Pointer vs Lasso */}
       <div className={cardClass}>
-        <div className={subHeadingClass}>Selection Mode</div>
+        <div className={subHeadingClass}>Selection Tool</div>
         <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
@@ -401,7 +356,7 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
         </div>
       </div>
 
-      {/* 4. TRANSFORM DETAILS (Expandable Accordion) */}
+      {/* 4. TRANSFORM DETAILS */}
       <div className={cardClass}>
         <button
           type="button"
@@ -422,11 +377,11 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
 
         {showTransformDetails && (
           <div className="space-y-2 pt-1 border-t border-black/5 dark:border-white/5">
-            {/* Position Row */}
+            {/* Position Row with Direct Stepper */}
             <div className="space-y-1">
               <div className="flex justify-between items-center text-[10px] font-medium">
                 <span className={isLight ? 'text-neutral-700' : 'text-neutral-300'}>Position (m)</span>
-                <span className="text-[9px] opacity-60">Tap to edit</span>
+                <span className="text-[9px] opacity-60">±0.1m nudge</span>
               </div>
               <div className="grid grid-cols-3 gap-1.5">
                 {[
@@ -434,28 +389,39 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
                   { axis: 'posY' as const, label: 'Y', val: transformValues.posY },
                   { axis: 'posZ' as const, label: 'Z', val: transformValues.posZ },
                 ].map(({ axis, label, val }) => (
-                  <button
+                  <div
                     key={axis}
-                    type="button"
-                    onClick={() => handleOpenNumpadValue(axis, `Position ${label}`, 'm', -100, 100, 0.1)}
-                    className={`h-8 min-h-[32px] px-2 py-1 rounded-lg border flex items-center justify-between font-mono text-xs transition-colors ${
-                      isLight
-                        ? 'bg-white border-black/10 hover:border-black/30 text-neutral-900'
-                        : 'bg-black/30 border-white/10 hover:border-white/30 text-white'
+                    className={`h-8 min-h-[32px] px-1 rounded-lg border flex items-center justify-between font-mono text-xs ${
+                      isLight ? 'bg-white border-black/10 text-neutral-900' : 'bg-black/30 border-white/10 text-white'
                     }`}
                   >
-                    <span className="font-sans text-[10px] font-bold opacity-60">{label}</span>
-                    <span>{val.toFixed(2)}</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleNudgePos(axis, -0.1)}
+                      className="w-5 h-6 flex items-center justify-center opacity-60 hover:opacity-100 active:scale-90"
+                      title={`Decrease ${label}`}
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="text-[10px] font-bold font-mono">{label}: {val.toFixed(2)}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleNudgePos(axis, 0.1)}
+                      className="w-5 h-6 flex items-center justify-center opacity-60 hover:opacity-100 active:scale-90"
+                      title={`Increase ${label}`}
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* Rotation Row */}
+            {/* Rotation Row with Direct 15° Stepper */}
             <div className="space-y-1 pt-1">
               <div className="flex justify-between items-center text-[10px] font-medium">
                 <span className={isLight ? 'text-neutral-700' : 'text-neutral-300'}>Rotation (°)</span>
-                <span className="text-[9px] opacity-60">Tap to edit</span>
+                <span className="text-[9px] opacity-60">±15° nudge</span>
               </div>
               <div className="grid grid-cols-3 gap-1.5">
                 {[
@@ -463,19 +429,30 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
                   { axis: 'rotY' as const, label: 'Y', val: transformValues.rotY },
                   { axis: 'rotZ' as const, label: 'Z', val: transformValues.rotZ },
                 ].map(({ axis, label, val }) => (
-                  <button
+                  <div
                     key={axis}
-                    type="button"
-                    onClick={() => handleOpenNumpadValue(axis, `Rotation ${label}`, '°', -360, 360, 15)}
-                    className={`h-8 min-h-[32px] px-2 py-1 rounded-lg border flex items-center justify-between font-mono text-xs transition-colors ${
-                      isLight
-                        ? 'bg-white border-black/10 hover:border-black/30 text-neutral-900'
-                        : 'bg-black/30 border-white/10 hover:border-white/30 text-white'
+                    className={`h-8 min-h-[32px] px-1 rounded-lg border flex items-center justify-between font-mono text-xs ${
+                      isLight ? 'bg-white border-black/10 text-neutral-900' : 'bg-black/30 border-white/10 text-white'
                     }`}
                   >
-                    <span className="font-sans text-[10px] font-bold opacity-60">{label}</span>
-                    <span>{Math.round(val)}°</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleNudgeRot(axis, -15)}
+                      className="w-5 h-6 flex items-center justify-center opacity-60 hover:opacity-100 active:scale-90"
+                      title={`Rotate -15° on ${label}`}
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="text-[10px] font-bold font-mono">{label}: {Math.round(val)}°</span>
+                    <button
+                      type="button"
+                      onClick={() => handleNudgeRot(axis, 15)}
+                      className="w-5 h-6 flex items-center justify-center opacity-60 hover:opacity-100 active:scale-90"
+                      title={`Rotate +15° on ${label}`}
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -484,156 +461,32 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
             <div className="space-y-1 pt-1">
               <div className="flex justify-between items-center text-[10px] font-medium">
                 <span className={isLight ? 'text-neutral-700' : 'text-neutral-300'}>Uniform Scale</span>
-                <span className="text-[9px] opacity-60">Tap to edit</span>
+                <span className="text-[9px] opacity-60">Scale factor</span>
               </div>
-              <button
-                type="button"
-                onClick={() => handleOpenNumpadValue('scale', 'Uniform Scale', '×', 0.05, 20, 0.1)}
-                className={`w-full h-8 min-h-[32px] px-2.5 py-1 rounded-lg border flex items-center justify-between font-mono text-xs transition-colors ${
-                  isLight
-                    ? 'bg-white border-black/10 hover:border-black/30 text-neutral-900'
-                    : 'bg-black/30 border-white/10 hover:border-white/30 text-white'
+              <div
+                className={`w-full h-8 min-h-[32px] px-2 rounded-lg border flex items-center justify-between font-mono text-xs ${
+                  isLight ? 'bg-white border-black/10 text-neutral-900' : 'bg-black/30 border-white/10 text-white'
                 }`}
               >
-                <span className="font-sans text-[10px] font-bold opacity-60">Scale Factor</span>
-                <span>{transformValues.scale.toFixed(2)}×</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 5. ADVANCED SNAPPING (Expandable Accordion) */}
-      <div className={cardClass}>
-        <button
-          type="button"
-          onClick={() => {
-            haptics.trigger('light');
-            setShowAdvancedSnapping((prev) => !prev);
-          }}
-          className="w-full flex items-center justify-between min-h-[28px] py-0.5 text-left"
-        >
-          <div className={subHeadingClass}>Advanced Snapping</div>
-          <div className="flex items-center gap-1.5 opacity-70">
-            <span className="text-[10px] font-mono">
-              {showAdvancedSnapping ? 'Hide' : 'Surface / Normals'}
-            </span>
-            {showAdvancedSnapping ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          </div>
-        </button>
-
-        {showAdvancedSnapping && (
-          <div className="space-y-2 pt-1 border-t border-black/5 dark:border-white/5">
-            {/* Sampling Density */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-center text-[10px]">
-                <span className="font-semibold text-current">Alignment Detail</span>
-                <span className="font-mono text-[10px] opacity-70">
-                  {brushSettings.raycastSampleDensity === 'ultra'
-                    ? 'Ultra (48 steps)'
-                    : brushSettings.raycastSampleDensity === 'standard'
-                    ? 'Standard (16 steps)'
-                    : 'High (32 steps)'}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { id: 'standard' as const, label: 'Standard' },
-                  { id: 'high' as const, label: 'High' },
-                  { id: 'ultra' as const, label: 'Ultra' },
-                ].map((lvl) => {
-                  const isSel = (brushSettings.raycastSampleDensity || 'high') === lvl.id;
-                  return (
-                    <button
-                      key={lvl.id}
-                      type="button"
-                      onClick={() => {
-                        haptics.trigger('light');
-                        updateBrushSetting('raycastSampleDensity', lvl.id);
-                      }}
-                      className={`h-8 min-h-[32px] py-1 px-2 rounded-lg border text-center font-medium transition-all text-xs ${
-                        isSel
-                          ? isLight
-                            ? 'bg-neutral-900 border-neutral-900 text-white font-bold shadow-xs'
-                            : 'bg-white border-white text-neutral-950 font-bold shadow-xs'
-                          : isLight
-                          ? 'bg-white border-black/10 text-neutral-700 hover:bg-neutral-200/50'
-                          : 'bg-black/30 border-white/10 text-neutral-300 hover:bg-white/5'
-                      }`}
-                    >
-                      {lvl.label}
-                    </button>
-                  );
-                })}
+                <button
+                  type="button"
+                  onClick={() => handleNudgeScale(0.9)}
+                  className="px-2 h-6 flex items-center justify-center opacity-70 hover:opacity-100 active:scale-90 font-bold"
+                  title="Scale down (0.9x)"
+                >
+                  <Minus className="w-3.5 h-3.5 mr-1" /> Smaller
+                </button>
+                <span className="font-bold text-xs">{transformValues.scale.toFixed(2)}×</span>
+                <button
+                  type="button"
+                  onClick={() => handleNudgeScale(1.1)}
+                  className="px-2 h-6 flex items-center justify-center opacity-70 hover:opacity-100 active:scale-90 font-bold"
+                  title="Scale up (1.1x)"
+                >
+                  Larger <Plus className="w-3.5 h-3.5 ml-1" />
+                </button>
               </div>
             </div>
-
-            {/* Surface Offset Slider */}
-            <div className="space-y-1 pt-1">
-              <div className="flex justify-between items-center text-[10px]">
-                <span className="font-medium text-current">Surface Offset (Elevation)</span>
-                <span className="font-mono text-[10px] font-semibold">
-                  {((brushSettings.surfaceOffset ?? 0.0015) * 1000).toFixed(1)} mm
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0.001"
-                max="0.010"
-                step="0.0005"
-                value={brushSettings.surfaceOffset ?? 0.0015}
-                onChange={(e) => updateBrushSetting('surfaceOffset', parseFloat(e.target.value))}
-                className={`w-full h-1.5 rounded cursor-pointer ${
-                  isLight ? 'accent-neutral-900 bg-neutral-200' : 'accent-white bg-neutral-800'
-                }`}
-              />
-            </div>
-
-            {/* Toggles */}
-            <div className="space-y-1 pt-1 border-t border-black/5 dark:border-white/5">
-              <label className="flex items-center justify-between min-h-[32px] py-0.5 cursor-pointer">
-                <span className="text-[11px] font-medium">Gap & Seam Bridging</span>
-                <input
-                  type="checkbox"
-                  checked={brushSettings.raycastSeamBridging !== false}
-                  onChange={(e) => updateBrushSetting('raycastSeamBridging', e.target.checked)}
-                  className="w-4 h-4 rounded accent-neutral-900 dark:accent-white cursor-pointer"
-                />
-              </label>
-
-              <label className="flex items-center justify-between min-h-[32px] py-0.5 cursor-pointer">
-                <span className="text-[11px] font-medium">Double-Sided Surfaces</span>
-                <input
-                  type="checkbox"
-                  checked={brushSettings.doubleSidedRaycast !== false}
-                  onChange={(e) => updateBrushSetting('doubleSidedRaycast', e.target.checked)}
-                  className="w-4 h-4 rounded accent-neutral-900 dark:accent-white cursor-pointer"
-                />
-              </label>
-            </div>
-
-            {/* Smooth Normals Action */}
-            <button
-              type="button"
-              onClick={handleManualRecalculate}
-              className={`w-full h-8 min-h-[32px] px-2.5 py-1 rounded-lg border flex items-center justify-center gap-1.5 font-semibold text-xs transition-all active:scale-98 ${
-                isLight
-                  ? 'bg-white border-black/10 hover:bg-neutral-200/50 text-neutral-800'
-                  : 'bg-black/30 border-white/10 hover:bg-white/10 text-neutral-200'
-              }`}
-            >
-              {recalcFeedback ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>{recalcFeedback}</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Smooth Surface Normals Now</span>
-                </>
-              )}
-            </button>
           </div>
         )}
       </div>

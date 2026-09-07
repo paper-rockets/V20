@@ -80,7 +80,7 @@ export const BrushSettingsPanelComponent: React.FC<BrushSettingsPanelProps> = ({
     {
       id: 'none',
       label: 'Raw Direct',
-      desc: 'Direct unfiltered coordinates with zero latency',
+      desc: 'Direct unfiltered coordinates for immediate input',
       badge: 'Raw',
     },
   ];

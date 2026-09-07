@@ -32,14 +32,9 @@ import { useUiMode, useHasOnboarded, setUiMode } from './core/uiModeStore';
 import { ProShell } from './components/pro/ProShell';
 import { useOpenSheet, openSheetId, closeSheet, toggleSheet } from './components/play/sheetStore';
 import { PlayTopStrip } from './components/play/PlayTopStrip';
-import { PlayDock, PlayToolId, playToolSettings } from './components/play/PlayDock';
-import { FirstRunOverlay } from './components/play/FirstRunOverlay';
-import { Toybox } from './components/play/Toybox';
-import { PlayStats } from './components/play/PlayStats';
 import { PlaySettingsSheet } from './components/play/PlaySettingsSheet';
 import { PlayImporter } from './components/play/PlayImporter';
 import { ShapesSheet } from './components/play/ShapesSheet';
-import { MagicFxSheet } from './components/play/MagicFxSheet';
 import { Compass } from 'lucide-react';
 import { CameraRecoveryPill } from './components/CameraRecoveryPill';
 import { AutoSaveToast, AutoSaveStatus } from './components/AutoSaveToast';
@@ -76,15 +71,6 @@ const ModelLibraryModal = lazy(() =>
   import('./components/ModelLibraryModal').then((m) => ({ default: m.ModelLibraryModal }))
 );
 const ExportModal = lazy(() => import('./components/ExportModal').then((m) => ({ default: m.ExportModal })));
-const RaycastSettingsModal = lazy(() =>
-  import('./components/RaycastSettingsModal').then((m) => ({ default: m.RaycastSettingsModal }))
-);
-const ModelConverterModal = lazy(() =>
-  import('./components/ModelConverterModal').then((m) => ({ default: m.ModelConverterModal }))
-);
-const SkyEnvironmentPanel = lazy(() =>
-  import('./components/SkyEnvironmentPanel').then((m) => ({ default: m.SkyEnvironmentPanel }))
-);
 const SimpleSceneIlluminationModal = lazy(() =>
   import('./components/SimpleSceneIlluminationModal').then((m) => ({ default: m.SimpleSceneIlluminationModal }))
 );
@@ -99,7 +85,6 @@ const CustomMirrorModal = lazy(() =>
 );
 const BentGuideModal = lazy(() => import('./components/BentGuideModal').then((m) => ({ default: m.BentGuideModal })));
 const ARViewerModal = lazy(() => import('./components/ARViewerModal').then((m) => ({ default: m.ARViewerModal })));
-const NumpadModal = lazy(() => import('./components/NumpadModal').then((m) => ({ default: m.NumpadModal })));
 const ColorStudioModal = lazy(() =>
   import('./components/CompactColorStudioModal').then((m) => ({ default: m.ColorStudioModal }))
 );
@@ -108,9 +93,6 @@ const HolisticDNAInspector = lazy(() =>
 );
 const FloatingReferenceClipboard = lazy(() =>
   import('./components/FloatingReferenceClipboard').then((m) => ({ default: m.FloatingReferenceClipboard }))
-);
-const ScaffoldingModal = lazy(() =>
-  import('./components/ScaffoldingModal').then((m) => ({ default: m.ScaffoldingModal }))
 );
 import { haptics } from './utils/haptics';
 import { setGlobalSoundEnabled } from './utils/audio';
@@ -217,7 +199,6 @@ export function App() {
   const uiMode = useUiMode();
   const openSheet = useOpenSheet();
   const hasOnboarded = useHasOnboarded();
-  const [isToyboxOpen, setIsToyboxOpen] = useState<boolean>(false);
   const [showPlayStats, setShowPlayStats] = useState<boolean>(false);
   const [showPlayNavigator, setShowPlayNavigator] = useState<boolean>(true);
   const [isPlayImporterOpen, setIsPlayImporterOpen] = useState<boolean>(false);
@@ -357,14 +338,9 @@ export function App() {
   const [isModelDisplayOpen, setIsModelDisplayOpen] = useState<boolean>(false);
   const [modelDisplayMode, setModelDisplayMode] = useState<ModelDisplayMode>('texture');
   const [isModelVisible, setIsModelVisible] = useState<boolean>(true);
-  const [isConverterOpen, setIsConverterOpen] = useState<boolean>(false);
-  const [droppedFilesForConverter, setDroppedFilesForConverter] = useState<FileList | File[] | null>(null);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState<boolean>(false);
-  const [isRaycastSettingsOpen, setIsRaycastSettingsOpen] = useState<boolean>(false);
   const [isIlluminationOpen, setIsIlluminationOpen] = useState<boolean>(false);
-  const [isSkyEnvironmentOpen, setIsSkyEnvironmentOpen] = useState<boolean>(false);
-  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [windowDragOver, setWindowDragOver] = useState<boolean>(false);
 
   // Sprint 1-5 Spatial Editing & Hardware States
@@ -394,10 +370,8 @@ export function App() {
   });
   const [isARViewerOpen, setIsARViewerOpen] = useState<boolean>(false);
   const [showPlane, setShowPlane] = useState<boolean>(true);
-  const [numpadTarget, setNumpadTarget] = useState<NumpadTarget | null>(null);
 
-  // Phase 4 Stage Assets, Scaffolding Hierarchy & Reference Clipboard States
-  const [isScaffoldingOpen, setIsScaffoldingOpen] = useState<boolean>(false);
+  // Phase 4 Stage Assets & Reference Clipboard States
   const [isClipboardOpen, setIsClipboardOpen] = useState<boolean>(false);
   const [referenceImages, setReferenceImages] = useState<ReferenceImageItem[]>([]);
 
@@ -430,19 +404,6 @@ export function App() {
   const [isColorStudioOpen, setIsColorStudioOpen] = useState<boolean>(false);
   const [activeDNA, setActiveDNA] = useState<HolisticStrokeDNA | null>(null);
   const [snappedShapeNotice, setSnappedShapeNotice] = useState<string | null>(null);
-
-  // Global on-screen Numpad event listener
-  useEffect(() => {
-    const handleOpenNumpad = (e: any) => {
-      if (e && e.detail) {
-        setNumpadTarget(e.detail);
-      }
-    };
-    window.addEventListener('OPEN_NUMPAD', handleOpenNumpad);
-    return () => {
-      window.removeEventListener('OPEN_NUMPAD', handleOpenNumpad);
-    };
-  }, []);
 
   const [activeGuide, setActiveGuide] = useState<Guide3D | null>(null);
 
@@ -673,7 +634,6 @@ export function App() {
       }));
     };
     inst.onShapeSnapped = (result) => {
-      if (uiMode === 'play') return;
       const typeLabels: Record<string, string> = {
         line: 'Straight Line',
         circle: 'Perfect Circle',
@@ -799,6 +759,22 @@ export function App() {
     PlatformBridge.triggerHaptic('success');
   }, [engine, layers, activeModelName]);
 
+  // Save current project session directly to a folder chosen by the user
+  const handleSaveProjectToFolder = useCallback(async (customName?: string) => {
+    if (!engine) return;
+    const nameToUse = (typeof customName === 'string' && customName.trim()) ? customName.trim() : (activeModelName || 'Remix 3D Project');
+    const projectData = engine.exportProjectData(nameToUse, layers);
+    const jsonStr = JSON.stringify(projectData, null, 2);
+    const filename = `${(projectData.name || 'Remix3D_Project').replace(/\s+/g, '_')}_${Date.now()}.remix3d`;
+    const result = await PlatformBridge.saveFileToChosenFolder(filename, jsonStr, [
+      { name: 'Remix 3D Project', extensions: ['remix3d', 'json'] },
+      { name: 'All Files', extensions: ['*'] },
+    ]);
+    if (result) {
+      PlatformBridge.triggerHaptic('success');
+    }
+  }, [engine, layers, activeModelName]);
+
   // Full Project State Load (.remix3d JSON file)
   const handleLoadProject = useCallback((file: File) => {
     if (!engine) return;
@@ -873,20 +849,17 @@ export function App() {
           case 'settings': toggleSheet('settings'); break;
           case 'sessions': setIsSessionModalOpen(true); break;
           case 'illumination': setIsIlluminationOpen(true); break;
-          case 'toybox': setIsToyboxOpen(true); break;
+          case 'toybox': setIsModelsOpen(true); break;
+          case 'models': setIsModelsOpen(true); break;
           case 'importer': setIsPlayImporterOpen(true); break;
           case 'colorStudio': setIsColorStudioOpen(true); break;
-          case 'skyEnvironment': setIsSkyEnvironmentOpen(true); break;
           case 'renderSettings': setIsRenderSettingsOpen(true); break;
           case 'export': setIsExportOpen(true); break;
-          case 'raycast': setIsRaycastSettingsOpen(true); break;
           case 'curveDecimate': setIsDecimateOpen(true); break;
           case 'bentGuide': setIsBentGuideOpen(true); break;
-          case 'scaffolding': setIsScaffoldingOpen(true); break;
           case 'customMirror': setIsCustomMirrorOpen(true); break;
           case 'arViewer': setIsARViewerOpen(true); break;
           case 'clipboard': setIsClipboardOpen(true); break;
-          case 'numpad': setNumpadTarget({ title: 'Brush Size', value: 25, unit: 'mm', min: 1, max: 100, step: 1, onChange: () => {} }); break;
           case 'dna': setActiveDNA({
             sourceType: 'stroke',
             colorHex: '#38bdf8',
@@ -909,19 +882,15 @@ export function App() {
         closeSheet();
         setIsSessionModalOpen(false);
         setIsIlluminationOpen(false);
-        setIsToyboxOpen(false);
+        setIsModelsOpen(false);
         setIsPlayImporterOpen(false);
         setIsColorStudioOpen(false);
-        setIsSkyEnvironmentOpen(false);
         setIsRenderSettingsOpen(false);
         setIsExportOpen(false);
-        setIsRaycastSettingsOpen(false);
         setIsDecimateOpen(false);
         setIsBentGuideOpen(false);
-        setIsScaffoldingOpen(false);
         setIsCustomMirrorOpen(false);
         setIsARViewerOpen(false);
-        setNumpadTarget(null);
         setActiveDNA(null);
         setIsClipboardOpen(false);
       }
@@ -999,16 +968,6 @@ export function App() {
     setLightingPreset(next);
     engine?.setLightingPreset(next);
   };
-
-  /**
-   * Play mode's four tools each map to one engine state. The mapping lives in
-   * PlayDock so the dock and this handler cannot drift apart.
-   */
-  const handlePlayToolSelect = useCallback((id: PlayToolId) => {
-    const { tool: nextTool, patch } = playToolSettings(id);
-    setTool(nextTool);
-    setBrushSettings((prev) => ({ ...prev, ...patch }));
-  }, []);
 
   const handleResetCamera = () => {
     engine?.snapToView('isometric');
@@ -1137,12 +1096,20 @@ export function App() {
       }
     };
 
-    const handleDrop = (e: DragEvent) => {
+    const handleDrop = async (e: DragEvent) => {
       e.preventDefault();
       setWindowDragOver(false);
       if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        setDroppedFilesForConverter(e.dataTransfer.files);
-        setIsConverterOpen(true);
+        const file = e.dataTransfer.files[0];
+        if (file && engine) {
+          try {
+            const buffer = await file.arrayBuffer();
+            await engine.loadGLTF(buffer, file.name);
+            setActiveModelName(file.name);
+          } catch (err) {
+            console.warn('Failed to load dropped 3D file directly:', err);
+          }
+        }
       }
     };
 
@@ -1155,21 +1122,17 @@ export function App() {
       window.removeEventListener('dragleave', handleDragLeave);
       window.removeEventListener('drop', handleDrop);
     };
-  }, []);
+  }, [engine]);
 
   const isAnyModalActive =
     isIlluminationOpen ||
     isColorStudioOpen ||
-    isToyboxOpen ||
     isPlayImporterOpen ||
     isModelsOpen ||
     isSessionModalOpen ||
-    isConverterOpen ||
     isExportOpen ||
-    isRaycastSettingsOpen ||
     isBentGuideOpen ||
     isCustomMirrorOpen ||
-    isScaffoldingOpen ||
     isDecimateOpen ||
     isSettingsOpen ||
     isARViewerOpen ||
@@ -1207,21 +1170,17 @@ export function App() {
         fingerPenMode={fingerPenMode}
         onToggleFingerPenMode={setFingerPenMode}
         liquifySettings={liquifySettings}
-        onOpenColorPanel={() => {
-          if (uiMode === 'play') openSheetId('brushes');
-          else setIsSettingsOpen(true);
-        }}
-        onOpenNumpad={(t) => setNumpadTarget(t)}
+        onOpenColorPanel={() => setIsColorStudioOpen(true)}
         disableContextMenu={disableContextMenu}
         onToggleDisableContextMenu={handleToggleDisableContextMenu}
         theme={theme}
         onStylusDetected={setIsStylusDetected}
       />
 
-      {/* Shared Top Strip (Play Mode and Pro 5-Mode Surface) */}
+      {/* Top Strip (Studio Workspace Surface) */}
       <PlayTopStrip
         projectName={activeModelName}
-        onOpenToybox={uiMode === 'pro' ? () => setIsModelsOpen(true) : () => setIsToyboxOpen(true)}
+        onOpenToybox={() => setIsModelsOpen(true)}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={canUndo}
@@ -1231,64 +1190,23 @@ export function App() {
         onOpenIllumination={() => setIsIlluminationOpen(true)}
         onQuickSave={handleQuickSave}
         onOpenSessions={() => setIsSessionModalOpen(true)}
-        onSwitchUiMode={() => {
-          haptics.trigger('mode-switch');
-          setUiMode('play');
-        }}
       />
 
       {/* Omnipresent Safety & Recovery Anchor: "Lost? Tap to return to artwork" */}
       <CameraRecoveryPill engine={engine} theme={theme} />
 
-      {/* ================= PLAY MODE (default surface) ================= */}
-      {uiMode === 'play' && (
-        <>
-          {!isAnyModalActive && (
-            <PlayDock
-              tool={tool}
-              brushSettings={brushSettings}
-              setBrushSettings={setBrushSettings}
-              shapeSnapping={brushSettings.shapeSnapping ?? false}
-              onSelect={handlePlayToolSelect}
-              onOpenFullColor={() => setIsColorStudioOpen(true)}
-              engine={engine}
-              theme={theme}
-            />
-          )}
-          <MagicFxSheet brushSettings={brushSettings} setBrushSettings={setBrushSettings} theme={theme} />
-          {showPlayStats && <PlayStats theme={theme} />}
-          <FirstRunOverlay onOpenToybox={() => setIsToyboxOpen(true)} theme={theme} />
-          <Toybox
-            isOpen={isToyboxOpen}
-            engine={engine}
-            onClose={() => setIsToyboxOpen(false)}
-            onSpawned={(name) => setActiveModelName(name)}
-            setBrushSettings={setBrushSettings}
-            onOpenImporter={() => setIsPlayImporterOpen(true)}
-            theme={theme}
-          />
-        </>
-      )}
-
-      {/* Shared 3D Model Importer (usable in both Play and Pro modes) */}
+      {/* Shared 3D Model Importer */}
       <PlayImporter
         isOpen={isPlayImporterOpen}
         engine={engine}
         onClose={() => setIsPlayImporterOpen(false)}
         onSaved={(n) => setActiveModelName(n)}
-        onOpenFineTuning={() => {
-          setDroppedFilesForConverter(null);
-          setIsConverterOpen(true);
-        }}
         theme={theme}
       />
 
-      {/* ================= PRO MODE (the full studio) ================= */}
-      {/* Five-Mode Surface Shell */}
-      {uiMode === 'pro' && (
-        <>
-          <ProShell
-            theme={theme}
+      {/* Studio Workspace Shell */}
+      <ProShell
+        theme={theme}
             engine={engine}
             tool={tool}
             setTool={setTool}
@@ -1298,7 +1216,6 @@ export function App() {
             onToggleGizmo={() => setGizmoMode(gizmoMode === 'Hidden' ? 'Standard' : 'Hidden')}
             isGizmoLocked={isGizmoLocked}
             onToggleLock={() => setIsGizmoLocked((prev) => !prev)}
-            onOpenNumpad={(t) => setNumpadTarget(t)}
             targetScope={targetScope}
             onSelectTargetScope={handleSelectTargetScope}
             onGizmoReset={handleGizmoReset}
@@ -1343,10 +1260,6 @@ export function App() {
               setIsLiquifyOpen(false);
               setTool('brush');
             }}
-            onOpenScaffolding={() => {
-              closeSheet();
-              setIsScaffoldingOpen(true);
-            }}
             onOpenBentGuide={() => {
               closeSheet();
               setIsBentGuideOpen(true);
@@ -1371,18 +1284,14 @@ export function App() {
             }}
             isIlluminationOpen={isIlluminationOpen}
           />
-        </>
-      )}
 
-      {/* FPS & Input Lag Diagnostics Counter (Pro Mode) */}
-      {uiMode === 'pro' && (
-        <FpsCounter
-          uiScale={uiScale}
-          theme={theme}
-          fullDebug={showPlayStats}
-          onToggleFullDebug={() => setShowPlayStats((prev) => !prev)}
-        />
-      )}
+      {/* FPS & Input Lag Diagnostics Counter */}
+      <FpsCounter
+        uiScale={uiScale}
+        theme={theme}
+        fullDebug={showPlayStats}
+        onToggleFullDebug={() => setShowPlayStats((prev) => !prev)}
+      />
 
       {/* Dynamic Screen Center Crosshair Reticle */}
       <ScreenCenterCrosshair
@@ -1395,7 +1304,7 @@ export function App() {
 
       {/* 3D Navigation Controller: Option 3 Sphere Navigator */}
       {gizmoMode !== 'Hidden' && activeController !== 'hidden' && showPlayNavigator &&
-        !isModelsOpen && !isConverterOpen && !isExportOpen && !isRaycastSettingsOpen &&
+        !isModelsOpen && !isExportOpen &&
         !isIlluminationOpen && !isColorStudioOpen && !isARViewerOpen && !isClipboardOpen && (
           <Option3SphereNavigator
             engine={engine}
@@ -1445,13 +1354,12 @@ export function App() {
       )}
 
       {/* Brush Settings / Color Panel */}
-      {isSettingsOpen && uiMode === 'pro' && (
+      {isSettingsOpen && (
         <BrushSettingsPanel
           brushSettings={brushSettings}
           setBrushSettings={setBrushSettings}
           onClose={() => setIsSettingsOpen(false)}
           onRecalculateNormals={() => engine?.recalculateMeshNormals()}
-          onOpenRaycastSettings={() => setIsRaycastSettingsOpen(true)}
           onOpenColorStudio={() => setIsColorStudioOpen(true)}
           theme={theme}
         />
@@ -1471,38 +1379,14 @@ export function App() {
         </Suspense>
       )}
 
-      {/* 3D Model Ingestion / Presets Modal (37+ Models with Draco compression) */}
+      {/* 3D Model Ingestion / Presets Modal */}
       {isModelsOpen && (
         <Suspense fallback={null}>
           <ModelLibraryModal
             engine={engine}
             onClose={() => setIsModelsOpen(false)}
             activeModelName={activeModelName}
-            onOpenConverter={() => {
-              setIsModelsOpen(false);
-              setDroppedFilesForConverter(null);
-              setIsConverterOpen(true);
-            }}
             theme={theme}
-          />
-        </Suspense>
-      )}
-
-      {/* 3D Model Converter, Draco Compressor & In-App Storage Suite */}
-      {isConverterOpen && (
-        <Suspense fallback={null}>
-          <ModelConverterModal
-            isOpen={isConverterOpen}
-            onClose={() => {
-              setIsConverterOpen(false);
-              setDroppedFilesForConverter(null);
-            }}
-            engine={engine}
-            initialFiles={droppedFilesForConverter}
-            theme={theme}
-            onModelLoadedToCanvas={(name) => {
-              setActiveModelName(name);
-            }}
           />
         </Suspense>
       )}
@@ -1527,23 +1411,11 @@ export function App() {
             onClose={() => setIsSessionModalOpen(false)}
             onSaveSession={handleSaveNamedSession}
             onLoadSession={handleLoadNamedSession}
+            onSaveToFolder={handleSaveProjectToFolder}
             onExportFile={handleSaveProject}
             onImportFile={handleLoadProject}
             theme={theme}
             activeProjectName={activeModelName}
-          />
-        </Suspense>
-      )}
-
-      {/* 3D Surface Raycasting & Snapping Parameters Modal */}
-      {isRaycastSettingsOpen && (
-        <Suspense fallback={null}>
-          <RaycastSettingsModal
-            brushSettings={brushSettings}
-            setBrushSettings={setBrushSettings}
-            onClose={() => setIsRaycastSettingsOpen(false)}
-            onRecalculateNormals={() => engine?.recalculateMeshNormals()}
-            theme={theme}
           />
         </Suspense>
       )}
@@ -1554,22 +1426,11 @@ export function App() {
           engine={engine}
           isOpen={isIlluminationOpen}
           onClose={() => setIsIlluminationOpen(false)}
-          onOpenSkybox={() => setIsSkyEnvironmentOpen(true)}
           theme={theme}
         />
       </DeferredPanel>
 
-      {/* Skybox & Atmosphere Environment Studio (from webgpu-skybox-studio) */}
-      <DeferredPanel active={isSkyEnvironmentOpen}>
-        <SkyEnvironmentPanel
-          engine={engine}
-          isOpen={isSkyEnvironmentOpen}
-          onClose={() => setIsSkyEnvironmentOpen(false)}
-          theme={theme}
-        />
-      </DeferredPanel>
-
-      {/* RDP Curve Decimation Modal (Sprint 2) */}
+      {/* RDP Curve Decimation Modal */}
       <DeferredPanel active={isDecimateOpen}>
         <CurveDecimateModal
           isOpen={isDecimateOpen}
@@ -1590,23 +1451,11 @@ export function App() {
           isOpen={isBentGuideOpen}
           onClose={() => setIsBentGuideOpen(false)}
           engine={engine}
-          onOpenNumpad={(t) => setNumpadTarget(t)}
           theme={theme}
         />
       </DeferredPanel>
 
-      {/* 3D Collision Scaffolding & Procedural Armatures Modal (Phase 4) */}
-      <DeferredPanel active={isScaffoldingOpen}>
-        <ScaffoldingModal
-          isOpen={isScaffoldingOpen}
-          onClose={() => setIsScaffoldingOpen(false)}
-          engine={engine}
-          onOpenNumpad={(t) => setNumpadTarget(t)}
-          theme={theme}
-        />
-      </DeferredPanel>
-
-      {/* Floating 2D Blueprint Clipboard & Reference Moodboard (Phase 4) */}
+      {/* Floating 2D Blueprint Clipboard & Reference Moodboard */}
       <DeferredPanel active={isClipboardOpen}>
         <FloatingReferenceClipboard
           isOpen={isClipboardOpen}
@@ -1617,7 +1466,7 @@ export function App() {
         />
       </DeferredPanel>
 
-      {/* Arbitrary 3D Mirror Plane Modal (Sprint 4) */}
+      {/* Arbitrary 3D Mirror Plane Modal */}
       <DeferredPanel active={isCustomMirrorOpen}>
         <CustomMirrorModal
           isOpen={isCustomMirrorOpen}
@@ -1648,21 +1497,12 @@ export function App() {
         />
       </DeferredPanel>
 
-      {/* WebXR AR Viewer Modal (Sprint 5) */}
+      {/* WebXR AR Viewer Modal */}
       <DeferredPanel active={isARViewerOpen}>
         <ARViewerModal
           isOpen={isARViewerOpen}
           onClose={() => setIsARViewerOpen(false)}
           engine={engine}
-          theme={theme}
-        />
-      </DeferredPanel>
-
-      {/* Floating On-Screen Numpad Modal */}
-      <DeferredPanel active={numpadTarget !== null}>
-        <NumpadModal
-          target={numpadTarget}
-          onClose={() => setNumpadTarget(null)}
           theme={theme}
         />
       </DeferredPanel>
@@ -1712,8 +1552,8 @@ export function App() {
         />
       </DeferredPanel>
 
-      {/* Snapped Shape Notice Toast (Pro Mode Only) */}
-      {snappedShapeNotice && uiMode !== 'play' && (
+      {/* Snapped Shape Notice Toast */}
+      {snappedShapeNotice && (
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
           <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-xs shadow-xl border ${
             theme === 'light'
@@ -1768,7 +1608,6 @@ export function App() {
           engine?.setModelDisplayMode(mode);
         }}
         onOpenIllumination={() => setIsIlluminationOpen(true)}
-        onOpenSkyEnvironment={() => setIsSkyEnvironmentOpen(true)}
         onOpenRenderSettings={() => setIsRenderSettingsOpen(true)}
         onOpenSessions={() => setIsSessionModalOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}

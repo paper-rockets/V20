@@ -126,7 +126,15 @@ export const MagicFxSheet: React.FC<MagicFxSheetProps> = ({
         background: 'linear-gradient(135deg, #cccccc 0%, #999999 100%)',
       },
     };
-    return styles[effectId] || {};
+    if (styles[effectId]) return styles[effectId];
+    const match = MAGIC_FX_TILES.find((t) => t.id === effectId);
+    if (match?.suggestColor) {
+      return {
+        background: `radial-gradient(circle at 35% 35%, ${match.suggestColor}ee 0%, ${match.suggestColor}88 50%, #18181b 100%)`,
+        boxShadow: `0 0 8px ${match.suggestColor}55`,
+      };
+    }
+    return { background: '#27272a' };
   };
 
   return (

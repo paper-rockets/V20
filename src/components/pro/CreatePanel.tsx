@@ -42,10 +42,6 @@ const PRIMITIVES: PrimitiveDef[] = [
   { id: 'sphere', name: 'Sphere', icon: Circle, factory: SampleModelFactory.createSphere },
   { id: 'cylinder', name: 'Cylinder', icon: Cylinder, factory: SampleModelFactory.createCylinder },
   { id: 'plane', name: 'Plane', icon: Square, factory: SampleModelFactory.createDrawingPlane },
-  { id: 'torus', name: 'Torus', icon: Orbit, factory: SampleModelFactory.createTorus },
-  { id: 'capsule', name: 'Capsule', icon: Disc3, factory: SampleModelFactory.createCapsule },
-  { id: 'cone', name: 'Cone', icon: Cone, factory: SampleModelFactory.createCone },
-  { id: 'pyramid', name: 'Pyramid', icon: Triangle, factory: SampleModelFactory.createPyramid },
 ];
 
 export const CreatePanel: React.FC<CreatePanelProps> = ({

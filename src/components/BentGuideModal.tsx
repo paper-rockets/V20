@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BentGuideConfig, NumpadTarget } from '../types';
+import { BentGuideConfig } from '../types';
 import {
   Spline,
   Plus,
@@ -22,7 +22,7 @@ interface BentGuideModalProps {
   isOpen: boolean;
   onClose: () => void;
   engine: StudioEngine | null;
-  onOpenNumpad: (target: NumpadTarget) => void;
+  onOpenNumpad?: any;
   theme?: 'light' | 'dark';
 }
 
@@ -30,7 +30,6 @@ export const BentGuideModal: React.FC<BentGuideModalProps> = ({
   isOpen,
   onClose,
   engine,
-  onOpenNumpad,
   theme = 'dark',
 }) => {
   if (!isOpen) return null;
@@ -283,28 +282,13 @@ export const BentGuideModal: React.FC<BentGuideModalProps> = ({
         <div className="space-y-0.5">
           <div className="flex items-center justify-between text-xs">
             <span className={`font-medium ${t.textPrimary}`}>Guide Width</span>
-            <button
-              onClick={() =>
-                onOpenNumpad({
-                  id: 'guide_width',
-                  title: 'Guide Width',
-                  value: guideWidth,
-                  min: 0.05,
-                  max: 2.0,
-                  step: 0.05,
-                  unit: 'm',
-                  onConfirm: (val) => {
-                    setGuideWidth(val);
-                    handleUpdateSelected({ width: val });
-                  },
-                })
-              }
+            <span
               className={`font-mono text-xs px-1.5 py-0.5 rounded font-bold ${
                 isLight ? 'bg-neutral-100 text-neutral-900 dark:text-neutral-200 border border-black/10' : 'bg-neutral-800 text-neutral-800 dark:text-zinc-300'
               }`}
             >
               {(guideWidth * 100).toFixed(0)} cm
-            </button>
+            </span>
           </div>
           <input
             type="range"

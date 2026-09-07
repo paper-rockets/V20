@@ -59,7 +59,7 @@ export const PlayDock: React.FC<PlayDockProps> = ({
 }) => {
   const active = activePlayTool(tool, shapeSnapping);
   const [panel, setPanel] = useState<'color' | 'size' | 'brush' | null>(null);
-  const [activeTab, setActiveTab] = useState<BrushCategoryTab>('Sculpt');
+  const [activeTab, setActiveTab] = useState<BrushCategoryTab>('Core');
   const root = useRef<HTMLDivElement>(null);
 
   const activeBrush = getActiveCuratedBrush(brushSettings);
@@ -266,9 +266,9 @@ export const PlayDock: React.FC<PlayDockProps> = ({
                 <div className="flex flex-col gap-3 w-full">
                   {/* Header Title & Category Tabs */}
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-sm font-semibold tracking-tight text-white/95">Brushes</h3>
-                    <div className="flex items-center gap-4 text-xs font-medium border-b border-white/[0.08] pb-1.5">
-                      {(['Favorites', 'Sculpt', 'Surface', 'Polish'] as BrushCategoryTab[]).map((tab) => {
+                    <h3 className={`text-sm font-semibold tracking-tight ${isLight ? 'text-neutral-900' : 'text-white/95'}`}>Brushes</h3>
+                    <div className={`flex items-center gap-4 text-xs font-medium border-b pb-1.5 ${isLight ? 'border-black/10' : 'border-white/[0.08]'}`}>
+                      {(['Favorites', 'Core', 'Textures', 'Surface'] as BrushCategoryTab[]).map((tab) => {
                         const isTabActive = activeTab === tab;
                         return (
                           <button
@@ -276,12 +276,18 @@ export const PlayDock: React.FC<PlayDockProps> = ({
                             type="button"
                             onClick={() => setActiveTab(tab)}
                             className={`transition-colors relative pb-1 ${
-                              isTabActive ? 'text-white font-semibold' : 'text-white/40 hover:text-white/75'
+                              isTabActive
+                                ? isLight ? 'text-neutral-950 font-bold' : 'text-white font-semibold'
+                                : isLight ? 'text-neutral-500 hover:text-neutral-800' : 'text-white/40 hover:text-white/75'
                             }`}
                           >
                             {tab}
                             {isTabActive && (
-                              <span className="absolute bottom-[-7px] left-0 right-0 h-[2px] bg-white rounded-full shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
+                              <span className={`absolute bottom-[-7px] left-0 right-0 h-[2px] rounded-full ${
+                                isLight
+                                  ? 'bg-neutral-900 shadow-[0_0_6px_rgba(0,0,0,0.3)]'
+                                  : 'bg-white shadow-[0_0_6px_rgba(255,255,255,0.4)]'
+                              }`} />
                             )}
                           </button>
                         );
@@ -304,29 +310,50 @@ export const PlayDock: React.FC<PlayDockProps> = ({
                           }}
                           className={`relative rounded-xl p-1.5 flex flex-col items-center justify-between transition-all active:scale-95 aspect-[4/5] border ${
                             isSelected
-                              ? 'border-white bg-white/[0.12] shadow-[0_0_12px_rgba(255,255,255,0.2)] ring-1 ring-white/70'
+                              ? isLight
+                                ? 'border-neutral-900 bg-neutral-900/[0.08] shadow-[0_0_12px_rgba(0,0,0,0.15)] ring-1 ring-neutral-900/40'
+                                : 'border-white bg-white/[0.12] shadow-[0_0_12px_rgba(255,255,255,0.2)] ring-1 ring-white/70'
+                              : isLight
+                              ? 'border-black/10 bg-black/[0.03] hover:border-black/25 hover:bg-black/[0.06]'
                               : 'border-white/[0.06] bg-[#18191e] hover:border-white/20 hover:bg-[#1f2127]'
                           }`}
                           title={preset.description}
                         >
                           {/* Active Star */}
                           {isSelected && (
-                            <Star className="w-2.5 h-2.5 text-white fill-white absolute top-1.5 right-1.5" />
+                            <Star className={`w-2.5 h-2.5 absolute top-1.5 right-1.5 ${
+                              isLight ? 'text-neutral-900 fill-neutral-900' : 'text-white fill-white'
+                            }`} />
                           )}
 
-                          {/* 3D Clay Thumbnail */}
+                          {/* 3D Clay Thumbnail with error fallback */}
                           <div className="w-full flex-1 flex items-center justify-center p-0.5 overflow-hidden">
                             <img
                               src={preset.iconUrl}
                               alt={preset.name}
                               className="w-10 h-10 object-contain pointer-events-none"
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent && !parent.querySelector('.brush-fallback-icon')) {
+                                  const fallback = document.createElement('div');
+                                  fallback.className = `brush-fallback-icon w-8 h-8 rounded-full border border-current flex items-center justify-center text-[9px] font-bold ${
+                                    isLight ? 'text-neutral-700 bg-neutral-200/60' : 'text-neutral-300 bg-white/10'
+                                  }`;
+                                  fallback.innerText = preset.name.slice(0, 2).toUpperCase();
+                                  parent.appendChild(fallback);
+                                }
+                              }}
                             />
                           </div>
 
                           {/* Label */}
                           <span
                             className={`text-[10px] truncate w-full text-center leading-tight pb-0.5 ${
-                              isSelected ? 'text-white font-semibold' : 'text-white/70'
+                              isSelected
+                                ? isLight ? 'text-neutral-950 font-bold' : 'text-white font-semibold'
+                                : isLight ? 'text-neutral-700' : 'text-white/70'
                             }`}
                           >
                             {preset.name}
@@ -337,12 +364,12 @@ export const PlayDock: React.FC<PlayDockProps> = ({
                   </div>
 
                   {/* Bottom Sliders & Falloff (matching Image 1) */}
-                  <div className="pt-2 border-t border-white/[0.08] flex flex-col gap-2">
+                  <div className={`pt-2 border-t flex flex-col gap-2 ${isLight ? 'border-black/10' : 'border-white/[0.08]'}`}>
                     <div className="flex items-center gap-3">
                       <div className="flex-1 flex flex-col gap-0.5">
-                        <div className="flex justify-between text-[10px] text-white/70">
+                        <div className={`flex justify-between text-[10px] ${isLight ? 'text-neutral-700' : 'text-white/70'}`}>
                           <span>Size</span>
-                          <span className="font-mono text-white/90">{displaySizeNumber}</span>
+                          <span className={`font-mono ${isLight ? 'text-neutral-950 font-semibold' : 'text-white/90'}`}>{displaySizeNumber}</span>
                         </div>
                         <input
                           type="range"
@@ -351,13 +378,15 @@ export const PlayDock: React.FC<PlayDockProps> = ({
                           step="0.002"
                           value={brushSettings.size}
                           onChange={(e) => setBrushSettings((p) => ({ ...p, size: parseFloat(e.target.value) }))}
-                          className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-white"
+                          className={`w-full h-1 rounded-full appearance-none cursor-pointer ${
+                            isLight ? 'bg-black/15 accent-neutral-900' : 'bg-white/20 accent-white'
+                          }`}
                         />
                       </div>
                       <div className="flex-1 flex flex-col gap-0.5">
-                        <div className="flex justify-between text-[10px] text-white/70">
+                        <div className={`flex justify-between text-[10px] ${isLight ? 'text-neutral-700' : 'text-white/70'}`}>
                           <span>Strength</span>
-                          <span className="font-mono text-white/90">{displayStrengthNumber}</span>
+                          <span className={`font-mono ${isLight ? 'text-neutral-950 font-semibold' : 'text-white/90'}`}>{displayStrengthNumber}</span>
                         </div>
                         <input
                           type="range"
@@ -366,7 +395,9 @@ export const PlayDock: React.FC<PlayDockProps> = ({
                           step="0.02"
                           value={brushSettings.opacity ?? 1.0}
                           onChange={(e) => setBrushSettings((p) => ({ ...p, opacity: parseFloat(e.target.value) }))}
-                          className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-white"
+                          className={`w-full h-1 rounded-full appearance-none cursor-pointer ${
+                            isLight ? 'bg-black/15 accent-neutral-900' : 'bg-white/20 accent-white'
+                          }`}
                         />
                       </div>
                     </div>

@@ -711,21 +711,36 @@ export class StudioEngine {
     if (!this.dracoLoader) {
       this.dracoLoader = new DRACOLoader();
       this.dracoLoader.setDecoderPath(resolveAssetUrl('draco/'));
-      this.dracoLoader.setDecoderConfig({ type: 'wasm' });
       this.dracoLoader.preload();
     }
     return this.dracoLoader;
   }
 
+  public getModelMetadata(): ModelMetadata {
+    return { ...this.modelMetadata };
+  }
+
   /**
    * Loads a preset procedural or remote 3D model
    */
-  public async loadPresetModel(presetId: string, initialDisplayMode?: ModelDisplayMode): Promise<void> {
+  public async loadPresetModel(
+    presetId: string,
+    initialDisplayMode?: ModelDisplayMode,
+    loadMode: 'add' | 'clear' = 'clear'
+  ): Promise<void> {
     const presets = SampleModelFactory.getPresets();
     const found = presets.find((p) => p.id === presetId) || presets[0];
 
-    // Clear current model & strokes (only recreate drawing plane if user selected the drawing plane preset)
-    this.clearModel(presetId === 'drawing_plane');
+    // Clear current model & drawings only if requested
+    if (loadMode === 'clear') {
+      this.clearAllStrokes();
+      this.clearModel(presetId === 'drawing_plane', false);
+      if (this.uvEngine) {
+        this.uvEngine.clearCanvas();
+        this.uvEngine.resetHistory();
+      }
+    }
+
     if (found.file || found.remoteUrl) {
       try {
         const rawUrl = found.file || found.remoteUrl!;
@@ -737,27 +752,27 @@ export class StudioEngine {
             throw new Error(`File ${fileUrl} is unavailable (HTTP ${checkRes?.status || 'error'}).`);
           }
         }
-        await this.loadGLTF(fileUrl, found.name, found);
+        await this.loadGLTF(fileUrl, found.name, found, loadMode);
         if (initialDisplayMode) {
           this.setModelDisplayMode(initialDisplayMode);
         }
       } catch (err) {
         console.warn(`Direct model load notice for ${found.name}, switching to procedural generation fallback:`, err);
         const meshObj = found.createMesh ? found.createMesh() : SampleModelFactory.createFallbackModelForPreset(found);
-        this.setModelObject(meshObj, found.name, found);
+        this.setModelObject(meshObj, found.name, found, loadMode);
         if (initialDisplayMode) {
           this.setModelDisplayMode(initialDisplayMode);
         }
       }
     } else if (found.createMesh) {
       const meshObj = found.createMesh();
-      this.setModelObject(meshObj, found.name, found);
+      this.setModelObject(meshObj, found.name, found, loadMode);
       if (initialDisplayMode) {
         this.setModelDisplayMode(initialDisplayMode);
       }
     } else {
       const meshObj = SampleModelFactory.createFallbackModelForPreset(found);
-      this.setModelObject(meshObj, found.name, found);
+      this.setModelObject(meshObj, found.name, found, loadMode);
       if (initialDisplayMode) {
         this.setModelDisplayMode(initialDisplayMode);
       }
@@ -767,13 +782,36 @@ export class StudioEngine {
   /**
    * Sets the 3D model object, configures stencil writing and auto-frames camera
    */
-  public setModelObject(obj: THREE.Object3D, name: string, modelDef?: any): void {
+  public setModelObject(
+    obj: THREE.Object3D,
+    name: string,
+    modelDef?: any,
+    loadMode: 'add' | 'clear' = 'clear'
+  ): void {
     this.ensureBaselineLighting();
     if (!this.skyEnabled) {
       this.applyStudioBackdrop(this.currentStudioTheme);
     }
     const isDrawingPlane = name === 'Drawing Canvas Plane' || obj.name === 'DrawingCanvasPlane' || obj.name === 'DrawingPlaneCanvas';
-    this.clearModel(false);
+
+    if (loadMode === 'clear') {
+      this.clearAllStrokes();
+      this.clearModel(false, false);
+      if (this.uvEngine) {
+        this.uvEngine.clearCanvas();
+        this.uvEngine.resetHistory();
+      }
+    } else {
+      this.cancelStroke();
+      // If only the empty default drawing canvas exists with 0 strokes, detach it
+      if (this.drawingPlaneMesh && this.strokes.size === 0) {
+        const existingPlane = this.modelRoot.getObjectByName('DrawingPlaneCanvas');
+        if (existingPlane) {
+          this.modelRoot.remove(existingPlane);
+        }
+        this.drawingPlaneMesh = null;
+      }
+    }
     this.activeModelName = name;
 
     // The Drawing Canvas preset represents the engine's native paint surface.
@@ -805,12 +843,14 @@ export class StudioEngine {
       return;
     }
 
-    // Ensure default drawing plane is detached when loading a 3D model
-    const existingPlane = this.modelRoot.getObjectByName('DrawingPlaneCanvas');
-    if (existingPlane) {
-      this.modelRoot.remove(existingPlane);
+    // Detach drawing plane only if clearing or if it has no user strokes
+    if (loadMode === 'clear' || this.strokes.size === 0) {
+      const existingPlane = this.modelRoot.getObjectByName('DrawingPlaneCanvas');
+      if (existingPlane && this.strokes.size === 0) {
+        this.modelRoot.remove(existingPlane);
+        this.drawingPlaneMesh = null;
+      }
     }
-    this.drawingPlaneMesh = null;
 
     this.modelRoot.add(obj);
 
@@ -999,14 +1039,53 @@ export class StudioEngine {
     const targetScale = 2.6 / maxDim;
     obj.scale.setScalar(targetScale);
 
-    // Recenter scaled model in X/Z and snap base flush to ground grid (y = -1.2)
+    // Ground base on grid (y = -1.2)
     const scaledBox = new THREE.Box3().setFromObject(obj);
     const scaledCenter = new THREE.Vector3();
     scaledBox.getCenter(scaledCenter);
-    obj.position.x -= scaledCenter.x;
-    obj.position.z -= scaledCenter.z;
-    obj.position.y += (-1.2 - scaledBox.min.y);
+
+    if (loadMode === 'add') {
+      const existingBox = new THREE.Box3();
+      this.modelRoot.children.forEach((child) => {
+        if (child !== this.strokeRoot && child !== obj) {
+          existingBox.expandByObject(child);
+        }
+      });
+      if (!existingBox.isEmpty()) {
+        const offsetX = existingBox.max.x + (scaledBox.max.x - scaledBox.min.x) * 0.55 + 0.4;
+        obj.position.x = offsetX - scaledCenter.x;
+        obj.position.z -= scaledCenter.z;
+        obj.position.y += (-1.2 - scaledBox.min.y);
+      } else {
+        obj.position.x -= scaledCenter.x;
+        obj.position.z -= scaledCenter.z;
+        obj.position.y += (-1.2 - scaledBox.min.y);
+      }
+    } else {
+      obj.position.x -= scaledCenter.x;
+      obj.position.z -= scaledCenter.z;
+      obj.position.y += (-1.2 - scaledBox.min.y);
+    }
     obj.updateMatrixWorld(true);
+
+    // If adding to existing scene, rebuild target meshes so raycasting works across all objects
+    if (loadMode === 'add') {
+      this.targetMeshes = [];
+      this.modelRoot.traverse((child) => {
+        if (
+          child instanceof THREE.Mesh &&
+          child.geometry &&
+          child.name !== 'UV_Overlay' &&
+          child.name !== 'ModelGroundContactShadow' &&
+          !child.userData?.isHelper
+        ) {
+          this.targetMeshes.push(child);
+          try {
+            this.fastRaycaster.updateMeshBVH(child);
+          } catch (_) {}
+        }
+      });
+    }
 
     // Update metadata
     this.modelMetadata = {
@@ -1022,12 +1101,14 @@ export class StudioEngine {
       this.onMetadataUpdate(this.modelMetadata);
     }
 
-    // Auto-frame camera comfortably around normalized model at ~70% viewport height with 45° perspective angle
-    this.targetSpherical.radius = 3.8;
-    this.targetSpherical.phi = 1.05; // ~60° pleasant perspective elevation
-    this.targetSpherical.theta = 0.65; // ~37° smooth diagonal azimuth
-    this.targetPosition.set(0, 0, 0);
-    this.updateCameraPosition();
+    // Auto-frame camera only when clearing and starting fresh (never jolt view when adding)
+    if (loadMode === 'clear') {
+      this.targetSpherical.radius = 3.8;
+      this.targetSpherical.phi = 1.05; // ~60° pleasant perspective elevation
+      this.targetSpherical.theta = 0.65; // ~37° smooth diagonal azimuth
+      this.targetPosition.set(0, 0, 0);
+      this.updateCameraPosition();
+    }
 
     // Soft circular ground contact shadow beneath model (y = -1.19)
     let shadowMesh = this.helperRoot.getObjectByName('ModelGroundContactShadow') as THREE.Mesh | null;
@@ -1266,9 +1347,21 @@ export class StudioEngine {
   }
 
   /**
+   * Check if user has active drawing strokes on canvas or models
+   */
+  public hasActiveDrawings(): boolean {
+    return this.strokes.size > 0;
+  }
+
+  /**
    * Load external GLB/GLTF model from ArrayBuffer or URL (supporting Draco compression)
    */
-  public async loadGLTF(bufferOrUrl: ArrayBuffer | string, name: string, modelDef?: any): Promise<void> {
+  public async loadGLTF(
+    bufferOrUrl: ArrayBuffer | string,
+    name: string,
+    modelDef?: any,
+    loadMode: 'add' | 'clear' = 'clear'
+  ): Promise<void> {
     try {
       let loadRes: LoadResult;
       if (typeof bufferOrUrl === 'string') {
@@ -1280,7 +1373,7 @@ export class StudioEngine {
       } else {
         loadRes = await modelLoader.loadFromArrayBuffer(bufferOrUrl, name);
       }
-      this.setModelObject(loadRes.scene, name, modelDef);
+      this.setModelObject(loadRes.scene, name, modelDef, loadMode);
     } catch (err) {
       console.warn(`modelLoader pipeline fallback for ${name}:`, err);
       // Fallback to standard GLTFLoader if direct load fails
@@ -1299,7 +1392,7 @@ export class StudioEngine {
               child.userData.originalMaterial = child.material;
             }
           });
-          this.setModelObject(scene, name, modelDef);
+          this.setModelObject(scene, name, modelDef, loadMode);
           resolve();
         };
         if (typeof bufferOrUrl === 'string') {
@@ -1368,11 +1461,12 @@ export class StudioEngine {
    */
   public async loadUniversalFiles(
     files: FileList | File[],
-    customName?: string
+    customName?: string,
+    loadMode: 'add' | 'clear' = 'clear'
   ): Promise<{ name: string; bytes: number; reduction: number }> {
     try {
       const loadRes = await modelLoader.loadFromFiles(files);
-      this.setModelObject(loadRes.scene, customName || loadRes.metadata.name);
+      this.setModelObject(loadRes.scene, customName || loadRes.metadata.name, undefined, loadMode);
       return {
         name: customName || loadRes.metadata.name,
         bytes: loadRes.metadata.originalSize,
@@ -1380,7 +1474,7 @@ export class StudioEngine {
       };
     } catch {
       const result = await ModelConverterEngine.autoConvertAndSave(files, customName);
-      await this.loadGLTF(result.glbArrayBuffer, result.name);
+      await this.loadGLTF(result.glbArrayBuffer, result.name, undefined, loadMode);
       return {
         name: result.name,
         bytes: result.convertedBytes,
@@ -1405,7 +1499,7 @@ export class StudioEngine {
 
     this.camera.getWorldDirection(_planeNormalScratch);
     _planeNormalScratch.negate().normalize(); // Facing camera
-    _planeCenterScratch.set(0, 0, depthOffset);
+    _planeCenterScratch.copy(this.cameraTarget).addScaledVector(_planeNormalScratch, depthOffset);
     _planeScratch.setFromNormalAndCoplanarPoint(_planeNormalScratch, _planeCenterScratch);
 
     const hit = this.raycaster.ray.intersectPlane(_planeScratch, _rayHitScratch);
@@ -1689,7 +1783,8 @@ export class StudioEngine {
     tool: ToolType,
     pressure: number = 1.0,
     symmetry: SymmetryMode = 'none',
-    skipGeometryUpdate: boolean = false
+    skipGeometryUpdate: boolean = false,
+    isCoalescedPoint: boolean = false
   ): void {
     if (!this.isDrawing) return;
 
@@ -1720,16 +1815,15 @@ export class StudioEngine {
     const dy = targetY - this.lastScreenCoords.y;
     const screenDist = Math.hypot(dx, dy);
 
-    // Sub-sample screen movements so fast sweeps calculate surface contact points smoothly without skipping
+    // Sub-sample screen movements so fast sweeps calculate surface contact points smoothly.
+    // When processing hardware coalesced points (S-Pen at 120-240Hz), points are already
+    // tightly spaced sub-millimeter samples, so we evaluate exactly 1 raycast per coalesced
+    // point to prevent exponential raycast overhead and eliminate tablet input lag.
     const sampleDensity = settings.raycastSampleDensity || 'high';
     const requestedMaxSteps = sampleDensity === 'ultra' ? 48 : sampleDensity === 'standard' ? 16 : 32;
-    // Each sub-step is a full BVH raycast. On entry-tier mobile GPUs an unbounded
-    // 48-step sweep per pointer event is the dominant cost while drawing, so the
-    // profile caps it; stroke fidelity is preserved because the smoother already
-    // interpolates between captured points.
     const densityMaxSteps = Math.min(requestedMaxSteps, this.profile.maxStrokeSubSteps);
     const maxStepDist = sampleDensity === 'ultra' ? 0.003 : 0.005;
-    const steps = Math.min(densityMaxSteps, Math.max(1, Math.ceil(screenDist / maxStepDist)));
+    const steps = isCoalescedPoint ? 1 : Math.min(densityMaxSteps, Math.max(1, Math.ceil(screenDist / maxStepDist)));
     const isSpatial = settings.drawingMode === 'spatial_3d' || tool === 'free_brush';
 
     let missStreak = 0;
@@ -1752,10 +1846,12 @@ export class StudioEngine {
         continue;
       }
 
-      // AIR GAP DETECTION: Ray missed model in free air (only in surface mode)
+      // AIR GAP DETECTION: Ray missed model in free air (only in surface mode).
+      // Use a tolerant streak of 6 misses so rapid stylus sweeps across curved geometry or
+      // borders do not fracture the stroke into dozens of broken, disconnected pieces.
       if (!rayResult || !rayResult.hit) {
         missStreak++;
-        if (missStreak >= 2) {
+        if (missStreak >= 6) {
           if (this.activePoints.length > 0) {
             // Commit active segment so stroke does NOT bridge through empty air
             this.commitActiveSegment(settings, tool);
@@ -1782,14 +1878,14 @@ export class StudioEngine {
       // Discontinuity detection:
       // 1. Returning from empty air
       // 2. Large 3D spatial jump across depth occlusion / silhouette
-      // 3. Sharp normal flip (> 135° angle, dot < -0.7)
+      // 3. Sharp normal flip (> 150° angle, dot < -0.85)
       if (this.lastCapturePoint) {
         const dist3D = this.lastCapturePoint.position.distanceTo(newPoint.position);
         const normalDot = this.lastCapturePoint.normal.dot(newPoint.normal);
 
         const gapToleranceMultiplier = settings.airGapTolerance ? settings.airGapTolerance * 2 : 1.0;
-        const maxJump = Math.max(0.35, (settings.size || 0.035) * 8.0 * gapToleranceMultiplier);
-        const isDiscontinuous = this.isOverAir || dist3D > maxJump || normalDot < -0.7;
+        const maxJump = Math.max(0.65, (settings.size || 0.035) * 14.0 * gapToleranceMultiplier);
+        const isDiscontinuous = this.isOverAir || dist3D > maxJump || normalDot < -0.85;
 
         if (isDiscontinuous) {
           if (this.activePoints.length > 0) {
@@ -1841,7 +1937,7 @@ export class StudioEngine {
 
   /**
    * High-performance batch insertion for hardware coalesced events (e.g. S-Pen, stylus).
-   * Processes all points with interpolation and updates the 3D mesh geometry once at the end.
+   * Processes all points directly without redundant sub-sampling and updates geometry once.
    */
   public addStrokePointsBatch(
     points: Array<{ x: number; y: number; pressure: number }>,
@@ -1859,7 +1955,8 @@ export class StudioEngine {
         tool,
         points[i].pressure,
         symmetry,
-        !isLast
+        !isLast,
+        true
       );
     }
   }
@@ -1886,11 +1983,6 @@ export class StudioEngine {
     });
 
     this.activeStrokeBatch.push(descriptor);
-
-    // Auto-recalculate mesh normals after committing segment if enabled
-    if (settings.autoRecalculateNormals !== false) {
-      descriptor.points.length > 0 && this.recalculateMeshNormals(this.activeLayerId);
-    }
 
     this.activePoints = [];
     this.activeStrokeMeshes = [];
@@ -1980,6 +2072,11 @@ export class StudioEngine {
     }
 
     this.commitActiveSegment(settings, tool);
+
+    // Auto-recalculate mesh normals once per completed stroke, never mid-stroke
+    if (settings.autoRecalculateNormals !== false) {
+      this.recalculateMeshNormals(this.activeLayerId);
+    }
 
     if (this.activeStrokeBatch.length > 0) {
       const action = {
@@ -2670,9 +2767,12 @@ export class StudioEngine {
   /**
    * Clear current 3D Model and all associated strokes, optionally restoring the drawing plane canvas
    */
-  public clearModel(restoreDrawingPlane: boolean = false): void {
-    // 1. Cancel in-progress strokes & purge all paint
-    this.clearAllStrokes();
+  public clearModel(restoreDrawingPlane: boolean = false, preserveStrokes: boolean = false): void {
+    // 1. Cancel in-progress strokes
+    this.cancelStroke();
+    if (!preserveStrokes) {
+      this.clearAllStrokes();
+    }
 
     // 2. Remove all model children from modelRoot except strokeRoot
     const toRemove: THREE.Object3D[] = [];
@@ -5265,7 +5365,7 @@ export class StudioEngine {
       const isIdle =
         !this.hasAnimatedContent && this.idleFrameIntervalMs > 0 && time - this.lastActivityTime > this.profile.idleAfterMs;
       const interval = isIdle ? this.idleFrameIntervalMs : this.minFrameIntervalMs;
-      if (interval > 0 && time - this.lastRenderTime < interval - 0.5) {
+      if (!this.isDrawing && interval > 0 && time - this.lastRenderTime < interval - 0.5) {
         return;
       }
       this.lastRenderTime = time;

@@ -139,16 +139,25 @@ export const ProPanel: React.FC<ProPanelProps> = ({
       role="region"
       aria-label={`${title} Panel`}
       data-theme={theme}
-      className={`paperrocket-pro-panel fixed left-[76px] sm:left-[88px] top-1/2 -translate-y-1/2 z-40 w-[290px] sm:w-[300px] max-w-[calc(100vw-6rem)] h-fit max-h-[76vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden select-none animate-in fade-in slide-in-from-left-3 duration-150 ${
+      className={`paperrocket-pro-panel fixed z-40 select-none flex flex-col border shadow-2xl animate-in fade-in duration-150 overflow-hidden
+        /* Mobile: Bottom sheet anchored at bottom with comfortable thumb reach */
+        inset-x-2 bottom-2 max-h-[74dvh] rounded-2xl slide-in-from-bottom-3
+        /* Desktop/Tablet: Floating side drawer docked next to rail */
+        sm:inset-x-auto sm:bottom-auto sm:left-[84px] sm:top-1/2 sm:-translate-y-1/2 sm:w-[310px] sm:max-w-[calc(100vw-6rem)] sm:max-h-[min(80vh,calc(100dvh-84px))] sm:slide-in-from-left-3 ${
         light
           ? 'bg-[#f7f4ee]/98 border-black/15 text-neutral-800 shadow-[0_20px_50px_rgba(35,28,20,0.14)]'
           : 'bg-[#14161a]/98 border-white/15 text-neutral-200 shadow-[0_24px_70px_rgba(0,0,0,0.6)]'
       }`}
     >
-      {/* Header */}
+      {/* Mobile top pull-handle */}
+      <div className="flex justify-center pt-2 pb-0.5 sm:hidden shrink-0">
+        <div className={`w-9 h-1 rounded-full ${light ? 'bg-black/20' : 'bg-white/20'}`} />
+      </div>
+
+      {/* Header - Sticky at top so close button is ALWAYS reachable */}
       <div
-        className={`flex items-center justify-between px-3 py-1.5 border-b min-h-[34px] shrink-0 ${
-          light ? 'border-black/10 bg-black/[0.02]' : 'border-white/10 bg-white/[0.02]'
+        className={`flex items-center justify-between px-3.5 py-2 border-b min-h-[40px] shrink-0 sticky top-0 z-10 ${
+          light ? 'border-black/10 bg-[#f7f4ee]' : 'border-white/10 bg-[#14161a]'
         }`}
       >
         <h2 className="text-xs font-bold uppercase tracking-wider text-current">{title}</h2>
@@ -164,8 +173,8 @@ export const ProPanel: React.FC<ProPanelProps> = ({
         />
       </div>
 
-      {/* Body / Placeholders */}
-      <div className="paperrocket-pro-content min-h-0 flex-initial p-2.5 overflow-y-auto studio-scroll">
+      {/* Body / Placeholders - Scrollable without pushing header off-screen */}
+      <div className="paperrocket-pro-content min-h-0 flex-1 p-2.5 overflow-y-auto studio-scroll">
         {mode === 'select' && brushSettings && (
           <SelectPanel
             engine={engine}

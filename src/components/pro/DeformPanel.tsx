@@ -29,7 +29,6 @@ export interface DeformPanelProps {
   onToggleCompare?: (active: boolean) => void;
   onApplyLiquify?: () => void;
   onCancelLiquify?: () => void;
-  onOpenScaffolding?: () => void;
   onOpenBentGuide?: () => void;
   onOpenCustomMirror?: () => void;
   onOpenDecimate?: () => void;
@@ -49,7 +48,6 @@ export const DeformPanel: React.FC<DeformPanelProps> = ({
   onToggleCompare = () => {},
   onApplyLiquify,
   onCancelLiquify,
-  onOpenScaffolding = () => {},
   onOpenBentGuide = () => {},
   onOpenCustomMirror = () => {},
   onOpenDecimate = () => {},
@@ -261,39 +259,22 @@ export const DeformPanel: React.FC<DeformPanelProps> = ({
           <span className={subHeadingClass}>Guides & Curves</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.trigger('light');
-              onOpenScaffolding();
-            }}
-            className={`h-8 min-h-[32px] px-2 py-1 rounded-lg border font-semibold flex items-center justify-center gap-1.5 transition-all text-xs ${
-              isLight
-                ? 'bg-white hover:bg-neutral-100 border-black/10 text-neutral-800'
-                : 'bg-black/30 hover:bg-white/10 border-white/10 text-neutral-200'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5 shrink-0" />
-            <span>Armatures</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              haptics.trigger('light');
-              onOpenBentGuide();
-            }}
-            className={`h-8 min-h-[32px] px-2 py-1 rounded-lg border font-semibold flex items-center justify-center gap-1.5 transition-all text-xs ${
-              isLight
-                ? 'bg-white hover:bg-neutral-100 border-black/10 text-neutral-800'
-                : 'bg-black/30 hover:bg-white/10 border-white/10 text-neutral-200'
-            }`}
-          >
-            <Spline className="w-3.5 h-3.5 shrink-0" />
-            <span>Bend Path</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            haptics.trigger('light');
+            onOpenBentGuide();
+          }}
+          className={`w-full h-8 min-h-[32px] px-2 py-1 rounded-lg border font-semibold flex items-center justify-center gap-1.5 transition-all text-xs ${
+            isLight
+              ? 'bg-white hover:bg-neutral-100 border-black/10 text-neutral-800'
+              : 'bg-black/30 hover:bg-white/10 border-white/10 text-neutral-200'
+          }`}
+          title="3D Bent Guide & Lofting Engine"
+        >
+          <Spline className="w-3.5 h-3.5 shrink-0" />
+          <span>Bend Path & Lofting Guide</span>
+        </button>
       </div>
 
       {/* 4. Simplify & Decimate */}

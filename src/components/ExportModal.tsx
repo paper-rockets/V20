@@ -118,6 +118,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const glbBlob = await engine.exportGLB();
       const arrayBuffer = await glbBlob.arrayBuffer();
       const snapshot = engine.captureSnapshot();
+      const meta = (engine as any).getModelMetadata?.() || {
+        triangleCount: 0,
+        vertexCount: 0,
+        meshCount: 1,
+        materialCount: 1,
+        dimensions: { x: 1, y: 1, z: 1 },
+      };
 
       const savedModel: Saved3DModel = {
         id: `model_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -129,11 +136,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         savedDate: Date.now(),
         thumbnail: snapshot,
         blob: arrayBuffer,
-        triangleCount: 0,
-        vertexCount: 0,
-        meshCount: 1,
-        materialCount: 1,
-        dimensions: { x: 1, y: 1, z: 1 },
+        triangleCount: meta.triangleCount || 0,
+        vertexCount: meta.vertexCount || 0,
+        meshCount: meta.meshCount || 1,
+        materialCount: meta.materialCount || 1,
+        dimensions: meta.dimensions || { x: 1, y: 1, z: 1 },
         dracoCompressed: false,
         isBaked: true,
       };
