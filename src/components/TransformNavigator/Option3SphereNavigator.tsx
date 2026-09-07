@@ -225,7 +225,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     }
   }, [isDark, isPro]);
 
-  // Safe area metrics
+  // Safe area metrics: unconstrained full-screen movement
   const cssPx = (n: string, fallback: number = 0) => {
     if (typeof document === 'undefined') return fallback;
     const raw = getComputedStyle(document.documentElement).getPropertyValue(n);
@@ -233,27 +233,30 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     const val = parseFloat(raw.trim());
     return isNaN(val) ? fallback : val;
   };
-  const safeBox = useCallback(() => {
-    const g = cssPx('--nv-gap', 2);
-    const l = cssPx('--nv-left', 2);
-    const t = cssPx('--nv-top', 56);
-    const r = cssPx('--nv-right', 4);
-    const b = cssPx('--nv-bottom', 20);
-    return {
-      left: l + g,
-      top: t + g,
-      right: window.innerWidth - r - g,
-      bottom: window.innerHeight - b - g
-    };
+
+  const setNavActive = useCallback((active: boolean) => {
+    if (typeof window !== 'undefined') {
+      (window as any).__NAVIGATOR_ACTIVE__ = active;
+      window.dispatchEvent(new CustomEvent('NAVIGATOR_ACTIVE', { detail: { active } }));
+    }
+    const nv = nvRef.current;
+    if (nv) {
+      if (active) {
+        nv.classList.add('nv-interacting');
+      } else {
+        nv.classList.remove('nv-interacting');
+      }
+    }
   }, []);
 
-  const span = useCallback(() => {
-    const s = safeBox();
-    const dock = dockRef.current;
-    const dw = dock ? dock.offsetWidth : 210;
-    const dh = dock ? dock.offsetHeight : 210;
-    return { s, w: Math.max(1, s.right - s.left - dw), h: Math.max(1, s.bottom - s.top - dh) };
-  }, [safeBox]);
+  const safeBox = useCallback(() => {
+    return {
+      left: 0,
+      top: 0,
+      right: window.innerWidth,
+      bottom: window.innerHeight
+    };
+  }, []);
 
   const positionMenu = useCallback(() => {
     const nv = nvRef.current;
@@ -311,22 +314,36 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   const place = useCallback((x: number, y: number, remember?: boolean) => {
     const dock = dockRef.current;
     if (!dock) return;
-    const { s, w, h } = span();
-    const left = Math.max(s.left, Math.min(s.right - dock.offsetWidth, x));
-    const top = Math.max(s.top, Math.min(s.bottom - dock.offsetHeight, y));
+    const dw = dock.offsetWidth || 160;
+    const dh = dock.offsetHeight || 160;
+    const minLeft = 0;
+    const maxLeft = Math.max(0, window.innerWidth - dw);
+    const minTop = 0;
+    const maxTop = Math.max(0, window.innerHeight - dh);
+    const left = Math.max(minLeft, Math.min(maxLeft, x));
+    const top = Math.max(minTop, Math.min(maxTop, y));
     dock.style.left = Math.round(left) + 'px';
     dock.style.top = Math.round(top) + 'px';
     if (remember) {
-      anchorRef.current = { ax: (left - s.left) / w, ay: (top - s.top) / h };
+      const denomW = Math.max(1, window.innerWidth - dw);
+      const denomH = Math.max(1, window.innerHeight - dh);
+      anchorRef.current = {
+        ax: Math.max(0, Math.min(1, left / denomW)),
+        ay: Math.max(0, Math.min(1, top / denomH))
+      };
       saveLayout();
     }
     positionMenu();
-  }, [span, saveLayout, positionMenu]);
+  }, [saveLayout, positionMenu]);
 
   const placeFromAnchor = useCallback(() => {
-    const { s, w, h } = span();
-    place(s.left + anchorRef.current.ax * w, s.top + anchorRef.current.ay * h);
-  }, [span, place]);
+    const dock = dockRef.current;
+    const dw = dock ? dock.offsetWidth : 160;
+    const dh = dock ? dock.offsetHeight : 160;
+    const denomW = Math.max(1, window.innerWidth - dw);
+    const denomH = Math.max(1, window.innerHeight - dh);
+    place(anchorRef.current.ax * denomW, anchorRef.current.ay * denomH);
+  }, [place]);
 
   const setMenu = useCallback((open: boolean) => {
     setIsMenuOpen(open);
@@ -1198,12 +1215,14 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
 
     const onTabDown = (e: PointerEvent) => {
       e.preventDefault();
+      setNavActive(true);
       startDrag(e.clientX, e.clientY, 'tab');
       try { tab?.setPointerCapture(e.pointerId); } catch (_) {}
     };
 
     const onHandleDown = (e: PointerEvent) => {
       e.preventDefault();
+      setNavActive(true);
       startDrag(e.clientX, e.clientY, 'handle');
       try { dragHandle?.setPointerCapture(e.pointerId); } catch (_) {}
     };
@@ -1217,6 +1236,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     };
 
     const onPointerUp = (e: PointerEvent) => {
+      setNavActive(false);
       if (!d) return;
       const moved = d.moved;
       const source = d.source;
@@ -1235,6 +1255,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     window.addEventListener('pointercancel', onPointerUp);
 
     return () => {
+      setNavActive(false);
       tab?.removeEventListener('pointerdown', onTabDown);
       dragHandle?.removeEventListener('pointerdown', onHandleDown);
       window.removeEventListener('pointermove', onPointerMove);
@@ -1250,6 +1271,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
 
     const onDown = (e: PointerEvent) => {
       stopTour();
+      setNavActive(true);
       const pt = gzPoint(e);
       const m = metrics(gzRef.current.size);
       const r = Math.hypot(pt.x - m.c, pt.y - m.c);
@@ -1271,6 +1293,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
             place(d.left + me.clientX - d.x, d.top + me.clientY - d.y, true);
           };
           const onDocDragUp = (ue: PointerEvent) => {
+            setNavActive(false);
             try { gzc.releasePointerCapture(ue.pointerId); } catch (_) {}
             window.removeEventListener('pointermove', onDocDragMove);
             window.removeEventListener('pointerup', onDocDragUp);
@@ -1384,6 +1407,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     };
 
     const onUp = (e: PointerEvent) => {
+      setNavActive(false);
       const drag = dragRef.current;
       if (!drag) return;
       if (!drag.moved && drag.hit) {
@@ -1415,6 +1439,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     gzc.addEventListener('wheel', onWheel, { passive: false });
 
     return () => {
+      setNavActive(false);
       gzc.removeEventListener('pointerdown', onDown);
       gzc.removeEventListener('pointermove', onMove);
       gzc.removeEventListener('pointerup', onUp);

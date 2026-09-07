@@ -357,6 +357,25 @@ export const Viewport: React.FC<ViewportProps> = ({
     return out;
   };
 
+  useEffect(() => {
+    const onNavActive = (e: CustomEvent<{ active: boolean }>) => {
+      if (e.detail?.active) {
+        if (isPointerDown.current) {
+          isPointerDown.current = false;
+          engineRef.current?.cancelStroke();
+        }
+        touchPointersRef.current.clear();
+        setIsOrbiting(false);
+        isPenDrawingRef.current = false;
+        activeDrawingPointerIdRef.current = null;
+        engineRef.current?.hideCursor();
+        if (cursorSvgRef.current) cursorSvgRef.current.style.display = 'none';
+      }
+    };
+    window.addEventListener('NAVIGATOR_ACTIVE', onNavActive as EventListener);
+    return () => window.removeEventListener('NAVIGATOR_ACTIVE', onNavActive as EventListener);
+  }, []);
+
   const getFovDescription = (fov: number): string => {
     if (fov <= 25) return 'Telephoto / Flat';
     if (fov <= 40) return 'Standard Portrait';
@@ -367,6 +386,8 @@ export const Viewport: React.FC<ViewportProps> = ({
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    if ((window as any).__NAVIGATOR_ACTIVE__) return;
+    refreshRect();
     const engine = engineRef.current;
     if (!engine) return;
 
@@ -572,9 +593,25 @@ export const Viewport: React.FC<ViewportProps> = ({
         return;
       }
 
-      // 1-Finger Touch: Finger Drawing (if fingerPenMode is ON and NO stylus is detected) or Camera Orbit
+      // 1-Finger Touch: Selection, Finger Drawing (if fingerPenMode is ON and NO stylus is detected) or Camera Orbit
       if (touchCount === 1) {
         const coords = getNormalizedCoords(e);
+
+        if (tool === 'pointer' || tool === 'select') {
+          const res = engine.raycastSelection(coords.x, coords.y);
+          if (res.type === 'stroke') {
+            triggerHaptic(20);
+            showGestureToast('Curve Selected', `ID: ${res.id?.slice(0, 8)}... (Press Del or Trash to remove)`);
+          } else if (res.type === 'model') {
+            triggerHaptic(20);
+            showGestureToast('Object Selected', `${res.name || '3D Object'} (Press Del or Trash to remove)`);
+          } else {
+            engine.selectStroke(null);
+          }
+          setIsOrbiting(false);
+          return;
+        }
+
         // STRICT HARDWARE LOCK: If a stylus is detected on the device,
         // touch is strictly reserved for camera navigation (orbiting) and never draws,
         // preventing accidental strokes from finger/palm contact.
@@ -696,6 +733,7 @@ export const Viewport: React.FC<ViewportProps> = ({
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
+    if ((window as any).__NAVIGATOR_ACTIVE__) return;
     const engine = engineRef.current;
     if (!engine) return;
 

@@ -1,10 +1,10 @@
 /* navigatorStyles.css - Build 9 Free Gizmo */
 :root {
-  --nv-top: 56px;
-  --nv-right: 4px;
-  --nv-bottom: 20px;
-  --nv-left: 2px;
-  --nv-gap: 2px;
+  --nv-top: 0px;
+  --nv-right: 0px;
+  --nv-bottom: 0px;
+  --nv-left: 0px;
+  --nv-gap: 0px;
 
   --nv-panel: rgba(252, 250, 247, 0.86);
   --nv-ink: #332e28;
@@ -107,6 +107,11 @@
 
 #nv > * {
   pointer-events: auto;
+}
+
+#nv.nv-interacting {
+  pointer-events: auto !important;
+  touch-action: none !important;
 }
 
 #nv.nv-dim {
@@ -509,3 +514,9 @@
     transform: none;
   }
 }
+
+#nv.nv-interacting {
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
+

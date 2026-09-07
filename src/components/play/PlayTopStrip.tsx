@@ -43,7 +43,7 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
   onOpenSessions,
 }) => {
   const ink = theme === 'light' ? 'text-neutral-800' : 'text-white/90';
-  const button = `pointer-events-auto min-w-[44px] min-h-[44px] w-11 h-11 sm:w-11 sm:h-11 grid place-items-center rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`;
+  const button = `pointer-events-auto min-w-[34px] min-h-[38px] w-[34px] h-[38px] sm:min-w-[44px] sm:min-h-[44px] sm:w-11 sm:h-11 grid place-items-center rounded-lg sm:rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`;
 
   const isCurrentlyFullscreen = (): boolean => {
     if (typeof document === 'undefined') return false;
@@ -130,19 +130,19 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
   }, [simulatedFs]);
 
   return (
-    <header className="play-top-strip fixed inset-x-0 top-0 z-30 flex h-14 sm:h-16 items-center justify-between px-2 sm:px-4 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pointer-events-none select-none">
+    <header className="play-top-strip fixed inset-x-0 top-0 z-30 flex h-14 sm:h-16 items-center justify-between px-1.5 sm:px-4 pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pointer-events-none select-none">
       <button
         type="button"
         onClick={onOpenToybox}
-        className={`pointer-events-auto play-top-strip-left shrink-0 inline-flex items-center gap-1.5 sm:gap-2 h-11 min-h-[44px] px-2.5 sm:px-3 rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`}
+        className={`pointer-events-auto play-top-strip-left shrink inline-flex items-center gap-1 sm:gap-2 h-9 sm:h-11 min-h-[38px] sm:min-h-[44px] px-2 sm:px-3 rounded-lg sm:rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`}
         aria-label="Open model library"
       >
         <Box className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" strokeWidth={1.35} />
-        <span className="text-[11px] sm:text-[13px] font-medium tracking-[0.01em] whitespace-nowrap">
+        <span className="text-[11px] sm:text-[13px] font-medium tracking-[0.01em] whitespace-nowrap truncate max-w-[64px] sm:max-w-[160px]">
           {projectName || 'Model'}
         </span>
       </button>
-      <nav className="flex items-center gap-0.5 sm:gap-1.5 pointer-events-auto shrink-0 max-w-[calc(100vw-68px)] overflow-x-auto no-scrollbar py-0.5" aria-label="History and settings">
+      <nav className="flex items-center gap-0.5 sm:gap-1.5 pointer-events-auto shrink-0 py-0.5" aria-label="History and settings">
         <button
           type="button"
           onClick={onUndo}
@@ -215,7 +215,7 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
         <button
           type="button"
           onClick={handleToggleFullscreen}
-          className={button}
+          className={`${button} shrink-0`}
           aria-label={isFsActive ? 'Exit Full Screen' : 'Full Screen'}
           title={isFsActive ? 'Exit Full Screen' : 'Full Screen'}
         >

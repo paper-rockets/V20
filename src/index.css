@@ -38,26 +38,31 @@ canvas {
   min-width: 44px;
 }
 
-/* Top strip on mobile screens (<640px) ensuring 44x44px touch targets */
+/* Top strip on mobile screens (<640px) with touch-friendly targets that fit without clipping */
 @media (max-width: 639px) {
-  .play-top-strip button,
-  .play-top-strip button:has(> svg:only-child),
-  .play-top-strip button[aria-label]:not(:has(span)) {
-    min-width: 44px !important;
-    min-height: 44px !important;
-    width: 44px !important;
-    height: 44px !important;
+  .play-top-strip button:not(.play-top-strip-left) {
+    min-width: 36px !important;
+    min-height: 38px !important;
+    width: 36px !important;
+    height: 38px !important;
     padding: 0 !important;
+    position: relative;
+  }
+  .play-top-strip button:not(.play-top-strip-left)::after {
+    content: '';
+    position: absolute;
+    inset: -4px -3px;
+    pointer-events: auto;
   }
   .play-top-strip .play-top-strip-left {
-    min-width: 44px !important;
+    min-width: 40px !important;
     width: auto !important;
-    height: 44px !important;
-    min-height: 44px !important;
+    height: 38px !important;
+    min-height: 38px !important;
     display: inline-flex !important;
     flex-direction: row !important;
     align-items: center !important;
-    padding: 0 10px 0 8px !important;
+    padding: 0 6px 0 6px !important;
   }
 }
 

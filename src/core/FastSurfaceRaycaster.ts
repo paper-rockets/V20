@@ -258,9 +258,9 @@ export class FastSurfaceRaycaster {
     doubleSided: boolean,
     interpolateBarycentric: boolean
   ): boolean {
-    // Convert pixel coordinates to NDC if values fall outside standard [-1, 1] device range
-    if (Math.abs(screenX) <= 1.0 && Math.abs(screenY) <= 1.0) {
-      this._scratchCoords.set(screenX, screenY);
+    // Convert pixel coordinates to NDC if values fall outside standard device range
+    if (Math.abs(screenX) <= 2.5 && Math.abs(screenY) <= 2.5) {
+      this._scratchCoords.set(Math.max(-1, Math.min(1, screenX)), Math.max(-1, Math.min(1, screenY)));
     } else {
       this._scratchCoords.set(
         (screenX / this._viewportWidth) * 2 - 1,
