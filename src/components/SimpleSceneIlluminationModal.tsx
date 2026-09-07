@@ -198,12 +198,13 @@ export const SimpleSceneIlluminationModal: React.FC<SimpleSceneIlluminationModal
 
   // Header Drag Handlers
   const handleHeaderPointerDown = (e: React.PointerEvent) => {
+    if (typeof window !== 'undefined' && window.innerWidth < 640) return;
     if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     isDraggingHeader.current = true;
-    const currentX = panelPos?.x ?? 72;
-    const currentY = panelPos?.y ?? 64;
+    const currentX = panelPos?.x ?? 84;
+    const currentY = panelPos?.y ?? 80;
     dragStart.current = {
       mouseX: e.clientX,
       mouseY: e.clientY,
@@ -217,7 +218,7 @@ export const SimpleSceneIlluminationModal: React.FC<SimpleSceneIlluminationModal
     const dx = e.clientX - dragStart.current.mouseX;
     const dy = e.clientY - dragStart.current.mouseY;
     setPanelPos({
-      x: Math.max(8, Math.min(window.innerWidth - 270, dragStart.current.startX + dx)),
+      x: Math.max(8, Math.min(window.innerWidth - 280, dragStart.current.startX + dx)),
       y: Math.max(8, Math.min(window.innerHeight - 320, dragStart.current.startY + dy)),
     });
   };
@@ -228,6 +229,38 @@ export const SimpleSceneIlluminationModal: React.FC<SimpleSceneIlluminationModal
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {}
   };
+
+  // Mobile Header Touch Gesture (Swipe down to dismiss)
+  const touchStartY = useRef<number | null>(null);
+
+  const handleHeaderTouchStart = (e: React.TouchEvent) => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 640) return;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleHeaderTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    if (dy > 45) {
+      touchStartY.current = null;
+      haptics.trigger('light');
+      onClose();
+    }
+  };
+
+  const handleHeaderTouchEnd = () => {
+    touchStartY.current = null;
+  };
+
+  // Dismiss on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Studio Preset Selection (Studio, North Light, Softbox, Silhouette)
   const handleSelectPreset = (presetName: 'studio' | 'north' | 'softbox' | 'silhouette') => {
@@ -264,7 +297,7 @@ export const SimpleSceneIlluminationModal: React.FC<SimpleSceneIlluminationModal
     setSoftness(pSoftness);
     setLightColor(pColor);
 
-    const radius = 46;
+    const radius = domeRef.current ? domeRef.current.getBoundingClientRect().width / 2 - 8 : 40;
     setPuckPos({ x: pDir.x * radius, y: pDir.z * radius });
     lightDirRef.current = pDir;
 
@@ -301,51 +334,60 @@ export const SimpleSceneIlluminationModal: React.FC<SimpleSceneIlluminationModal
     <aside
       aria-label="Studio Illumination Menu"
       style={{
-        left: panelPos ? `${panelPos.x}px` : undefined,
-        top: panelPos ? `${panelPos.y}px` : undefined,
+        left: panelPos && typeof window !== 'undefined' && window.innerWidth >= 640 ? `${panelPos.x}px` : undefined,
+        top: panelPos && typeof window !== 'undefined' && window.innerWidth >= 640 ? `${panelPos.y}px` : undefined,
       }}
-      className={`pr-surface fixed z-50 select-none pointer-events-auto w-[270px] rounded-2xl border shadow-2xl transition-shadow ${
-        panelPos ? '' : 'left-[76px] sm:left-[84px] top-16 sm:top-20'
+      className={`pr-surface fixed z-50 select-none pointer-events-auto transition-shadow ${
+        panelPos && typeof window !== 'undefined' && window.innerWidth >= 640
+          ? 'sm:w-[280px] sm:rounded-2xl sm:border sm:shadow-2xl'
+          : 'inset-x-0 bottom-0 w-full rounded-t-2xl sm:rounded-2xl border-t sm:border border-x shadow-2xl sm:w-[280px] sm:top-20 sm:left-[84px] sm:inset-x-auto sm:bottom-auto'
       } ${
         isLight
           ? 'bg-white/95 border-neutral-200 text-neutral-900 shadow-neutral-400/25'
           : 'bg-neutral-950/95 border-neutral-800 text-neutral-100 shadow-black/60'
-      }`}
+      } pb-[max(env(safe-area-inset-bottom),8px)] sm:pb-2.5`}
     >
-      {/* Draggable Header */}
+      {/* Draggable Header / Mobile Drawer Handle */}
       <div
         onPointerDown={handleHeaderPointerDown}
         onPointerMove={handleHeaderPointerMove}
         onPointerUp={handleHeaderPointerUp}
-        className={`flex items-center justify-between px-3 py-1.5 border-b min-h-[32px] cursor-grab active:cursor-grabbing rounded-t-2xl ${
+        onTouchStart={handleHeaderTouchStart}
+        onTouchMove={handleHeaderTouchMove}
+        onTouchEnd={handleHeaderTouchEnd}
+        className={`flex flex-col sm:flex-row sm:items-center justify-between px-3 py-1.5 border-b min-h-[30px] cursor-grab active:cursor-grabbing rounded-t-2xl ${
           isLight ? 'border-neutral-200/80 bg-neutral-50/90' : 'border-neutral-800/80 bg-neutral-900/60'
         }`}
       >
-        <span className="text-xs font-semibold tracking-wide">Studio Light</span>
-        <StudioCloseButton
-          onClick={() => {
-            haptics.trigger('light');
-            onClose();
-          }}
-          size="sm"
-        />
+        {/* Mobile drag handle pill */}
+        <div className="w-8 h-1 rounded-full bg-neutral-400/40 mx-auto mb-1 sm:hidden" />
+        <div className="flex items-center justify-between w-full">
+          <span className="text-xs font-semibold tracking-wide">Studio Light</span>
+          <StudioCloseButton
+            onClick={() => {
+              haptics.trigger('light');
+              onClose();
+            }}
+            size="sm"
+          />
+        </div>
       </div>
 
-      {/* Miniature Interactive Content */}
-      <div className="p-2.5 flex flex-col gap-2 text-xs">
-        {/* Trackball Dome */}
-        <div className="flex flex-col items-center">
+      {/* Interactive Content: 2-column compact bottom sheet on mobile, stacked on desktop */}
+      <div className="p-2.5 flex flex-row sm:flex-col items-center sm:items-stretch gap-3 sm:gap-2 text-xs">
+        {/* Left Column on Mobile: Trackball Dome + Tone Chips */}
+        <div className="flex flex-col items-center shrink-0">
           <div
             ref={domeRef}
             onPointerDown={handleDomePointerDown}
             onPointerMove={handleDomePointerMove}
             onPointerUp={handleDomePointerUp}
-            className="relative w-28 h-28 rounded-full bg-gradient-to-b from-[#242b3d] to-[#0c0f18] border border-[#3b435a] shadow-inner cursor-crosshair flex items-center justify-center touch-none select-none"
+            className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-b from-[#242b3d] to-[#0c0f18] border border-[#3b435a] shadow-inner cursor-crosshair flex items-center justify-center touch-none select-none"
             title="Drag inside dome to rotate light live"
           >
             {/* Guide Rings */}
-            <div className="w-20 h-20 rounded-full border border-dashed border-white/10 pointer-events-none" />
-            <div className="w-10 h-10 rounded-full border border-white/5 pointer-events-none" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-dashed border-white/10 pointer-events-none" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-white/5 pointer-events-none" />
 
             {/* Compass Marks */}
             <span className="absolute top-1 text-[7px] font-bold text-neutral-400 pointer-events-none">N</span>
@@ -358,114 +400,17 @@ export const SimpleSceneIlluminationModal: React.FC<SimpleSceneIlluminationModal
               style={{
                 transform: `translate(${puckPos.x}px, ${puckPos.y}px)`,
               }}
-              className="absolute w-4 h-4 rounded-full bg-amber-300 border border-white shadow-[0_0_10px_#f59e0b] flex items-center justify-center pointer-events-none transition-transform duration-75"
+              className="absolute w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-amber-300 border border-white shadow-[0_0_10px_#f59e0b] flex items-center justify-center pointer-events-none transition-transform duration-75"
             >
               <div className="w-1 h-1 rounded-full bg-amber-900" />
             </div>
           </div>
-          <span className="text-[9px] text-neutral-400 mt-1 font-mono tracking-wide">
+          <span className="text-[8px] sm:text-[9px] text-neutral-400 mt-0.5 sm:mt-1 font-mono tracking-wide">
             Drag Dome to Move Light
           </span>
-        </div>
 
-        {/* 4 Presets - Simple small buttons */}
-        <div className="grid grid-cols-2 gap-1.5">
-          {(
-            [
-              { id: 'studio', name: 'Studio' },
-              { id: 'north', name: 'North Light' },
-              { id: 'softbox', name: 'Softbox' },
-              { id: 'silhouette', name: 'Silhouette' },
-            ] as const
-          ).map((preset) => {
-            const isActive = activePreset === preset.id;
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => handleSelectPreset(preset.id)}
-                className={`h-8 px-2 rounded-lg text-xs font-medium border transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
-                  isActive
-                    ? isLight
-                      ? 'border-amber-500 bg-amber-500/10 text-amber-900 font-semibold ring-1 ring-amber-500/30'
-                      : 'border-amber-400/80 bg-amber-400/15 text-amber-300 font-semibold ring-1 ring-amber-400/30'
-                    : isLight
-                    ? 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700'
-                    : 'border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-300'
-                }`}
-              >
-                {preset.name}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Softness Slider */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-neutral-400 font-medium">Softness</span>
-            <span className="font-mono font-semibold text-neutral-300">{Math.round(softness * 100)}%</span>
-          </div>
-          <input
-            type="range"
-            min="0.1"
-            max="1.0"
-            step="0.05"
-            value={softness}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              setSoftness(val);
-              applyLighting({
-                intensity,
-                softness: val,
-                color: lightColor,
-                dir: lightDirRef.current,
-                shadowFloor,
-                showGrid,
-                modelMode,
-              });
-            }}
-            className={`w-full h-1.5 rounded cursor-pointer accent-sky-400 ${
-              isLight ? 'bg-neutral-200' : 'bg-neutral-700'
-            }`}
-          />
-        </div>
-
-        {/* Intensity / Brightness Slider */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-neutral-400 font-medium">Intensity</span>
-            <span className="font-mono font-semibold text-neutral-300">{intensity.toFixed(2)}x</span>
-          </div>
-          <input
-            type="range"
-            min="0.2"
-            max="2.5"
-            step="0.05"
-            value={intensity}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              setIntensity(val);
-              applyLighting({
-                intensity: val,
-                softness,
-                color: lightColor,
-                dir: lightDirRef.current,
-                shadowFloor,
-                showGrid,
-                modelMode,
-              });
-            }}
-            className={`w-full h-1.5 rounded cursor-pointer accent-amber-500 ${
-              isLight ? 'bg-neutral-200' : 'bg-neutral-700'
-            }`}
-          />
-        </div>
-
-        {/* Light Tone Chips */}
-        <div className="flex items-center justify-between gap-1 pt-0.5">
-          <span className="text-[11px] text-neutral-400 font-medium">Tone</span>
-          <div className="flex gap-1.5">
+          {/* Mobile Tone Chips (placed under dome) */}
+          <div className="flex sm:hidden items-center justify-center gap-1.5 pt-1.5">
             {TONES.map((t) => (
               <button
                 key={t.name}
@@ -483,7 +428,7 @@ export const SimpleSceneIlluminationModal: React.FC<SimpleSceneIlluminationModal
                     modelMode,
                   });
                 }}
-                className={`w-7 h-7 rounded-lg border transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
+                className={`w-6 h-6 rounded-lg border transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
                   lightColor === t.color
                     ? isLight
                       ? 'border-amber-500 bg-amber-100/60 ring-2 ring-amber-400/40'
@@ -496,7 +441,7 @@ export const SimpleSceneIlluminationModal: React.FC<SimpleSceneIlluminationModal
                 aria-label={t.name}
               >
                 <div
-                  className={`w-3.5 h-3.5 rounded-full ${t.bgClass} border ${
+                  className={`w-3 h-3 rounded-full ${t.bgClass} border ${
                     isLight ? 'border-neutral-300' : 'border-neutral-600'
                   } shadow-sm`}
                 />
@@ -505,87 +450,227 @@ export const SimpleSceneIlluminationModal: React.FC<SimpleSceneIlluminationModal
           </div>
         </div>
 
-        {/* 3 Quick Toggles: Floor Shadow, Floor Grid, Model Finish */}
-        <div className="grid grid-cols-3 gap-1.5 pt-1">
-          {/* Shadow Floor */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.trigger('light');
-              const next = !shadowFloor;
-              setShadowFloor(next);
-              applyLighting({
-                intensity,
-                softness,
-                color: lightColor,
-                dir: lightDirRef.current,
-                shadowFloor: next,
-                showGrid,
-                modelMode,
-              });
-            }}
-            className={`h-8 px-1.5 rounded-lg border text-[11px] font-medium flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 ${
-              shadowFloor
-                ? isLight
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-semibold'
-                  : 'border-emerald-500/80 bg-emerald-500/15 text-emerald-300 font-semibold'
-                : isLight
-                ? 'border-neutral-200 bg-neutral-100 text-neutral-500 hover:bg-neutral-200/70'
-                : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:bg-neutral-800'
-            }`}
-          >
-            <span>Shadow</span>
-            <span className="text-[9px] opacity-75 font-mono">{shadowFloor ? 'ON' : 'OFF'}</span>
-          </button>
+        {/* Right Column: Presets, Sliders, Toggles */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between gap-1.5 sm:gap-2">
+          {/* 4 Presets - Simple small buttons */}
+          <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
+            {(
+              [
+                { id: 'studio', name: 'Studio' },
+                { id: 'north', name: 'North Light' },
+                { id: 'softbox', name: 'Softbox' },
+                { id: 'silhouette', name: 'Silhouette' },
+              ] as const
+            ).map((preset) => {
+              const isActive = activePreset === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => handleSelectPreset(preset.id)}
+                  className={`h-7 sm:h-8 px-1.5 sm:px-2 rounded-lg text-[11px] sm:text-xs font-medium border transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
+                    isActive
+                      ? isLight
+                        ? 'border-amber-500 bg-amber-500/10 text-amber-900 font-semibold ring-1 ring-amber-500/30'
+                        : 'border-amber-400/80 bg-amber-400/15 text-amber-300 font-semibold ring-1 ring-amber-400/30'
+                      : isLight
+                      ? 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-700'
+                      : 'border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 text-neutral-300'
+                  }`}
+                >
+                  {preset.name}
+                </button>
+              );
+            })}
+          </div>
 
-          {/* Floor Grid */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.trigger('light');
-              const nextGrid = !showGrid;
-              setShowGrid(nextGrid);
-              applyLighting({
-                intensity,
-                softness,
-                color: lightColor,
-                dir: lightDirRef.current,
-                shadowFloor,
-                showGrid: nextGrid,
-                modelMode,
-              });
-            }}
-            className={`h-8 px-1.5 rounded-lg border text-[11px] font-medium flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 ${
-              showGrid
-                ? isLight
-                  ? 'border-sky-500 bg-sky-50 text-sky-800 font-semibold'
-                  : 'border-sky-500/80 bg-sky-500/15 text-sky-300 font-semibold'
-                : isLight
-                ? 'border-neutral-200 bg-neutral-100 text-neutral-500 hover:bg-neutral-200/70'
-                : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:bg-neutral-800'
-            }`}
-          >
-            <span>Grid</span>
-            <span className="text-[9px] opacity-75 font-mono">{showGrid ? 'ON' : 'OFF'}</span>
-          </button>
+          {/* Softness Slider */}
+          <div className="space-y-0.5 sm:space-y-1">
+            <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
+              <span className="text-neutral-400 font-medium">Softness</span>
+              <span className="font-mono font-semibold text-neutral-300">{Math.round(softness * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="1.0"
+              step="0.05"
+              value={softness}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setSoftness(val);
+                applyLighting({
+                  intensity,
+                  softness: val,
+                  color: lightColor,
+                  dir: lightDirRef.current,
+                  shadowFloor,
+                  showGrid,
+                  modelMode,
+                });
+              }}
+              className={`w-full h-1.5 rounded cursor-pointer accent-sky-400 ${
+                isLight ? 'bg-neutral-200' : 'bg-neutral-700'
+              }`}
+            />
+          </div>
 
-          {/* Model Clay Finish */}
-          <button
-            type="button"
-            onClick={handleToggleModelFinish}
-            className={`h-8 px-1.5 rounded-lg border text-[11px] font-medium flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 ${
-              modelMode === 'clay'
-                ? isLight
-                  ? 'border-amber-500 bg-amber-50 text-amber-900 font-semibold'
-                  : 'border-amber-400/80 bg-amber-400/15 text-amber-300 font-semibold'
-                : isLight
-                ? 'border-neutral-200 bg-neutral-100 text-neutral-700 hover:bg-neutral-200/70'
-                : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:bg-neutral-800'
-            }`}
-          >
-            <span>Finish</span>
-            <span className="text-[9px] opacity-75 font-mono">{modelMode === 'clay' ? 'Clay' : 'Tex'}</span>
-          </button>
+          {/* Intensity / Brightness Slider */}
+          <div className="space-y-0.5 sm:space-y-1">
+            <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
+              <span className="text-neutral-400 font-medium">Intensity</span>
+              <span className="font-mono font-semibold text-neutral-300">{intensity.toFixed(2)}x</span>
+            </div>
+            <input
+              type="range"
+              min="0.2"
+              max="2.5"
+              step="0.05"
+              value={intensity}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setIntensity(val);
+                applyLighting({
+                  intensity: val,
+                  softness,
+                  color: lightColor,
+                  dir: lightDirRef.current,
+                  shadowFloor,
+                  showGrid,
+                  modelMode,
+                });
+              }}
+              className={`w-full h-1.5 rounded cursor-pointer accent-amber-500 ${
+                isLight ? 'bg-neutral-200' : 'bg-neutral-700'
+              }`}
+            />
+          </div>
+
+          {/* Desktop Light Tone Chips (in right column on desktop) */}
+          <div className="hidden sm:flex items-center justify-between gap-1 pt-0.5">
+            <span className="text-[11px] text-neutral-400 font-medium">Tone</span>
+            <div className="flex gap-1.5">
+              {TONES.map((t) => (
+                <button
+                  key={t.name}
+                  type="button"
+                  onClick={() => {
+                    haptics.trigger('light');
+                    setLightColor(t.color);
+                    applyLighting({
+                      intensity,
+                      softness,
+                      color: t.color,
+                      dir: lightDirRef.current,
+                      shadowFloor,
+                      showGrid,
+                      modelMode,
+                    });
+                  }}
+                  className={`w-7 h-7 rounded-lg border transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
+                    lightColor === t.color
+                      ? isLight
+                        ? 'border-amber-500 bg-amber-100/60 ring-2 ring-amber-400/40'
+                        : 'border-amber-400 bg-amber-400/20 ring-2 ring-amber-400/30'
+                      : isLight
+                      ? 'border-neutral-200 hover:border-neutral-400 bg-neutral-50'
+                      : 'border-neutral-700 hover:border-neutral-500 bg-neutral-900/40'
+                  }`}
+                  title={t.name}
+                  aria-label={t.name}
+                >
+                  <div
+                    className={`w-3.5 h-3.5 rounded-full ${t.bgClass} border ${
+                      isLight ? 'border-neutral-300' : 'border-neutral-600'
+                    } shadow-sm`}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3 Quick Toggles: Floor Shadow, Floor Grid, Model Finish */}
+          <div className="grid grid-cols-3 gap-1 sm:gap-1.5 pt-0.5 sm:pt-1">
+            {/* Shadow Floor */}
+            <button
+              type="button"
+              onClick={() => {
+                haptics.trigger('light');
+                const next = !shadowFloor;
+                setShadowFloor(next);
+                applyLighting({
+                  intensity,
+                  softness,
+                  color: lightColor,
+                  dir: lightDirRef.current,
+                  shadowFloor: next,
+                  showGrid,
+                  modelMode,
+                });
+              }}
+              className={`h-7 sm:h-8 px-1 rounded-lg border text-[10px] sm:text-[11px] font-medium flex items-center justify-center gap-0.5 sm:gap-1 transition-all cursor-pointer active:scale-95 ${
+                shadowFloor
+                  ? isLight
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-semibold'
+                    : 'border-emerald-500/80 bg-emerald-500/15 text-emerald-300 font-semibold'
+                  : isLight
+                  ? 'border-neutral-200 bg-neutral-100 text-neutral-500 hover:bg-neutral-200/70'
+                  : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:bg-neutral-800'
+              }`}
+            >
+              <span>Shadow</span>
+              <span className="text-[9px] opacity-75 font-mono">{shadowFloor ? 'ON' : 'OFF'}</span>
+            </button>
+
+            {/* Floor Grid */}
+            <button
+              type="button"
+              onClick={() => {
+                haptics.trigger('light');
+                const nextGrid = !showGrid;
+                setShowGrid(nextGrid);
+                applyLighting({
+                  intensity,
+                  softness,
+                  color: lightColor,
+                  dir: lightDirRef.current,
+                  shadowFloor,
+                  showGrid: nextGrid,
+                  modelMode,
+                });
+              }}
+              className={`h-7 sm:h-8 px-1 rounded-lg border text-[10px] sm:text-[11px] font-medium flex items-center justify-center gap-0.5 sm:gap-1 transition-all cursor-pointer active:scale-95 ${
+                showGrid
+                  ? isLight
+                    ? 'border-sky-500 bg-sky-50 text-sky-800 font-semibold'
+                    : 'border-sky-500/80 bg-sky-500/15 text-sky-300 font-semibold'
+                  : isLight
+                  ? 'border-neutral-200 bg-neutral-100 text-neutral-500 hover:bg-neutral-200/70'
+                  : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:bg-neutral-800'
+              }`}
+            >
+              <span>Grid</span>
+              <span className="text-[9px] opacity-75 font-mono">{showGrid ? 'ON' : 'OFF'}</span>
+            </button>
+
+            {/* Model Clay Finish */}
+            <button
+              type="button"
+              onClick={handleToggleModelFinish}
+              className={`h-7 sm:h-8 px-1 rounded-lg border text-[10px] sm:text-[11px] font-medium flex items-center justify-center gap-0.5 sm:gap-1 transition-all cursor-pointer active:scale-95 ${
+                modelMode === 'clay'
+                  ? isLight
+                    ? 'border-amber-500 bg-amber-50 text-amber-900 font-semibold'
+                    : 'border-amber-400/80 bg-amber-400/15 text-amber-300 font-semibold'
+                  : isLight
+                  ? 'border-neutral-200 bg-neutral-100 text-neutral-700 hover:bg-neutral-200/70'
+                  : 'border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:bg-neutral-800'
+              }`}
+            >
+              <span>Finish</span>
+              <span className="text-[9px] opacity-75 font-mono">{modelMode === 'clay' ? 'Clay' : 'Tex'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </aside>

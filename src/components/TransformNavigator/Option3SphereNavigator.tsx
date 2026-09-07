@@ -532,22 +532,85 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     ctx.shadowBlur = 6;
     ctx.shadowOffsetY = 1.5;
 
-    // 1. Draw solid stems ONLY for front-facing positive axes (no dashed spider webs)
+    // 1. Back-facing positive axes (+X, +Y, +Z with depth < -0.04): draw stems and handles behind center hub
     hs.forEach((h: any) => {
+      if (h.sign <= 0) return;
       const front = h.p.depth >= -0.04;
-      if (h.sign > 0 && front) {
+      if (front) return;
+
+      const on = live && gz.active && gz.active.type === 'axis' && gz.active.i === h.i && gz.active.sign === h.sign;
+      const hov = live && gz.hover && gz.hover.i === h.i && gz.hover.sign === h.sign;
+
+      // Stem connecting to center
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(m.c, m.c);
+      ctx.lineTo(h.p.x, h.p.y);
+      ctx.strokeStyle = h.a.tone;
+      ctx.globalAlpha = on || hov ? 0.9 : 0.6;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      ctx.restore();
+
+      // Back handle
+      ctx.save();
+      ctx.globalAlpha = on || hov ? 1.0 : 0.82;
+
+      // Arrow head for back-facing axis
+      if (h.p.len > (gz.mode === 'rotate' ? 0.34 : 0.22)) {
+        const ux = (h.p.x - m.c) / h.p.rad, uy = (h.p.y - m.c) / h.p.rad;
         ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(m.c, m.c);
-        ctx.lineTo(h.p.x, h.p.y);
+        ctx.translate(h.p.x, h.p.y);
+        ctx.rotate(Math.atan2(uy, ux));
+        ctx.fillStyle = h.a.tone;
         ctx.strokeStyle = h.a.tone;
-        ctx.lineWidth = 2.8;
-        ctx.stroke();
+        if (gz.mode === 'rotate') {
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.arc(0, 0, m.hand * 1.25, -0.92, 0.92);
+          ctx.stroke();
+          const ax = Math.cos(0.92) * m.hand * 1.25, ay = Math.sin(0.92) * m.hand * 1.25;
+          ctx.beginPath();
+          ctx.moveTo(ax + 3, ay + 1);
+          ctx.lineTo(ax - 2.5, ay + 3);
+          ctx.lineTo(ax - 1, ay - 2.5);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          const base = m.hand * 0.92, wide = m.hand * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(base + m.hand * 0.88, 0);
+          ctx.lineTo(base, -wide);
+          ctx.lineTo(base, wide);
+          ctx.closePath();
+          ctx.fill();
+        }
         ctx.restore();
       }
+
+      const r = m.hand * (on || hov ? 1.05 : 0.9);
+      ctx.beginPath();
+      ctx.arc(h.p.x, h.p.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = h.a.tone;
+      ctx.fill();
+
+      if (on || hov) {
+        ctx.strokeStyle = T.ink;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(h.p.x, h.p.y, m.hand * 1.25, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#ffffff';
+      labelFont(ctx, h.a.lbl, r);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(h.a.lbl, h.p.x, h.p.y + 0.5);
+      ctx.restore();
     });
 
-    // 2. Center Hub (placed under front handles so it never obstructs them)
+    // 2. Center Hub (placed over back handles, under front handles)
     ctx.beginPath();
     ctx.arc(m.c, m.c, m.hub, 0, Math.PI * 2);
     ctx.fillStyle = T.hub;
@@ -559,27 +622,19 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
 
     hubIcon(ctx, m.c, m.c, m.hub * 0.72);
 
-    // 3. Negative / Back-facing axes: render ONLY subtle small pips on hover/active (zero idle dark blotches)
+    // 3. Front-facing positive axes (depth >= -0.04): draw stems and handles on top of hub
     hs.forEach((h: any) => {
+      if (h.sign <= 0) return;
       const front = h.p.depth >= -0.04;
-      if (h.sign > 0 && front) return;
-      const on = live && gz.active && gz.active.type === 'axis' && gz.active.i === h.i && gz.active.sign === h.sign;
-      const hov = live && gz.hover && gz.hover.i === h.i && gz.hover.sign === h.sign;
-      if (on || hov) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(h.p.x, h.p.y, m.hand * 0.55, 0, Math.PI * 2);
-        ctx.fillStyle = h.a.tone;
-        ctx.globalAlpha = 0.85;
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-        ctx.fillStyle = '#ffffff';
-        labelFont(ctx, h.sign < 0 ? h.a.back : h.a.lbl, m.hand * 0.65);
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(h.sign < 0 ? h.a.back : h.a.lbl, h.p.x, h.p.y + 0.5);
-        ctx.restore();
-      }
+      if (!front) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(m.c, m.c);
+      ctx.lineTo(h.p.x, h.p.y);
+      ctx.strokeStyle = h.a.tone;
+      ctx.lineWidth = 2.8;
+      ctx.stroke();
+      ctx.restore();
     });
 
     // 4. Front-facing vibrant handles (+X, +Y, +Z)
@@ -589,8 +644,10 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     ctx.shadowOffsetY = 1.5;
 
     hs.forEach((h: any) => {
+      if (h.sign <= 0) return;
       const front = h.p.depth >= -0.04;
-      if (!(h.sign > 0 && front)) return;
+      if (!front) return;
+
       const on = live && gz.active && gz.active.type === 'axis' && gz.active.i === h.i && gz.active.sign === h.sign;
       const hov = live && gz.hover && gz.hover.i === h.i && gz.hover.sign === h.sign;
 
@@ -642,6 +699,38 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       ctx.fillText(h.a.lbl, h.p.x, h.p.y + 0.5);
     });
     ctx.restore();
+
+    // 5. Negative axes (-X, -Y, -Z): render on hover/active or subtle front-facing pip
+    hs.forEach((h: any) => {
+      if (h.sign >= 0) return;
+      const on = live && gz.active && gz.active.type === 'axis' && gz.active.i === h.i && gz.active.sign === h.sign;
+      const hov = live && gz.hover && gz.hover.i === h.i && gz.hover.sign === h.sign;
+      const front = h.p.depth >= -0.04;
+
+      if (on || hov) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(h.p.x, h.p.y, m.hand * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = h.a.tone;
+        ctx.globalAlpha = 0.85;
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#ffffff';
+        labelFont(ctx, h.a.back, m.hand * 0.65);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(h.a.back, h.p.x, h.p.y + 0.5);
+        ctx.restore();
+      } else if (front) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(h.p.x, h.p.y, m.hand * 0.32, 0, Math.PI * 2);
+        ctx.fillStyle = h.a.tone;
+        ctx.globalAlpha = 0.45;
+        ctx.fill();
+        ctx.restore();
+      }
+    });
 
     if (live && gz.ring) pulse(ctx, m, now);
   }, [handles]);
