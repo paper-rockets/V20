@@ -28,7 +28,7 @@ import { Option3SphereNavigator } from './components/TransformNavigator/Option3S
 import { FpsCounter } from './components/FpsCounter';
 import { DeferredPanel } from './components/DeferredPanel';
 import { publishCameraPose, publishFps } from './core/telemetryStore';
-import { useUiMode, useHasOnboarded, setUiMode } from './core/uiModeStore';
+import { useHasOnboarded } from './core/uiModeStore';
 import { ProShell } from './components/pro/ProShell';
 import { useOpenSheet, openSheetId, closeSheet, toggleSheet } from './components/play/sheetStore';
 import { PlayTopStrip } from './components/play/PlayTopStrip';
@@ -194,7 +194,6 @@ export function App() {
     }
   }, [theme, engine]);
 
-  const uiMode = useUiMode();
   const openSheet = useOpenSheet();
   const hasOnboarded = useHasOnboarded();
   const [showPlayStats, setShowPlayStats] = useState<boolean>(false);
@@ -838,10 +837,6 @@ export function App() {
     (window as any).__testApp = {
       getEngine: () => engine,
       setTheme: handleSetTheme,
-      setUiMode: (mode: 'play' | 'pro') => {
-        setUiMode(mode);
-        try { localStorage.setItem('remix3d.uiMode', mode); } catch {}
-      },
       setTool,
       setBrushSettings,
       openSheet: (sheet: any) => openSheetId(sheet),
@@ -1188,7 +1183,6 @@ export function App() {
         canUndo={canUndo}
         canRedo={canRedo}
         theme={theme}
-        uiMode={uiMode}
         onOpenIllumination={() => setIsIlluminationOpen(true)}
         onQuickSave={handleQuickSave}
         onOpenSessions={() => setIsSessionModalOpen(true)}
@@ -1311,7 +1305,6 @@ export function App() {
           <Option3SphereNavigator
             engine={engine}
             theme={theme}
-            uiMode={uiMode}
             layers={layers}
             activeLayerId={activeLayerId}
             onSelectLayer={handleSelectLayer}

@@ -21,8 +21,6 @@ interface PlayTopStripProps {
   canUndo: boolean;
   canRedo: boolean;
   theme?: 'light' | 'dark';
-  uiMode?: 'play' | 'pro';
-  onSwitchUiMode?: () => void;
   onOpenIllumination?: () => void;
   onQuickSave?: () => void;
   onOpenSessions?: () => void;
@@ -36,8 +34,6 @@ export const PlayTopStrip: React.FC<PlayTopStripProps> = ({
   canUndo,
   canRedo,
   theme = 'dark',
-  uiMode = 'play',
-  onSwitchUiMode,
   onOpenIllumination,
   onQuickSave,
   onOpenSessions,

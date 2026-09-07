@@ -54,34 +54,18 @@ function notify(listeners: Set<Listener>): void {
   }
 }
 
-// --- Mode ---------------------------------------------------------------
-
-let uiMode: UiMode = 'pro';
-const modeListeners = new Set<Listener>();
+// --- Mode (Studio Shell) ------------------------------------------------
 
 export function getUiMode(): UiMode {
   return 'pro';
 }
 
-export function setUiMode(_mode: any): void {
-  uiMode = 'pro';
-  writeStored(MODE_KEY, 'pro');
-  notify(modeListeners);
-}
-
-export function subscribeUiMode(listener: Listener): () => void {
-  modeListeners.add(listener);
-  return () => {
-    modeListeners.delete(listener);
-  };
-}
-
-/** Reactive read. Safe in any component; re-renders only that component. */
+/** Reactive read. Maintained for Option3SphereNavigator gizmo compatibility */
 export function useUiMode(): UiMode {
-  return useSyncExternalStore(subscribeUiMode, getUiMode, getUiMode);
+  return 'pro';
 }
 
-// --- First run ----------------------------------------------------------
+// --- First run / Onboarding ---------------------------------------------
 
 let hasOnboarded: boolean = readStored(ONBOARDED_KEY) !== 'false';
 const onboardedListeners = new Set<Listener>();
@@ -106,34 +90,4 @@ export function subscribeHasOnboarded(listener: Listener): () => void {
 
 export function useHasOnboarded(): boolean {
   return useSyncExternalStore(subscribeHasOnboarded, getHasOnboarded, getHasOnboarded);
-}
-
-// --- Pro Surface Sub-Flag -----------------------------------------------
-
-export type ProSurface = 'classic' | 'modes';
-const PRO_SURFACE_KEY = 'remix3d.proSurface';
-
-let proSurface: ProSurface = readStored(PRO_SURFACE_KEY) === 'classic' ? 'classic' : 'modes';
-const proSurfaceListeners = new Set<Listener>();
-
-export function getProSurface(): ProSurface {
-  return proSurface;
-}
-
-export function setProSurface(s: ProSurface): void {
-  if (proSurface === s) return;
-  proSurface = s;
-  writeStored(PRO_SURFACE_KEY, s);
-  notify(proSurfaceListeners);
-}
-
-export function subscribeProSurface(listener: Listener): () => void {
-  proSurfaceListeners.add(listener);
-  return () => {
-    proSurfaceListeners.delete(listener);
-  };
-}
-
-export function useProSurface(): ProSurface {
-  return useSyncExternalStore(subscribeProSurface, getProSurface, getProSurface);
 }

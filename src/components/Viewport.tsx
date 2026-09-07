@@ -31,7 +31,6 @@ import {
   Pipette,
   Trash2,
 } from 'lucide-react';
-import { useUiMode } from '../core/uiModeStore';
 
 interface ViewportProps {
   tool: ToolType;
@@ -142,7 +141,6 @@ export const Viewport: React.FC<ViewportProps> = ({
   const lastPenEventTimeRef = useRef<number>(0);
   const [isStylusLockEnabled, setIsStylusLockEnabled] = useState<boolean>(true);
 
-  const uiMode = useUiMode();
   const cursorSvgRef = useRef<SVGSVGElement | null>(null);
   const cursorGroupRef = useRef<SVGGElement | null>(null);
   const [rulerDrag, setRulerDrag] = useState<{ startX: number; startY: number; currentX: number; currentY: number; active: boolean } | null>(null);
@@ -969,7 +967,28 @@ export const Viewport: React.FC<ViewportProps> = ({
             engine.applyLiquifyAtScreen(coords.x, coords.y, deltaScreenX, deltaScreenY, liquifySettings);
           }
         } else {
-          engine.addStrokePoint(coords.x, coords.y, brushSettings, tool, 1.0, symmetry);
+          const native = e.nativeEvent as any;
+          const rect = getRect();
+          let consumedCoalesced = false;
+
+          if (native && typeof native.getCoalescedEvents === 'function' && rect) {
+            const cEvents = native.getCoalescedEvents();
+            if (cEvents && cEvents.length > 0) {
+              const batch: Array<{ x: number; y: number; pressure: number }> = [];
+              for (let i = 0; i < cEvents.length; i++) {
+                const ev = cEvents[i];
+                const cx = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+                const cy = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
+                batch.push({ x: cx, y: cy, pressure: 1.0 });
+              }
+              engine.addStrokePointsBatch(batch, brushSettings, tool, symmetry);
+              consumedCoalesced = true;
+            }
+          }
+
+          if (!consumedCoalesced) {
+            engine.addStrokePoint(coords.x, coords.y, brushSettings, tool, 1.0, symmetry);
+          }
         }
         lastNormalizedPos.current.x = coords.x;
         lastNormalizedPos.current.y = coords.y;

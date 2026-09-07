@@ -1738,6 +1738,8 @@ export class StudioEngine {
       return;
     }
 
+    this.lastHitMesh = rayResult.mesh || null;
+
     // UV Texture Brush Mode
     if (tool === 'uv_brush' && rayResult.hit && rayResult.uv) {
       this.uvEngine.beginStroke(rayResult.uv, settings);
@@ -1813,16 +1815,18 @@ export class StudioEngine {
     const dy = targetY - this.lastScreenCoords.y;
     const screenDist = Math.hypot(dx, dy);
 
+    const isSpatial = settings.drawingMode === 'spatial_3d' || tool === 'free_brush';
+    const isDrawingPlane = isSpatial || (this.lastHitMesh !== null && (this.lastHitMesh === this.drawingPlaneMesh || this.lastHitMesh.name === 'DrawingPlaneCanvas'));
+
     // Sub-sample screen movements so fast sweeps calculate surface contact points smoothly.
-    // When processing hardware coalesced points (S-Pen at 120-240Hz), points are already
-    // tightly spaced sub-millimeter samples, so we evaluate exactly 1 raycast per coalesced
-    // point to prevent exponential raycast overhead and eliminate tablet input lag.
+    // When processing hardware coalesced points (S-Pen at 120-240Hz), or when drawing on a flat
+    // canvas / spatial plane, we evaluate exactly 1 raycast per point: this prevents straight-line
+    // chord pinning and lets the 3D Catmull-Rom spline construct smooth, jitter-free curves.
     const sampleDensity = settings.raycastSampleDensity || 'high';
-    const requestedMaxSteps = sampleDensity === 'ultra' ? 48 : sampleDensity === 'standard' ? 16 : 32;
+    const requestedMaxSteps = sampleDensity === 'ultra' ? 8 : sampleDensity === 'standard' ? 4 : 6;
     const densityMaxSteps = Math.min(requestedMaxSteps, this.profile.maxStrokeSubSteps);
     const maxStepDist = sampleDensity === 'ultra' ? 0.003 : 0.005;
-    const steps = isCoalescedPoint ? 1 : Math.min(densityMaxSteps, Math.max(1, Math.ceil(screenDist / maxStepDist)));
-    const isSpatial = settings.drawingMode === 'spatial_3d' || tool === 'free_brush';
+    const steps = (isCoalescedPoint || isDrawingPlane) ? 1 : Math.min(densityMaxSteps, Math.max(1, Math.ceil(screenDist / maxStepDist)));
 
     let missStreak = 0;
 
@@ -1861,6 +1865,10 @@ export class StudioEngine {
       }
 
       missStreak = 0;
+
+      if (rayResult.mesh) {
+        this.lastHitMesh = rayResult.mesh;
+      }
 
       // SURFACE / SPATIAL HIT
       const newPoint: StrokePoint = {

@@ -26,7 +26,6 @@ import {
 } from 'lucide-react';
 import { PlaySheet } from './PlaySheet';
 import { closeSheet } from './sheetStore';
-import { setUiMode, useUiMode } from '../../core/uiModeStore';
 import { haptics } from '../../utils/haptics';
 import { StorageEstimateInfo, AutoSaveMetaInfo } from '../../utils/storagePermission';
 
@@ -180,7 +179,6 @@ export const PlaySettingsSheet: React.FC<PlaySettingsSheetProps> = ({
   onToggleStats,
 }) => {
   const isLight = theme === 'light';
-  const uiMode = useUiMode();
   const [internalSound, setInternalSound] = useState<boolean>(() => haptics.getAudioFeedbackEnabled());
   const [showMore, setShowMore] = useState(false);
 

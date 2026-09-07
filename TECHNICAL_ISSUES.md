@@ -11,17 +11,18 @@ This file contains only technical issues previously confirmed through source ins
 
 ## Unresolved confirmed issues
 
-### 1. [P0] Loading a preset model can silently destroy the current drawing and undo history
+### 1. [P0] Replacing the base model can silently destroy the current drawing and undo history
 
 **Evidence:**
 
 - `src/components/ModelLibraryModal.tsx:82-89` loads a selected preset without checking whether the current canvas contains work and without asking for confirmation.
 - `src/core/studioEngine.ts:723-728` calls `clearModel()` before loading the new preset.
+- `src/core/studioEngine.ts:776` also calls `clearModel(false)` when placing a newly loaded object into the scene, so the risk is not limited to preset cards.
 - `src/core/studioEngine.ts:2673-2675` shows that `clearModel()` calls `clearAllStrokes()`.
 - `clearAllStrokes()` resets the drawing state and history.
 - Direct testing confirmed that loading a model after drawing removed the existing stroke/model state and left Undo/Redo unavailable.
 
-**Impact:** A user can permanently lose unsaved creative work by choosing a model from the Pro model library.
+**Impact:** A user can permanently lose unsaved creative work by choosing or importing a replacement base model.
 
 **Required fix:** Add a dirty-work check and a real confirmation dialog with Save, Replace, and Cancel choices. Loading a model should become an undoable project operation or create a new project instead of clearing history.
 
@@ -243,6 +244,14 @@ This file contains only technical issues previously confirmed through source ins
 **Impact:** A future developer cannot reliably reproduce releases or determine asset/code obligations, and users cannot evaluate local-data and network behavior.
 
 **Required fix:** Add a developer README, release procedure, root license decision, third-party notices, and a plain-language privacy/data-storage document before distribution.
+
+### 26. [P2] Service-worker updates have no user-facing activation flow
+
+**Evidence:** The service-worker registration path reports update activity through console messages, but no visible “Update available” prompt or controlled reload flow was found during the earlier source inspection.
+
+**Impact:** Users of the installed PWA can continue running an older application version without understanding why behavior differs from the newly deployed build. Reloading at an uncontrolled time can also interrupt unsaved work.
+
+**Required fix:** Detect a waiting worker, notify the user, preserve the current project, and activate/reload only after explicit confirmation or at a clearly safe point.
 
 ## Technical issues resolved during the V20 cleanup
 

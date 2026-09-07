@@ -938,9 +938,9 @@ export class ConformalBeadGenerator {
     const vectorPoints = points.map((p) => p.position);
     const curve = new THREE.CatmullRomCurve3(vectorPoints, false, 'centripetal', 0.5);
 
-    const stepSize = Math.max(0.008, brushSize * 0.35);
+    const stepSize = Math.max(0.005, brushSize * 0.25);
     const length = curve.getLength();
-    const divisions = Math.max(4, Math.min(64, Math.ceil(length / stepSize)));
+    const divisions = Math.max(8, Math.min(3072, Math.max(points.length * 2, Math.ceil(length / stepSize))));
 
     const rawPoints = curve.getPoints(divisions);
     const sampledPositions: THREE.Vector3[] = [];
