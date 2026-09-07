@@ -6,6 +6,11 @@ export interface UseDismissibleSurfaceOptions {
   surfaceRef: RefObject<HTMLElement | null>;
   triggerRef?: RefObject<HTMLElement | null>;
   /**
+   * Optional CSS selector for elements (e.g. toolbar buttons) that should not trigger
+   * outside dismissal on pointerdown so their own click handlers can toggle cleanly.
+   */
+  ignoreSelector?: string;
+  /**
    * When true (default), clicking on a canvas element outside the surface closes the surface
    * and prevents the event from starting a drawing stroke.
    */
@@ -31,6 +36,7 @@ export function useDismissibleSurface({
   onClose,
   surfaceRef,
   triggerRef,
+  ignoreSelector,
   suppressCanvasClick = true,
   closeOnEscape = true,
 }: UseDismissibleSurfaceOptions): void {
@@ -61,6 +67,11 @@ export function useDismissibleSurface({
 
       // Click on opener trigger button -> let the button toggle naturally
       if (triggerRef?.current && (triggerRef.current === target || triggerRef.current.contains(target))) {
+        return;
+      }
+
+      // Click on an element matching ignoreSelector (e.g. rail button) -> let the button's own click handler toggle
+      if (ignoreSelector && target.closest(ignoreSelector)) {
         return;
       }
 
@@ -102,5 +113,5 @@ export function useDismissibleSurface({
       window.removeEventListener('pointerdown', handlePointerDownCapture, true);
       window.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [isOpen, onClose, surfaceRef, triggerRef, suppressCanvasClick, closeOnEscape]);
+  }, [isOpen, onClose, surfaceRef, triggerRef, ignoreSelector, suppressCanvasClick, closeOnEscape]);
 }

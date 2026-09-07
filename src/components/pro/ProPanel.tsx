@@ -126,6 +126,7 @@ export const ProPanel: React.FC<ProPanelProps> = ({
     isOpen: isProMode,
     onClose: closeSheet,
     surfaceRef: panelRef,
+    ignoreSelector: '[data-pro-rail-button]',
   });
 
   if (!isProMode || !openSheet) return null;
@@ -134,10 +135,20 @@ export const ProPanel: React.FC<ProPanelProps> = ({
   const title = MODE_TITLES[mode] ?? mode;
 
   return (
-    <aside
-      ref={panelRef}
-      role="region"
-      aria-label={`${title} Panel`}
+    <>
+      {/* Outside click/tap dismiss backdrop */}
+      <div
+        className="fixed inset-0 z-30 bg-black/20 sm:bg-black/10 animate-in fade-in duration-150 pointer-events-auto"
+        onClick={() => {
+          haptics.trigger('light');
+          closeSheet();
+        }}
+        aria-hidden="true"
+      />
+      <aside
+        ref={panelRef}
+        role="region"
+        aria-label={`${title} Panel`}
       data-theme={theme}
       className={`paperrocket-pro-panel fixed z-40 select-none flex flex-col border shadow-2xl animate-in fade-in duration-150 overflow-hidden
         /* Mobile: Bottom sheet anchored at bottom with comfortable thumb reach */
@@ -245,5 +256,6 @@ export const ProPanel: React.FC<ProPanelProps> = ({
         )}
       </div>
     </aside>
-  );
+  </>
+);
 };

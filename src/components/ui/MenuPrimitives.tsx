@@ -26,14 +26,14 @@ export function getMenuDividerClasses(isLight: boolean): string {
  * MenuShelf: The standard window frame for all floating drawers, shelves, and popouts.
  * Enforces unified corner radius (2xl / 16px), 1px hairline border, theme colors, and standardized padding.
  */
-export const MenuShelf: React.FC<MenuShelfProps> = ({
+export const MenuShelf = React.forwardRef<HTMLDivElement, MenuShelfProps>(({
   theme = 'dark',
   padding = 'standard',
   className = '',
   style,
   children,
   as: Component = 'div',
-}) => {
+}, ref) => {
   const isLight = theme === 'light';
 
   const paddingClass =
@@ -47,6 +47,7 @@ export const MenuShelf: React.FC<MenuShelfProps> = ({
 
   return (
     <Component
+      ref={ref}
       className={`rounded-2xl border select-none transition-colors ${getMenuSurfaceClasses(
         isLight
       )} ${paddingClass} ${className}`}
@@ -55,7 +56,8 @@ export const MenuShelf: React.FC<MenuShelfProps> = ({
       {children}
     </Component>
   );
-};
+});
+MenuShelf.displayName = 'MenuShelf';
 
 export interface MenuHeaderProps {
   title: string;

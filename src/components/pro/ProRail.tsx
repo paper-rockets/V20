@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { IcPointer, IcDraw, IcCreate, IcDeform, IcLayers } from './StudioIcons';
-import { ProMode, toggleSheet, useOpenSheet, closeSheet } from '../play/sheetStore';
+import { ProMode, toggleSheet, useOpenSheet, closeSheet, openSheetId } from '../play/sheetStore';
 import { haptics } from '../../utils/haptics';
 import { ToolType, BrushSettings } from '../../types';
 import { RealBrushSizeControl } from '../common/RealBrushSizeControl';
@@ -55,6 +55,7 @@ export const ProRail: React.FC<ProRailProps> = ({
   const light = theme === 'light';
   const isLight = light;
   const rootRef = useRef<HTMLElement>(null);
+  const shelfRef = useRef<HTMLDivElement>(null);
   const colorBtnRef = useRef<HTMLButtonElement>(null);
   const sizeBtnRef = useRef<HTMLButtonElement>(null);
   const brushBtnRef = useRef<HTMLButtonElement>(null);
@@ -81,10 +82,21 @@ export const ProRail: React.FC<ProRailProps> = ({
     }
   }, [panel]);
 
+  const activeTriggerRef =
+    panel === 'color'
+      ? colorBtnRef
+      : panel === 'size'
+      ? sizeBtnRef
+      : panel === 'brush'
+      ? brushBtnRef
+      : undefined;
+
   useDismissibleSurface({
     isOpen: panel !== null,
     onClose: () => setPanel(null),
-    surfaceRef: rootRef,
+    surfaceRef: shelfRef,
+    triggerRef: activeTriggerRef,
+    ignoreSelector: '[data-pro-rail-button]',
   });
 
   const currentBrushSettings: BrushSettings = brushSettings || {
@@ -100,252 +112,271 @@ export const ProRail: React.FC<ProRailProps> = ({
 
 
   return (
-    <nav
-      ref={rootRef}
-      aria-label="Studio modes"
-      className="fixed left-1.5 sm:left-2 top-1/2 -translate-y-1/2 z-40 select-none pointer-events-none"
-    >
-      <div className={`pointer-events-auto flex flex-col items-center gap-2 py-1 ${light ? 'text-neutral-800' : 'text-white/85'}`}>
-        {/* Studio Modes: Select, Draw, Create, Deform, Layers */}
-        {MODES.map(({ id, label, icon: Icon }) => {
-          const isActive = openSheet === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => {
-                haptics.trigger('light');
-                if (id === 'draw' && setTool) {
-                  setTool('brush');
-                }
-                setPanel(null);
-                toggleSheet(id);
-              }}
-              className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors active:scale-95 border-0 bg-transparent ${
-                isActive
-                  ? light
-                    ? 'text-neutral-950 font-bold'
-                    : 'text-white font-bold'
-                  : light
-                    ? 'text-neutral-500 hover:text-neutral-900'
-                    : 'text-neutral-400 hover:text-white'
-              }`}
-              aria-label={label}
-              aria-pressed={isActive}
-              title={label}
-            >
-              <Icon className="h-[21px] w-[21px] shrink-0" strokeWidth={1.35} />
-            </button>
-          );
-        })}
-
-        {/* Color swatch disc */}
-        <button
-          ref={colorBtnRef}
-          type="button"
-          onClick={() => {
-            haptics.trigger('light');
-            closeSheet();
-            setPanel(panel === 'color' ? null : 'color');
-          }}
-          className="w-11 h-11 rounded-xl grid place-items-center active:scale-95 transition-transform border-0 bg-transparent"
-          aria-label="Color"
-          title="Color"
-        >
-          <span
-            className={`w-7 h-7 rounded-full border transition-all ${
-              panel === 'color'
-                ? isLight ? 'border-neutral-900 ring-2 ring-neutral-900/40 shadow-xs' : 'border-white ring-2 ring-white/40 shadow-xs'
-                : isLight ? 'border-black/15' : 'border-white/20'
-            }`}
-            style={{ background: currentBrushSettings.color || '#38bdf8' }}
-          />
-        </button>
-
-        {/* Size button - Sleek concentric target circle */}
-        <button
-          ref={sizeBtnRef}
-          type="button"
-          onClick={() => {
-            haptics.trigger('light');
-            closeSheet();
-            setPanel(panel === 'size' ? null : 'size');
-          }}
-          className={`w-11 h-11 rounded-xl flex items-center justify-center active:scale-95 transition-colors border-0 bg-transparent ${
-            panel === 'size'
-              ? isLight
-                ? 'text-neutral-950 font-bold'
-                : 'text-white font-bold'
-              : isLight
-              ? 'text-neutral-500 hover:text-neutral-900'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-          aria-label="Stroke size"
-          title={`Size: ${activeBrush.name}`}
-        >
-          <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
-            panel === 'size'
-              ? isLight ? 'border-neutral-900' : 'border-white'
-              : isLight ? 'border-neutral-400' : 'border-white/40'
-          }`}>
-            <span
-              className={`rounded-full transition-all ${
-                panel === 'size'
-                  ? isLight ? 'bg-neutral-900' : 'bg-white'
-                  : isLight ? 'bg-neutral-900' : 'bg-white'
-              }`}
-              style={{
-                width: Math.max(4, Math.min(10, currentBrushSettings.size * 100)),
-                height: Math.max(4, Math.min(10, currentBrushSettings.size * 100)),
-              }}
-            />
-          </div>
-        </button>
-
-        {/* Brushes button - Sleek spline wave curve */}
-        <button
-          ref={brushBtnRef}
-          type="button"
-          onClick={() => {
-            haptics.trigger('light');
-            if (setTool) {
-              setTool('brush');
-            }
-            closeSheet();
-            setPanel(panel === 'brush' ? null : 'brush');
-          }}
-          className={`w-11 h-11 rounded-xl flex items-center justify-center active:scale-95 transition-colors border-0 bg-transparent ${
-            panel === 'brush'
-              ? isLight
-                ? 'text-neutral-950 font-bold'
-                : 'text-white font-bold'
-              : isLight
-              ? 'text-neutral-500 hover:text-neutral-900'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-          aria-label="Brushes"
-          title={`Brush: ${activeBrush.name}`}
-        >
-          <svg viewBox="0 0 24 24" className="w-5 h-5 stroke-current fill-none">
-            <path d="M 4 14 Q 8 6, 12 12 T 20 10" strokeWidth={1.6} strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Popover Floating Shelf on the Right of the Dock */}
+    <>
+      {/* Tap-outside backdrop for shelf popover */}
       {panel && (
-        <MenuShelf
-          theme={theme}
-          padding={panel === 'brush' ? 'standard' : 'tight'}
-          style={shelfTop !== null ? { top: `${shelfTop}px`, transform: 'translateY(-50%)' } : undefined}
-          className={`pointer-events-auto absolute left-full ml-3 z-50 animate-in fade-in slide-in-from-left-2 duration-150 ${
-            shelfTop === null ? 'top-1/2 -translate-y-1/2' : ''
-          } ${
-            panel === 'color'
-              ? 'w-[188px]'
-              : panel === 'size'
-              ? 'w-[154px]'
-              : 'w-[320px] max-w-[calc(100vw-88px)]'
-          }`}
-        >
+        <div
+          className="fixed inset-0 z-30 pointer-events-auto"
+          onClick={() => setPanel(null)}
+          aria-hidden="true"
+        />
+      )}
 
-            {/* Color Panel */}
-            {panel === 'color' && (
-              <div className="flex flex-col gap-2.5">
-                {/* Active Color Preview & Quick Native Color Picker */}
-                <div className="flex items-center justify-between px-0.5 pb-1.5 border-b border-black/10 dark:border-white/10">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-5 h-5 rounded-full border border-black/15 dark:border-white/20 shadow-xs shrink-0"
-                      style={{ background: currentBrushSettings.color || '#38bdf8' }}
-                    />
-                    <span className="font-mono text-[11px] font-bold tracking-tight opacity-80">
-                      {(currentBrushSettings.color || '#38bdf8').toUpperCase()}
-                    </span>
-                  </div>
-                  {/* Quick Native Color Picker */}
-                  <label
-                    title="Pick custom color"
-                    className="relative cursor-pointer w-6 h-6 rounded-md flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                  >
-                    <input
-                      type="color"
-                      value={currentBrushSettings.color || '#38bdf8'}
-                      onChange={(e) => {
-                        const newColor = e.target.value;
-                        if (setBrushSettings) {
-                          setBrushSettings((p) => ({ ...p, color: newColor }));
-                        }
-                      }}
-                      className="sr-only"
-                    />
-                    <Palette className="w-3.5 h-3.5 opacity-70" />
-                  </label>
-                </div>
+      <nav
+        ref={rootRef}
+        aria-label="Studio modes"
+        className="fixed left-1.5 sm:left-2 top-1/2 -translate-y-1/2 z-40 select-none pointer-events-none"
+      >
+        <div className={`pointer-events-auto flex flex-col items-center gap-2 py-1 ${light ? 'text-neutral-800' : 'text-white/85'}`}>
+          {/* Studio Modes: Select, Draw, Create, Deform, Layers */}
+          {MODES.map(({ id, label, icon: Icon }) => {
+            const isActive = openSheet === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                data-pro-rail-button="true"
+                onClick={() => {
+                  haptics.trigger('light');
+                  if (id === 'draw' && setTool) {
+                    setTool('brush');
+                  }
+                  setPanel(null);
+                  if (openSheet === id) {
+                    closeSheet();
+                  } else {
+                    openSheetId(id);
+                  }
+                }}
+                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors active:scale-95 border-0 bg-transparent ${
+                  isActive
+                    ? light
+                      ? 'text-neutral-950 font-bold'
+                      : 'text-white font-bold'
+                    : light
+                      ? 'text-neutral-500 hover:text-neutral-900'
+                      : 'text-neutral-400 hover:text-white'
+                }`}
+                aria-label={label}
+                aria-pressed={isActive}
+                title={label}
+              >
+                <Icon className="h-[21px] w-[21px] shrink-0" strokeWidth={1.35} />
+              </button>
+            );
+          })}
 
-                {/* Preset Swatches with Selection Indicator */}
-                <div className="grid grid-cols-4 gap-2">
-                  {COLORS.map((color) => {
-                    const isSelected = (currentBrushSettings.color || '#38bdf8').toLowerCase() === color.toLowerCase();
-                    const isWhite = color.toLowerCase() === '#ffffff';
-                    const isLightColor = color === '#ffffff' || color === '#f59e0b';
-                    return (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => {
-                          haptics.trigger('light');
+          {/* Color swatch disc */}
+          <button
+            ref={colorBtnRef}
+            type="button"
+            data-pro-rail-button="true"
+            onClick={() => {
+              haptics.trigger('light');
+              closeSheet();
+              setPanel((prev) => (prev === 'color' ? null : 'color'));
+            }}
+            className="w-11 h-11 rounded-xl grid place-items-center active:scale-95 transition-transform border-0 bg-transparent"
+            aria-label="Color"
+            title="Color"
+          >
+            <span
+              className={`w-7 h-7 rounded-full border transition-all ${
+                panel === 'color'
+                  ? isLight ? 'border-neutral-900 ring-2 ring-neutral-900/40 shadow-xs' : 'border-white ring-2 ring-white/40 shadow-xs'
+                  : isLight ? 'border-black/15' : 'border-white/20'
+              }`}
+              style={{ background: currentBrushSettings.color || '#38bdf8' }}
+            />
+          </button>
+
+          {/* Size button - Sleek concentric target circle */}
+          <button
+            ref={sizeBtnRef}
+            type="button"
+            data-pro-rail-button="true"
+            onClick={() => {
+              haptics.trigger('light');
+              closeSheet();
+              setPanel((prev) => (prev === 'size' ? null : 'size'));
+            }}
+            className={`w-11 h-11 rounded-xl flex items-center justify-center active:scale-95 transition-colors border-0 bg-transparent ${
+              panel === 'size'
+                ? isLight
+                  ? 'text-neutral-950 font-bold'
+                  : 'text-white font-bold'
+                : isLight
+                ? 'text-neutral-500 hover:text-neutral-900'
+                : 'text-neutral-400 hover:text-white'
+            }`}
+            aria-label="Stroke size"
+            title={`Size: ${activeBrush.name}`}
+          >
+            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
+              panel === 'size'
+                ? isLight ? 'border-neutral-900' : 'border-white'
+                : isLight ? 'border-neutral-400' : 'border-white/40'
+            }`}>
+              <span
+                className={`rounded-full transition-all ${
+                  panel === 'size'
+                    ? isLight ? 'bg-neutral-900' : 'bg-white'
+                    : isLight ? 'bg-neutral-900' : 'bg-white'
+                }`}
+                style={{
+                  width: Math.max(4, Math.min(10, currentBrushSettings.size * 100)),
+                  height: Math.max(4, Math.min(10, currentBrushSettings.size * 100)),
+                }}
+              />
+            </div>
+          </button>
+
+          {/* Brushes button - Sleek spline wave curve */}
+          <button
+            ref={brushBtnRef}
+            type="button"
+            data-pro-rail-button="true"
+            onClick={() => {
+              haptics.trigger('light');
+              if (setTool) {
+                setTool('brush');
+              }
+              closeSheet();
+              setPanel((prev) => (prev === 'brush' ? null : 'brush'));
+            }}
+            className={`w-11 h-11 rounded-xl flex items-center justify-center active:scale-95 transition-colors border-0 bg-transparent ${
+              panel === 'brush'
+                ? isLight
+                  ? 'text-neutral-950 font-bold'
+                  : 'text-white font-bold'
+                : isLight
+                ? 'text-neutral-500 hover:text-neutral-900'
+                : 'text-neutral-400 hover:text-white'
+            }`}
+            aria-label="Brushes"
+            title={`Brush: ${activeBrush.name}`}
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5 stroke-current fill-none">
+              <path d="M 4 14 Q 8 6, 12 12 T 20 10" strokeWidth={1.6} strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Popover Floating Shelf on the Right of the Dock */}
+        {panel && (
+          <MenuShelf
+            ref={shelfRef}
+            theme={theme}
+            padding={panel === 'brush' ? 'standard' : 'tight'}
+            style={shelfTop !== null ? { top: `${shelfTop}px`, transform: 'translateY(-50%)' } : undefined}
+            className={`pointer-events-auto absolute left-full ml-3 z-50 animate-in fade-in slide-in-from-left-2 duration-150 ${
+              shelfTop === null ? 'top-1/2 -translate-y-1/2' : ''
+            } ${
+              panel === 'color'
+                ? 'w-[154px]'
+                : panel === 'size'
+                ? 'w-[154px]'
+                : 'w-[320px] max-w-[calc(100vw-88px)]'
+            }`}
+          >
+
+              {/* Color Panel */}
+              {panel === 'color' && (
+                <div className="flex flex-col gap-2">
+                  {/* Active Color Preview & Quick Native Color Picker */}
+                  <div className="flex items-center justify-between px-0.5 pb-1 border-b border-black/10 dark:border-white/10">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border border-black/15 dark:border-white/20 shadow-xs shrink-0"
+                        style={{ background: currentBrushSettings.color || '#38bdf8' }}
+                      />
+                      <span className="font-mono text-[10px] font-bold tracking-tight opacity-75">
+                        {(currentBrushSettings.color || '#38bdf8').toUpperCase()}
+                      </span>
+                    </div>
+                    {/* Quick Native Color Picker */}
+                    <label
+                      title="Pick custom color"
+                      className="relative cursor-pointer w-5 h-5 rounded-md flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                    >
+                      <input
+                        type="color"
+                        value={currentBrushSettings.color || '#38bdf8'}
+                        onChange={(e) => {
+                          const newColor = e.target.value;
                           if (setBrushSettings) {
-                            setBrushSettings((p) => ({ ...p, color }));
+                            setBrushSettings((p) => ({ ...p, color: newColor }));
                           }
-                          setPanel(null);
                         }}
-                        className={`w-8 h-8 rounded-full border active:scale-90 transition-all shadow-sm flex items-center justify-center ${
-                          isSelected
-                            ? isLight
-                              ? 'ring-2 ring-neutral-900 ring-offset-2 ring-offset-[#FAF9F5] scale-105 border-transparent'
-                              : 'ring-2 ring-white ring-offset-2 ring-offset-[#131518] scale-105 border-transparent'
-                            : isWhite
-                            ? isLight
-                              ? 'border-black/30 ring-1 ring-black/10 hover:scale-105'
-                              : 'border-white/30 hover:scale-105'
-                            : isLight
-                            ? 'border-black/20 hover:scale-105'
-                            : 'border-white/20 hover:scale-105'
-                        }`}
-                        style={{ background: color }}
-                        aria-label={`Use ${color}`}
-                        title={color}
-                      >
-                        {isSelected && (
-                          <Check
-                            className={`w-4 h-4 ${isLightColor ? 'text-neutral-950' : 'text-white'}`}
-                            strokeWidth={3}
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                        className="sr-only"
+                      />
+                      <Palette className="w-3 h-3 opacity-70" />
+                    </label>
+                  </div>
 
-                {/* More Colors Button -> Opens Full Color Studio */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPanel(null);
-                    onOpenColorStudio?.();
-                  }}
-                  className={`w-full h-8 rounded-lg border flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all ${
-                    isLight
-                      ? 'border-black/15 text-neutral-800 hover:text-black hover:bg-black/5'
-                      : 'border-white/10 text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  <span>More colors</span>
-                  <ChevronRight className="w-3.5 h-3.5 opacity-70" />
-                </button>
-              </div>
-            )}
+                  {/* Preset Swatches with Selection Indicator */}
+                  <div className="grid grid-cols-4 gap-3 py-0.5 justify-items-center">
+                    {COLORS.map((color) => {
+                      const isSelected = (currentBrushSettings.color || '#38bdf8').toLowerCase() === color.toLowerCase();
+                      const isWhite = color.toLowerCase() === '#ffffff';
+                      const isLightColor = color === '#ffffff' || color === '#f59e0b';
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => {
+                            haptics.trigger('light');
+                            if (setBrushSettings) {
+                              setBrushSettings((p) => ({ ...p, color }));
+                            }
+                            setPanel(null);
+                          }}
+                          className={`w-6 h-6 rounded-full border active:scale-90 transition-all shadow-xs flex items-center justify-center ${
+                            isSelected
+                              ? isLight
+                                ? 'ring-2 ring-neutral-900 ring-offset-2 ring-offset-[#FAF9F5] scale-110 border-transparent'
+                                : 'ring-2 ring-white ring-offset-2 ring-offset-[#131518] scale-110 border-transparent'
+                              : isWhite
+                              ? isLight
+                                ? 'border-black/30 ring-1 ring-black/10 hover:scale-105'
+                                : 'border-white/30 hover:scale-105'
+                              : isLight
+                              ? 'border-black/20 hover:scale-105'
+                              : 'border-white/20 hover:scale-105'
+                          }`}
+                          style={{ background: color }}
+                          aria-label={`Use ${color}`}
+                          title={color}
+                        >
+                          {isSelected && (
+                            <Check
+                              className={`w-3.5 h-3.5 ${isLightColor ? 'text-neutral-950' : 'text-white'}`}
+                              strokeWidth={3}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* More Colors Button -> Opens Full Color Studio */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPanel(null);
+                      onOpenColorStudio?.();
+                    }}
+                    className={`w-full h-7 rounded-lg border flex items-center justify-center gap-1 text-[11px] font-medium active:scale-95 transition-all ${
+                      isLight
+                        ? 'border-black/15 text-neutral-800 hover:text-black hover:bg-black/5'
+                        : 'border-white/10 text-white/80 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <span>More colors</span>
+                    <ChevronRight className="w-3 h-3 opacity-70" />
+                  </button>
+                </div>
+              )}
 
             {/* Size Selector Panel - Actual Shape & Size with Slider */}
             {panel === 'size' && (
@@ -450,6 +481,7 @@ export const ProRail: React.FC<ProRailProps> = ({
             )}
           </MenuShelf>
         )}
-    </nav>
+      </nav>
+    </>
   );
 };
