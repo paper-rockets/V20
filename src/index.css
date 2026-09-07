@@ -1,0 +1,796 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Ensure canvas takes up full available touch area cleanly */
+canvas {
+  touch-action: none;
+}
+
+/* One tactile interaction language across Play, Pro, and every nested menu. */
+.paperrocket-ui {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+.paperrocket-ui button {
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.paperrocket-ui button:has(> svg:only-child),
+.paperrocket-ui button[aria-label]:not(:has(span)) {
+  min-width: 44px;
+}
+
+/* Compact top strip on mobile screens (<640px) so all options (Fullscreen, Sessions, etc.) fit comfortably */
+@media (max-width: 639px) {
+  .play-top-strip button,
+  .play-top-strip button:has(> svg:only-child),
+  .play-top-strip button[aria-label]:not(:has(span)) {
+    min-width: 32px !important;
+    min-height: 32px !important;
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+  }
+  .play-top-strip .play-top-strip-left {
+    min-width: auto !important;
+    width: auto !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 0 8px 0 6px !important;
+  }
+  .play-top-strip .play-top-strip-mode-btn {
+    min-width: auto !important;
+    width: auto !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 8px !important;
+  }
+}
+
+.paperrocket-ui button:focus-visible,
+.paperrocket-ui input:focus-visible,
+.paperrocket-ui select:focus-visible,
+.paperrocket-ui [tabindex]:focus-visible {
+  outline: 2px solid rgb(56 189 248 / 0.7);
+  outline-offset: 2px;
+}
+
+.paperrocket-ui * {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(161 161 170 / 0.45) transparent;
+}
+
+.paperrocket-ui *::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.paperrocket-ui *::-webkit-scrollbar-thumb {
+  background: rgb(161 161 170 / 0.4);
+  border-radius: 999px;
+}
+
+.paperrocket-ui *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.paperrocket-ui [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.paperrocket-library-tray {
+  height: 48vh;
+  height: 48dvh;
+}
+
+@media (min-width: 640px) {
+  .paperrocket-library-tray {
+    left: 88px !important;
+    right: auto !important;
+    bottom: 20px !important;
+    width: 420px !important;
+    height: 56vh !important;
+    height: 56dvh !important;
+    max-height: 620px;
+  }
+
+  .paperrocket-library-tray > :first-child p {
+    display: none;
+  }
+}
+
+.paperrocket-model-grid {
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+
+.paperrocket-model-item {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 4px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.paperrocket-model-item p,
+.paperrocket-model-item > :last-child > :first-child {
+  display: none;
+}
+
+.paperrocket-model-item > :last-child {
+  margin: 0 !important;
+  padding: 0 4px 0 10px !important;
+  border: 0 !important;
+}
+
+.paperrocket-model-upload {
+  min-height: 48px;
+  padding: 8px !important;
+  display: grid !important;
+  grid-template-columns: auto 1fr auto;
+  text-align: left !important;
+  border-width: 1px !important;
+}
+
+.paperrocket-model-upload > div > p:last-child {
+  display: none;
+}
+
+.paperrocket-toybox-list {
+  grid-template-columns: 1fr !important;
+}
+
+.paperrocket-toybox-item {
+  min-height: 48px;
+  padding: 7px 4px !important;
+  flex-direction: row !important;
+  align-items: center;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.paperrocket-toybox-item > :first-child {
+  width: 34px !important;
+  height: 34px !important;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  border-radius: 9px !important;
+}
+
+.paperrocket-toybox-item > :last-child > :last-child {
+  display: none;
+}
+
+.paperrocket-layer-item {
+  padding: 9px 2px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.paperrocket-transform-navigator {
+  background: transparent !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.paperrocket-transform-navigator #transform-navigator-header {
+  border-color: transparent !important;
+}
+
+.paperrocket-transform-navigator #transform-navigator-body {
+  overflow: visible !important;
+}
+
+.paperrocket-transform-navigator #transform-navigator-minimize-btn,
+.paperrocket-transform-navigator #transform-navigator-settings-btn {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.paperrocket-settings-row {
+  min-height: 46px !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  gap: 10px !important;
+}
+
+.paperrocket-settings-row > svg {
+  width: 17px !important;
+  height: 17px !important;
+}
+
+.paperrocket-settings-row > div:nth-child(2) > div:first-child {
+  font-size: 12px !important;
+}
+
+.paperrocket-settings-row > div:nth-child(2) > div:last-child {
+  font-size: 10px !important;
+}
+
+.paperrocket-settings-section {
+  padding-top: 10px !important;
+}
+
+.paperrocket-toggle {
+  min-width: 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  background: transparent !important;
+}
+
+.paperrocket-toggle::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 10px;
+  width: 40px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgb(82 82 91);
+}
+
+.paperrocket-toggle[data-state="on"]::before {
+  background: rgb(56 189 248);
+}
+
+.paperrocket-toggle > span {
+  top: 13px !important;
+  z-index: 1;
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.paperrocket-toggle[data-state="on"] > span {
+  left: 21px !important;
+}
+
+.paperrocket-toggle[data-state="off"] > span {
+  left: 5px !important;
+}
+
+@media (min-width: 500px) {
+  .paperrocket-play-sheet {
+    left: auto !important;
+    right: 20px !important;
+    bottom: 20px !important;
+    width: min(390px, calc(100vw - 40px)) !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 40px) !important;
+    border: 1px solid rgb(255 255 255 / 0.1) !important;
+    border-radius: 16px !important;
+  }
+
+  .paperrocket-play-sheet[data-sheet-id="settings"] {
+    width: min(410px, calc(100vw - 40px)) !important;
+  }
+}
+
+.paperrocket-modal-overlay {
+  background: rgb(0 0 0 / 0.6) !important;
+}
+
+/*
+ * Pro is a tool belt over the canvas, not a dashboard.  The source panels keep
+ * their semantic groups and every advanced control, while this layer removes
+ * the nested-card treatment and leaves a quiet, floating studio palette.
+ */
+.paperrocket-pro-panel {
+  border-radius: 18px !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.paperrocket-pro-panel[data-theme="light"] {
+  box-shadow: 0 20px 55px rgb(var(--pr-menu-shadow-rgb) / var(--pr-menu-shadow-opacity)) !important;
+}
+
+.paperrocket-pro-panel > :first-child {
+  min-height: 34px !important;
+  padding: 4px 10px !important;
+  background: transparent !important;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08) !important;
+}
+
+.paperrocket-pro-panel > :first-child h2 {
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.72));
+}
+
+.paperrocket-pro-content {
+  padding: 10px !important;
+}
+
+.paperrocket-pro-content button {
+  border-radius: 9px !important;
+  box-shadow: none !important;
+}
+
+/* Dark theme button accents */
+.paperrocket-pro-panel:not([data-theme="light"]) .paperrocket-pro-content button[class~="bg-black/30"],
+.paperrocket-pro-panel:not([data-theme="light"]) .paperrocket-pro-content button[class~="bg-neutral-900"] {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.paperrocket-pro-panel:not([data-theme="light"]) .paperrocket-pro-content button[class~="bg-white"] {
+  color: rgb(224 247 255) !important;
+  background: rgb(56 189 248 / 0.12) !important;
+  border-color: rgb(56 189 248 / 0.72) !important;
+}
+
+/* Light theme button accents */
+.paperrocket-pro-panel[data-theme="light"] .paperrocket-pro-content button[class~="bg-white"] {
+  color: rgb(55 65 81) !important;
+  background: transparent !important;
+  border-color: rgb(17 24 39 / 0.15) !important;
+}
+
+.paperrocket-pro-panel[data-theme="light"] .paperrocket-pro-content button[class~="bg-neutral-900"] {
+  color: rgb(12 74 96) !important;
+  background: rgb(14 165 233 / 0.14) !important;
+  border-color: rgb(2 132 199 / 0.8) !important;
+  font-weight: 700 !important;
+}
+
+.paperrocket-pro-content input[type="range"] {
+  accent-color: rgb(56 189 248);
+}
+
+.paperrocket-pro-panel[data-theme="light"] > :first-child {
+  border-bottom: 1px solid rgb(17 24 39 / 0.08) !important;
+}
+
+.paperrocket-pro-panel[data-theme="light"] .paperrocket-pro-content > div > div {
+  border-color: rgb(17 24 39 / 0.14) !important;
+}
+
+.paperrocket-pro-panel[data-theme="light"] > :first-child h2,
+.paperrocket-pro-panel[data-theme="light"] .paperrocket-pro-content {
+  filter: drop-shadow(0 1px 1px rgb(255 255 255 / 0.8));
+}
+
+@media (min-width: 640px) {
+  .paperrocket-pro-panel {
+    width: 290px !important;
+    height: auto !important;
+    max-height: 76vh !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .paperrocket-library-tray {
+    height: 70vh;
+    height: 70dvh;
+  }
+
+  .paperrocket-pro-panel,
+  .paperrocket-context-panel {
+    left: 60px !important;
+    top: 68px !important;
+    bottom: auto !important;
+    transform: none !important;
+    translate: none !important;
+    width: min(280px, calc(100vw - 72px)) !important;
+    max-width: calc(100vw - 72px) !important;
+    height: auto !important;
+    max-height: calc(100dvh - 76px - max(8px, env(safe-area-inset-bottom))) !important;
+  }
+}
+
+/*
+ * Low-Power UI Rendering Mode
+ *
+ * Applied to <html> by the device profile on entry-tier tablets and phones.
+ *
+ * Every element, icon and control stays exactly where it is - this only turns off
+ * two compositor effects that are disproportionately expensive on a Mali/Adreno
+ * entry-tier GPU while a live WebGL canvas sits underneath:
+ *
+ *   1. backdrop-filter, used by ~79 panels here. Each one makes the compositor
+ *      snapshot and blur the pixels behind it every frame. Panels keep their
+ *      translucent look, they just no longer blur what is behind them.
+ *   2. Infinite decorative keyframe animations (pulse / ping / spin), which keep
+ *      the compositor awake and defeat the engine's idle frame pacing.
+ */
+html.low-power-ui *,
+html.low-power-ui *::before,
+html.low-power-ui *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.low-power-ui .animate-pulse,
+html.low-power-ui .animate-ping,
+html.low-power-ui .animate-spin {
+  animation: none !important;
+}
+
+/* Respect the OS-level reduced-motion setting on every device. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =============================================================
+   UNIFIED FLOATING SURFACE — one look for every menu, sheet,
+   panel and pop-up (Play + Pro). A surface opts in by adding the
+   class `pr-surface` to its outermost card element. ALL visual
+   work happens here; components only add that one class.
+   ============================================================= */
+
+/* MASTER MENU CONTROLS
+   Change these values once to restyle every menu shell in the app.
+   RGB values use three numbers so color and opacity remain independent. */
+:root {
+  --pr-menu-rgb: 20 22 26;
+  --pr-menu-opacity: .96;
+  --pr-menu-border-rgb: 255 255 255;
+  --pr-menu-border-opacity: .14;
+  --pr-menu-shadow-rgb: 0 0 0;
+  --pr-menu-shadow-opacity: .48;
+}
+
+html.light,
+.pr-surface[data-theme="light"],
+.paperrocket-pro-panel[data-theme="light"],
+.paperrocket-color-studio[data-theme="light"] {
+  --pr-menu-rgb: 247 244 238;
+  --pr-menu-opacity: .97;
+  --pr-menu-border-rgb: 17 24 39;
+  --pr-menu-border-opacity: .16;
+  --pr-menu-shadow-rgb: 35 28 20;
+  --pr-menu-shadow-opacity: .18;
+}
+
+/* 1 · A menu is a compact studio instrument: clearly separated from the
+      artwork, but still quiet. The shell is opaque enough to read without
+      using backdrop blur over the live canvas. */
+.pr-surface:not(.paperrocket-toolbar-surface),
+.paperrocket-pro-panel,
+.paperrocket-color-studio {
+  background:rgb(var(--pr-menu-rgb) / var(--pr-menu-opacity)) !important;
+  border-color:rgb(var(--pr-menu-border-rgb) / var(--pr-menu-border-opacity)) !important;
+  box-shadow:0 24px 70px rgb(var(--pr-menu-shadow-rgb) / var(--pr-menu-shadow-opacity)), 0 1px 0 rgb(255 255 255 / .035) inset !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+
+html.light .pr-surface,
+.pr-surface[data-theme="light"]{
+  box-shadow:0 20px 55px rgb(var(--pr-menu-shadow-rgb) / var(--pr-menu-shadow-opacity)), 0 1px 0 rgb(255 255 255 / .7) inset !important;
+}
+
+/* Persistent floating instruments stay boxless. Only the menu they open
+   receives the shared menu surface. */
+.pr-surface.paperrocket-toolbar-surface,
+html.light .pr-surface.paperrocket-toolbar-surface {
+  background:transparent !important;
+  border-color:transparent !important;
+  box-shadow:none !important;
+}
+
+/* 2 · Inner cards and sections keep subtle backgrounds for hierarchy */
+.studio-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(161 161 170 / 0.45) transparent;
+  scrollbar-gutter: stable;
+}
+
+.studio-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.studio-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+.studio-scroll::-webkit-scrollbar-thumb {
+  background: rgb(161 161 170 / 0.35);
+  border-radius: 9999px;
+}
+
+.studio-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(161 161 170 / 0.6);
+}
+
+html.light .studio-scroll {
+  scrollbar-color: rgb(100 116 139 / 0.4) transparent;
+}
+
+html.light .studio-scroll::-webkit-scrollbar-thumb {
+  background: rgb(100 116 139 / 0.35);
+}
+
+html.light .studio-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(100 116 139 / 0.6);
+}
+
+/* soften inner divider borders into hairlines instead of hard edges */
+.pr-surface :is(div,section,aside,header,footer,nav)[class*="border"]{
+  border-color:rgb(255 255 255 / .12) !important;
+}
+html.light .pr-surface :is(div,section,aside,header,footer,nav)[class*="border"],
+.pr-surface[data-theme="light"] :is(div,section,aside,header,footer,nav)[class*="border"]{
+  border-color:rgb(17 24 39 / .14) !important;
+}
+
+/* 3 · Keep text readable over the live 3D canvas (dark is the default). */
+.pr-surface :is(h1,h2,h3,h4,h5,p,span,label,a,li,dt,dd,button){
+  text-shadow:0 1px 2px rgb(0 0 0 / .60);
+}
+html.light .pr-surface :is(h1,h2,h3,h4,h5,p,span,label,a,li,dt,dd,button),
+.pr-surface[data-theme="light"] :is(h1,h2,h3,h4,h5,p,span,label,a,li,dt,dd,button){
+  text-shadow:0 1px 1px rgb(255 255 255 / .85);
+}
+
+/* 4 · Buttons: quiet ghost by default, accent tint when active.
+       This mirrors the exact convention the whole app already uses. */
+.pr-surface button{ border-radius:9px !important; box-shadow:none !important; }
+
+/* dark theme — inactive buttons */
+html:not(.light) .pr-surface button:is(
+  [class*="bg-black/"],[class*="bg-neutral-"],[class*="bg-zinc-"],[class*="bg-stone-"],[class*="bg-gray-"]
+):not([class~="bg-white"]):not([class*="bg-sky-"]):not([class*="bg-blue-"]):not([class*="bg-emerald-"]):not([class*="bg-red-"]){
+  background:transparent !important;
+  border-color:rgb(255 255 255 / .14) !important;
+}
+/* dark theme — active button */
+html:not(.light) .pr-surface button[class~="bg-white"]{
+  color:rgb(224 247 255) !important;
+  background:rgb(56 189 248 / .14) !important;
+  border-color:rgb(56 189 248 / .72) !important;
+}
+/* light theme — inactive buttons */
+html.light .pr-surface button:is(
+  [class*="bg-white"],[class*="bg-neutral-"],[class*="bg-zinc-"],[class*="bg-stone-"],[class*="bg-gray-"]
+):not([class~="bg-neutral-900"]):not([class*="bg-sky-"]):not([class*="bg-blue-"]):not([class*="bg-emerald-"]):not([class*="bg-red-"]){
+  color:rgb(55 65 81) !important;
+  background:transparent !important;
+  border-color:rgb(17 24 39 / .15) !important;
+}
+/* light theme — active button */
+html.light .pr-surface button[class~="bg-neutral-900"]{
+  color:rgb(12 74 96) !important;
+  background:rgb(14 165 233 / .14) !important;
+  border-color:rgb(2 132 199 / .80) !important;
+  font-weight:700 !important;
+}
+
+/* 5 · Text inputs inside floating surfaces float too. */
+.pr-surface input[type="text"],
+.pr-surface input:not([type]){
+  background:transparent !important;
+  border-color:rgb(255 255 255 / .18) !important;
+  box-shadow:none !important;
+}
+html.light .pr-surface input[type="text"],
+html.light .pr-surface input:not([type]){
+  color:rgb(17 24 39) !important;
+  background:transparent !important;
+  border-color:rgb(17 24 39 / .18) !important;
+  box-shadow:none !important;
+}
+
+/* 6 · Sliders keep the studio accent. */
+.pr-surface input[type="range"]{ accent-color:rgb(56 189 248); }
+
+/* =============================================================
+   MINIMAL MENU SYSTEM
+   Menus use the same visual restraint as the canvas chrome: one
+   quiet plane, hairline groups and cyan only for active state.
+   ============================================================= */
+.paperrocket-play-sheet,
+.paperrocket-pro-panel,
+.paperrocket-context-panel,
+.paperrocket-color-studio {
+  border-radius: 16px !important;
+}
+
+.paperrocket-play-sheet {
+  overflow: hidden;
+}
+
+.paperrocket-sheet-header {
+  min-height: 48px !important;
+  padding: 0 14px !important;
+  border-bottom: 1px solid rgb(255 255 255 / .10);
+}
+
+html.light .paperrocket-sheet-header,
+.paperrocket-play-sheet[data-theme="light"] .paperrocket-sheet-header {
+  border-bottom-color: rgb(17 24 39 / .10);
+}
+
+.paperrocket-sheet-header h2 {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+.paperrocket-sheet-header button {
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+}
+
+.paperrocket-sheet-body {
+  padding: 0 14px 10px !important;
+}
+
+/* Preferences is intentionally narrower and denser than content browsers. */
+.paperrocket-play-sheet[data-sheet-id="settings"] .paperrocket-sheet-body {
+  padding-inline: 14px !important;
+}
+
+.paperrocket-settings-row {
+  display: grid !important;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 9px !important;
+  min-height: 48px !important;
+  padding-block: 6px !important;
+}
+
+.paperrocket-settings-row > svg {
+  align-self: center;
+  opacity: .72 !important;
+}
+
+.paperrocket-settings-row > div:nth-child(2) > div:first-child {
+  font-size: 11.5px !important;
+  font-weight: 650 !important;
+}
+
+.paperrocket-settings-row > div:nth-child(2) > div:last-child {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9.5px !important;
+  opacity: .82;
+}
+
+.paperrocket-settings-control {
+  justify-self: end;
+}
+
+.paperrocket-settings-control button:not(.paperrocket-toggle) {
+  border-radius: 8px !important;
+}
+
+.paperrocket-settings-section {
+  padding: 10px 0 3px !important;
+  font-size: 9px !important;
+  letter-spacing: .13em !important;
+}
+
+.paperrocket-settings-more {
+  font-size: 11.5px !important;
+}
+
+.paperrocket-settings-more > span:last-child {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9.5px !important;
+}
+
+/* The color studio is a compact horizontal tool palette on tablets/desktop. */
+.paperrocket-color-studio {
+  background: rgb(var(--pr-menu-rgb) / .98) !important;
+  border-color: rgb(var(--pr-menu-border-rgb) / var(--pr-menu-border-opacity)) !important;
+  box-shadow: 0 22px 64px rgb(var(--pr-menu-shadow-rgb) / var(--pr-menu-shadow-opacity)) !important;
+}
+
+.paperrocket-color-studio > header {
+  min-height: 52px !important;
+}
+
+.paperrocket-color-studio > nav button {
+  border-radius: 8px !important;
+}
+
+/* Every floating dialog must remain recoverable on a compressed viewport. */
+@media (max-width: 499px) {
+  .paperrocket-play-sheet {
+    left: 8px !important;
+    right: 8px !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 16px) !important;
+    border: 1px solid rgb(var(--pr-menu-border-rgb) / var(--pr-menu-border-opacity)) !important;
+    border-radius: 14px !important;
+  }
+
+  .paperrocket-sheet-body {
+    max-height: calc(100dvh - 66px) !important;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (min-width: 500px) {
+  .paperrocket-sheet-grab {
+    display: none !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .paperrocket-settings-row {
+    grid-template-columns: 18px minmax(0, 1fr);
+    row-gap: 6px;
+    padding-block: 8px !important;
+  }
+
+  .paperrocket-settings-control {
+    grid-column: 2;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .paperrocket-settings-control > div {
+    width: 100% !important;
+  }
+
+  .paperrocket-settings-control > .paperrocket-toggle {
+    margin-left: auto;
+  }
+
+  .paperrocket-settings-more > span:last-child {
+    display: none;
+  }
+}
+
+@media (max-height: 540px) {
+  .paperrocket-play-sheet,
+  .paperrocket-color-studio {
+    top: 8px !important;
+    bottom: 8px !important;
+    max-height: none !important;
+  }
+}

@@ -1,0 +1,11 @@
+Model Information:
+* title:	capybara bath
+* source:	https://sketchfab.com/3d-models/capybara-bath-cac0402a2de94ac4ad1439f3c4e9eef2
+* author:	tubs_arts (https://sketchfab.com/tubs_arts)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "capybara bath" (https://sketchfab.com/3d-models/capybara-bath-cac0402a2de94ac4ad1439f3c4e9eef2) by tubs_arts (https://sketchfab.com/tubs_arts) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Chonky Axolotl
+* source:	https://sketchfab.com/3d-models/chonky-axolotl-2f0d9f7c520449d1a953b9be2d6eab97
+* author:	yllieebs (https://sketchfab.com/yllieebs)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Chonky Axolotl" (https://sketchfab.com/3d-models/chonky-axolotl-2f0d9f7c520449d1a953b9be2d6eab97) by yllieebs (https://sketchfab.com/yllieebs) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
