@@ -1,10 +1,10 @@
 /* navigatorStyles.css - Build 9 Free Gizmo */
 :root {
-  --nv-top: 62px;
-  --nv-right: 8px;
-  --nv-bottom: 30px;
-  --nv-left: 62px;
-  --nv-gap: 10px;
+  --nv-top: 56px;
+  --nv-right: 4px;
+  --nv-bottom: 20px;
+  --nv-left: 2px;
+  --nv-gap: 2px;
 
   --nv-panel: rgba(252, 250, 247, 0.86);
   --nv-ink: #332e28;
@@ -98,7 +98,7 @@
 #nv {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 38;
   pointer-events: none;
   color: var(--nv-ink);
   font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -183,12 +183,12 @@
 
 .nv-drag-handle {
   position: absolute;
-  top: -10px;
+  top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  width: 60px;
-  height: 24px;
-  border-radius: 12px;
+  width: 68px;
+  height: 28px;
+  border-radius: 14px;
   background: var(--nv-panel);
   border: 1px solid var(--nv-edge);
   box-shadow: 0 2px 8px rgba(51, 46, 40, 0.15);
@@ -200,6 +200,13 @@
   pointer-events: auto;
   z-index: 10;
   transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.nv-drag-handle::before {
+  content: '';
+  position: absolute;
+  inset: -10px -14px;
+  pointer-events: auto;
 }
 
 .nv-drag-handle:active {
@@ -240,6 +247,13 @@
   z-index: 10;
 }
 
+.nv-tab::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  pointer-events: auto;
+}
+
 .nv-tab:hover {
   color: var(--nv-ink);
 }
@@ -256,11 +270,11 @@
 /* ── everything else lives here, closed by default ── */
 .nv-menu {
   position: absolute;
-  width: 198px;
-  padding: 8px;
-  border-radius: 14px;
+  width: 194px;
+  padding: 6px;
+  border-radius: 12px;
   display: none;
-  max-height: min(78vh, 520px);
+  max-height: min(78vh, 480px);
   overflow-y: auto;
   background: var(--nv-panel);
   -webkit-backdrop-filter: blur(20px) saturate(1.1);
@@ -275,23 +289,23 @@
 }
 
 .nv-sec {
-  font-size: 10.5px;
+  font-size: 10px;
   letter-spacing: 0.03em;
   color: var(--nv-ink-35);
-  margin: 8px 2px 4px;
+  margin: 5px 2px 2px;
 }
 
 .nv-sec:first-child {
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 /* Pro numeric readout */
 .nv-num {
   display: grid;
-  grid-template-columns: 26px 1fr 1fr 1fr;
-  gap: 1px 6px;
-  padding: 2px 2px 4px;
-  font-size: 11px;
+  grid-template-columns: 24px 1fr 1fr 1fr;
+  gap: 1px 4px;
+  padding: 1px 2px 2px;
+  font-size: 10px;
   color: var(--nv-ink-60);
   font-variant-numeric: tabular-nums;
 }
@@ -310,19 +324,19 @@
 .nv-pick {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   width: 100%;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 11.5px;
   line-height: 1;
-  padding: 9px;
-  border-radius: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
   cursor: pointer;
   text-align: left;
   color: var(--nv-ink);
   background: var(--nv-btn);
   border: 1px solid var(--nv-line);
-  min-height: 34px;
+  min-height: 28px;
 }
 
 .nv-pick b {
@@ -343,7 +357,13 @@
 
 #nv-list {
   display: none;
-  margin-top: 3px;
+  margin-top: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--nv-line);
+  border-radius: 8px;
+  background: var(--nv-panel);
+  padding: 2px;
 }
 
 #nv-list.nv-on {
@@ -353,14 +373,14 @@
 .nv-opt {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   width: 100%;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 11.5px;
   line-height: 1.2;
-  padding: 9px 8px;
+  padding: 5px 7px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 7px;
   background: none;
   color: var(--nv-ink);
   cursor: pointer;
@@ -379,13 +399,13 @@
 .nv-opt em {
   font-style: normal;
   color: var(--nv-ink-35);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .nv-swatch {
-  width: 8px;
-  height: 8px;
-  border-radius: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
   background: var(--nv-ink-35);
   flex: 0 0 auto;
 }
@@ -406,7 +426,7 @@
 .nv-chips {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  gap: 3px;
 }
 
 .nv-chips {
@@ -417,19 +437,34 @@
 .nv-chip,
 .nv-act {
   font: inherit;
-  font-size: 11.5px;
-  line-height: 1.15;
-  padding: 8px 3px;
+  font-size: 11px;
+  line-height: 1.1;
+  padding: 5px 2px;
   cursor: pointer;
-  border-radius: 9px;
+  border-radius: 7px;
   color: var(--nv-ink);
   background: var(--nv-btn);
   border: 1px solid var(--nv-line);
-  min-height: 33px;
+  min-height: 27px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
+}
+
+/* Explicitly override global .paperrocket-ui button { min-height: 44px } to prevent navigator menu bloat */
+.paperrocket-ui #nv .nv-menu button,
+#nv .nv-menu button,
+#nv .nv-pick,
+#nv .nv-mode,
+#nv .nv-chip,
+#nv .nv-act {
+  min-height: 27px !important;
+}
+
+.paperrocket-ui #nv .nv-opt,
+#nv .nv-opt {
+  min-height: 24px !important;
 }
 
 .nv-mode[aria-pressed="true"],
@@ -442,7 +477,7 @@
 .nv-acts {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 4px;
+  gap: 3px;
 }
 
 .nv-act:disabled {
@@ -452,7 +487,7 @@
 
 .nv-wide {
   width: 100%;
-  margin-top: 6px;
+  margin-top: 3px;
   color: var(--nv-ink-60);
 }
 

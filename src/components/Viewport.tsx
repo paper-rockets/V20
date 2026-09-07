@@ -1013,6 +1013,7 @@ export const Viewport: React.FC<ViewportProps> = ({
         lastTouchMidpointRef.current = null;
         threeFingerStartY.current = null;
         threeFingerStartX.current = null;
+        engine?.hideCursor();
       } else if (touchPointersRef.current.size === 1) {
         const remaining = Array.from(touchPointersRef.current.values())[0] as { x: number; y: number } | undefined;
         if (remaining) {
@@ -1117,6 +1118,7 @@ export const Viewport: React.FC<ViewportProps> = ({
       }}
       onPointerLeave={(e) => {
         if (cursorSvgRef.current) cursorSvgRef.current.style.display = 'none';
+        engineRef.current?.hideCursor();
         if (rulerDrag?.active) setRulerDrag(null);
         if (e.pointerType === 'pen') {
           penInProximityRef.current = false;

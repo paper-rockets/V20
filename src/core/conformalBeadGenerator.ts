@@ -373,12 +373,15 @@ export class ConformalBeadGenerator {
       const t = totalLength > 0 ? cumulativeDistances[i] / totalLength : i / (numPoints - 1);
 
       let taper = 1.0;
-      if (t < 0.04) {
-        taper = Math.sin((t / 0.04) * (Math.PI * 0.5));
-      } else if (t > 0.96) {
-        taper = Math.sin(((1.0 - t) / 0.04) * (Math.PI * 0.5));
+      if (settings.brushShape === 'line' && settings.taperLength && settings.taperLength > 0.01) {
+        const effTaper = Math.min(0.35, settings.taperLength);
+        if (t < effTaper) {
+          taper = Math.sin((t / effTaper) * (Math.PI * 0.5));
+        } else if (t > 1.0 - effTaper) {
+          taper = Math.sin(((1.0 - t) / effTaper) * (Math.PI * 0.5));
+        }
+        taper = Math.max(0.08, Math.min(1.0, taper));
       }
-      taper = Math.max(0.01, Math.min(1.0, taper));
 
       const pressureScale = settings.pressureSensitivity ? Math.max(0.2, pressures[i]) : 1.0;
       const radius = settings.size * pressureScale * taper;
@@ -456,12 +459,15 @@ export class ConformalBeadGenerator {
       const t = totalLength > 0 ? cumulativeDistances[i] / totalLength : i / (numPoints - 1);
 
       let taper = 1.0;
-      if (t < 0.04) {
-        taper = Math.sin((t / 0.04) * (Math.PI * 0.5));
-      } else if (t > 0.96) {
-        taper = Math.sin(((1.0 - t) / 0.04) * (Math.PI * 0.5));
+      if (settings.brushShape === 'line' && settings.taperLength && settings.taperLength > 0.01) {
+        const effTaper = Math.min(0.35, settings.taperLength);
+        if (t < effTaper) {
+          taper = Math.sin((t / effTaper) * (Math.PI * 0.5));
+        } else if (t > 1.0 - effTaper) {
+          taper = Math.sin(((1.0 - t) / effTaper) * (Math.PI * 0.5));
+        }
+        taper = Math.max(0.08, Math.min(1.0, taper));
       }
-      taper = Math.max(0.01, Math.min(1.0, taper));
 
       const pressureScale = settings.pressureSensitivity ? Math.max(0.2, pressures[i]) : 1.0;
       const widthMultiplier = Math.max(0.5, Math.min(10.0, settings.brushWidthMultiplier ?? (settings.brushShape === 'wide_flat' ? 3.0 : 1.0)));
@@ -499,6 +505,15 @@ export class ConformalBeadGenerator {
       _workIndices.push(a, b, d);
       _workIndices.push(b, c, d);
     }
+
+    // Add smooth rounded start and end caps for clean brush tip appearance (zero arrowhead artifacts)
+    const isRoundCap = !settings.brushShape || settings.brushShape === 'round' || settings.brushShape === 'wide_flat';
+    if (isRoundCap && numPoints >= 2) {
+      const startWidth = settings.size * (settings.pressureSensitivity ? Math.max(0.2, pressures[0]) : 1.0) * 1.5 * (settings.brushWidthMultiplier ?? (settings.brushShape === 'wide_flat' ? 3.0 : 1.0));
+      const endWidth = settings.size * (settings.pressureSensitivity ? Math.max(0.2, pressures[numPoints - 1]) : 1.0) * 1.5 * (settings.brushWidthMultiplier ?? (settings.brushShape === 'wide_flat' ? 3.0 : 1.0));
+      this.addRoundedRibbonCap(_workVertices, _workNormals, _workUvs, _workIndices, positions[0], normals[0], binormals[0], tangents[0], startWidth, baseOffset, true, 0, 1);
+      this.addRoundedRibbonCap(_workVertices, _workNormals, _workUvs, _workIndices, positions[numPoints - 1], normals[numPoints - 1], binormals[numPoints - 1], tangents[numPoints - 1], endWidth, baseOffset, false, (numPoints - 1) * 2, (numPoints - 1) * 2 + 1);
+    }
   }
 
   /**
@@ -532,12 +547,15 @@ export class ConformalBeadGenerator {
       const t = totalLength > 0 ? cumulativeDistances[i] / totalLength : i / (numPoints - 1);
 
       let taper = 1.0;
-      if (t < 0.04) {
-        taper = Math.sin((t / 0.04) * (Math.PI * 0.5));
-      } else if (t > 0.96) {
-        taper = Math.sin(((1.0 - t) / 0.04) * (Math.PI * 0.5));
+      if (settings.brushShape === 'line' && settings.taperLength && settings.taperLength > 0.01) {
+        const effTaper = Math.min(0.35, settings.taperLength);
+        if (t < effTaper) {
+          taper = Math.sin((t / effTaper) * (Math.PI * 0.5));
+        } else if (t > 1.0 - effTaper) {
+          taper = Math.sin(((1.0 - t) / effTaper) * (Math.PI * 0.5));
+        }
+        taper = Math.max(0.08, Math.min(1.0, taper));
       }
-      taper = Math.max(0.01, Math.min(1.0, taper));
 
       const pressureScale = settings.pressureSensitivity ? Math.max(0.2, pressures[i]) : 1.0;
       const widthMultiplier = Math.max(0.5, Math.min(10.0, settings.brushWidthMultiplier ?? (settings.brushShape === 'wide_flat' ? 3.0 : 1.0)));
@@ -622,12 +640,15 @@ export class ConformalBeadGenerator {
       const t = totalLength > 0 ? cumulativeDistances[i] / totalLength : i / (numPoints - 1);
 
       let taper = 1.0;
-      if (t < 0.04) {
-        taper = Math.sin((t / 0.04) * (Math.PI * 0.5));
-      } else if (t > 0.96) {
-        taper = Math.sin(((1.0 - t) / 0.04) * (Math.PI * 0.5));
+      if (settings.brushShape === 'line' && settings.taperLength && settings.taperLength > 0.01) {
+        const effTaper = Math.min(0.35, settings.taperLength);
+        if (t < effTaper) {
+          taper = Math.sin((t / effTaper) * (Math.PI * 0.5));
+        } else if (t > 1.0 - effTaper) {
+          taper = Math.sin(((1.0 - t) / effTaper) * (Math.PI * 0.5));
+        }
+        taper = Math.max(0.08, Math.min(1.0, taper));
       }
-      taper = Math.max(0.01, Math.min(1.0, taper));
 
       const pressureScale = settings.pressureSensitivity ? Math.max(0.2, pressures[i]) : 1.0;
       const ringRadius = settings.size * pressureScale * taper;
@@ -694,9 +715,9 @@ export class ConformalBeadGenerator {
     _scratchTipDir.copy(tangent);
     if (isStart) _scratchTipDir.negate();
 
+    // Clean baseline cap closure flush with surface offset (zero arrowhead spear artifact)
     _scratchTipPos.copy(centerPos)
-      .addScaledVector(_scratchTipDir, radius * 0.35)
-      .addScaledVector(normal, baseOffset + radius * 0.15);
+      .addScaledVector(normal, baseOffset);
 
     const tipVertexIdx = vertices.length / 3;
     vertices.push(_scratchTipPos.x, _scratchTipPos.y, _scratchTipPos.z);
@@ -710,6 +731,66 @@ export class ConformalBeadGenerator {
         indices.push(tipVertexIdx, ringB, ringA);
       } else {
         indices.push(tipVertexIdx, ringA, ringB);
+      }
+    }
+  }
+
+  /**
+   * Adds smooth semicircular fan end-cap to flat ribbon profiles
+   * eliminating sharp flat/arrowhead start & end edges.
+   */
+  private addRoundedRibbonCap(
+    vertices: number[],
+    geomNormals: number[],
+    uvs: number[],
+    indices: number[],
+    centerPos: THREE.Vector3,
+    normal: THREE.Vector3,
+    binormal: THREE.Vector3,
+    tangent: THREE.Vector3,
+    width: number,
+    baseOffset: number,
+    isStart: boolean,
+    leftIdx: number,
+    rightIdx: number
+  ): void {
+    const segments = 6;
+    const centerIdx = vertices.length / 3;
+    _scratchCenter.copy(centerPos).addScaledVector(normal, baseOffset);
+    vertices.push(_scratchCenter.x, _scratchCenter.y, _scratchCenter.z);
+    geomNormals.push(normal.x, normal.y, normal.z);
+    uvs.push(0.5, isStart ? 0.0 : 1.0);
+
+    const arcIndices: number[] = [isStart ? leftIdx : rightIdx];
+
+    for (let k = 1; k < segments; k++) {
+      const frac = k / segments;
+      const angle = -Math.PI * 0.5 + Math.PI * frac;
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
+
+      const latOffset = sinA * width;
+      const longOffset = (isStart ? -1 : 1) * cosA * width;
+
+      _scratchPos.copy(_scratchCenter)
+        .addScaledVector(binormal, latOffset)
+        .addScaledVector(tangent, longOffset);
+
+      const vIdx = vertices.length / 3;
+      vertices.push(_scratchPos.x, _scratchPos.y, _scratchPos.z);
+      geomNormals.push(normal.x, normal.y, normal.z);
+      uvs.push((sinA + 1) * 0.5, isStart ? 0.0 : 1.0);
+      arcIndices.push(vIdx);
+    }
+    arcIndices.push(isStart ? rightIdx : leftIdx);
+
+    for (let k = 0; k < arcIndices.length - 1; k++) {
+      const a = arcIndices[k];
+      const b = arcIndices[k + 1];
+      if (isStart) {
+        indices.push(centerIdx, b, a);
+      } else {
+        indices.push(centerIdx, a, b);
       }
     }
   }

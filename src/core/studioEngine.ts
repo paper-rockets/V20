@@ -606,14 +606,15 @@ export class StudioEngine {
     // Ensure baseline lighting and reflection environment are immediately ready
     this.ensureBaselineLighting();
 
-    // 8. 3D Brush Cursor Decal Ring
-    const cursorGeom = new THREE.RingGeometry(0.85, 1.0, 32);
+    // 8. 3D Brush Cursor Decal Ring: refined hairline reticle
+    const cursorGeom = new THREE.RingGeometry(0.94, 1.0, 48);
     const cursorMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.85,
-      depthTest: false,
+      opacity: 0.45,
+      depthTest: true,
+      depthWrite: false,
     });
     this.cursorDecal = new THREE.Mesh(cursorGeom, cursorMat);
     this.cursorDecal.renderOrder = 10;
@@ -803,14 +804,6 @@ export class StudioEngine {
       }
     } else {
       this.cancelStroke();
-      // If only the empty default drawing canvas exists with 0 strokes, detach it
-      if (this.drawingPlaneMesh && this.strokes.size === 0) {
-        const existingPlane = this.modelRoot.getObjectByName('DrawingPlaneCanvas');
-        if (existingPlane) {
-          this.modelRoot.remove(existingPlane);
-        }
-        this.drawingPlaneMesh = null;
-      }
     }
     this.activeModelName = name;
 
@@ -843,10 +836,10 @@ export class StudioEngine {
       return;
     }
 
-    // Detach drawing plane only if clearing or if it has no user strokes
-    if (loadMode === 'clear' || this.strokes.size === 0) {
+    // Detach drawing plane only if explicitly clearing the scene
+    if (loadMode === 'clear') {
       const existingPlane = this.modelRoot.getObjectByName('DrawingPlaneCanvas');
-      if (existingPlane && this.strokes.size === 0) {
+      if (existingPlane) {
         this.modelRoot.remove(existingPlane);
         this.drawingPlaneMesh = null;
       }
@@ -1676,8 +1669,10 @@ export class StudioEngine {
       _cursorQuat.setFromUnitVectors(_cursorUp, _cursorNormal);
       this.cursorDecal.setRotationFromQuaternion(_cursorQuat);
 
-      const scale = brushSize;
-      this.cursorDecal.scale.set(scale, scale, scale);
+      const radius = settings?.profile === 'tube'
+        ? brushSize
+        : brushSize * 1.2 * (settings?.brushWidthMultiplier ?? 1.0);
+      this.cursorDecal.scale.set(radius, radius, radius);
     } else {
       this.cursorDecal.visible = false;
     }
@@ -1685,7 +1680,10 @@ export class StudioEngine {
   }
 
   public hideCursor(): void {
-    this.cursorDecal.visible = false;
+    if (this.cursorDecal.visible) {
+      this.cursorDecal.visible = false;
+      this.markDirty();
+    }
   }
 
   /**
@@ -2961,6 +2959,10 @@ export class StudioEngine {
 
   public getModelRoot(): THREE.Group {
     return this.modelRoot;
+  }
+
+  public getStrokeRoot(): THREE.Group {
+    return this.strokeRoot;
   }
 
   public toggleDrawingPlane(visible?: boolean): boolean {

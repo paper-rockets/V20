@@ -546,10 +546,14 @@ export function App() {
       if (e.detail && Array.isArray(e.detail)) {
         setLoadedModels(e.detail);
       }
+      if (engine) {
+        const selId = engine.getActiveSelectedModelId();
+        if (selId) setActiveModelId(selId);
+      }
     };
     window.addEventListener('MODELS_CHANGED', handleModelsChanged);
     return () => window.removeEventListener('MODELS_CHANGED', handleModelsChanged);
-  }, []);
+  }, [engine]);
 
   const handleSelectModel = useCallback((modelId: string | null) => {
     setActiveModelId(modelId);

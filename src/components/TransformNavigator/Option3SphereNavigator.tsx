@@ -226,14 +226,24 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   }, [isDark, isPro]);
 
   // Safe area metrics
-  const cssPx = (n: string) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || 0;
+  const cssPx = (n: string, fallback: number = 0) => {
+    if (typeof document === 'undefined') return fallback;
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(n);
+    if (!raw) return fallback;
+    const val = parseFloat(raw.trim());
+    return isNaN(val) ? fallback : val;
+  };
   const safeBox = useCallback(() => {
-    const g = cssPx('--nv-gap') || 10;
+    const g = cssPx('--nv-gap', 2);
+    const l = cssPx('--nv-left', 2);
+    const t = cssPx('--nv-top', 56);
+    const r = cssPx('--nv-right', 4);
+    const b = cssPx('--nv-bottom', 20);
     return {
-      left: (cssPx('--nv-left') || 62) + g,
-      top: (cssPx('--nv-top') || 62) + g,
-      right: window.innerWidth - (cssPx('--nv-right') || 8) - g,
-      bottom: window.innerHeight - (cssPx('--nv-bottom') || 30) - g
+      left: l + g,
+      top: t + g,
+      right: window.innerWidth - r - g,
+      bottom: window.innerHeight - b - g
     };
   }, []);
 
@@ -253,7 +263,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     if (nv.dataset.menu !== 'open') return;
 
     const s = safeBox();
-    menu.style.maxHeight = Math.max(160, s.bottom - s.top) + 'px';
+    menu.style.maxHeight = Math.min(480, Math.max(160, s.bottom - s.top)) + 'px';
     const r = dock.getBoundingClientRect();
     const w = menu.offsetWidth || 198;
     const h = menu.offsetHeight || 380;
@@ -1047,16 +1057,15 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     selectTarget(Math.min(currentRef.current, formatted.length - 1), true);
   }, [selectTarget]);
 
-  // Populate targets from engine
+  // Populate targets from engine and multi-model state
   useEffect(() => {
     if (!engine) return;
     const list: TargetItem[] = [];
     const drawingPlane = engine.getDrawingPlane();
     const sceneRoot = engine.getModelRoot();
-    const loadedModel = sceneRoot?.children?.find(
-      c => c !== drawingPlane && (c as any).name !== 'DrawingPlaneCanvas' && !(c as any).isLine && !(c as any).isPoints
-    );
+    const strokeRoot = (engine as any).strokeRoot;
 
+    // 1. Everything / Scene Root
     if (sceneRoot) {
       list.push({
         id: 'scene',
@@ -1065,31 +1074,59 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
         object: sceneRoot
       });
     }
-    if (loadedModel) {
-      list.push({
-        id: 'model',
-        name: 'Model',
-        note: isPro ? 'mesh' : 'the 3D shape',
-        object: loadedModel
-      });
-    }
+
+    // 2. Drawing Canvas
     if (drawingPlane) {
       list.push({
         id: 'canvas',
-        name: 'Canvas',
+        name: 'Drawing Canvas',
         note: isPro ? 'paint surface' : 'what you draw on',
         object: drawingPlane
       });
     }
 
+    // 3. All individual 3D models loaded in the scene
+    if (sceneRoot?.children) {
+      let modelCount = 0;
+      sceneRoot.children.forEach((child) => {
+        if (child === strokeRoot) return;
+        if (child === drawingPlane || child.name === 'DrawingPlaneCanvas') return;
+        if ((child as any).isLine || (child as any).isPoints || (child as any).isCamera) return;
+
+        modelCount++;
+        const modelName = child.name && child.name !== 'Scene' && child.name !== 'Object3D'
+          ? child.name
+          : `3D Model ${modelCount}`;
+
+        list.push({
+          id: child.uuid,
+          name: modelName,
+          note: isPro ? '3D model' : 'the 3D shape',
+          object: child
+        });
+      });
+    }
+
+    // 4. All 3D Brush Strokes
+    if (strokeRoot && strokeRoot.children && strokeRoot.children.length > 0) {
+      list.push({
+        id: 'strokes',
+        name: isPro ? 'Brush Strokes' : 'All Drawings',
+        note: isPro ? '3D paint strokes' : 'your drawings',
+        object: strokeRoot
+      });
+    }
+
+    // 5. Drawing Layers
     if (layers && layers.length > 0) {
       layers.forEach(l => {
-        const layerObj = (drawingPlane?.getObjectByName?.(l.id) || (drawingPlane?.children?.find((c: any) => c.userData?.layerId === l.id))) as THREE.Object3D;
+        const layerInStrokes = strokeRoot?.children?.find((c: any) => c.name === `LayerGroup_${l.id}` || (c as any).userData?.layerId === l.id);
+        const layerObj = layerInStrokes || (drawingPlane?.getObjectByName?.(l.id) || (drawingPlane?.children?.find((c: any) => (c as any).userData?.layerId === l.id))) || strokeRoot;
         if (layerObj) {
           list.push({
             id: l.id,
             name: l.name || 'Layer',
-            note: isPro ? 'child of canvas' : (l.type || 'layer'),
+            note: isPro ? 'drawing layer' : (l.type || 'layer'),
             object: layerObj
           });
         }
@@ -1100,16 +1137,35 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       const dummy = new THREE.Group();
       list.push({
         id: 'canvas',
-        name: 'Canvas',
+        name: 'Drawing Canvas',
         note: isPro ? 'paint surface' : 'what you draw on',
         object: dummy
       });
     }
 
     setTargets(list);
+
+    // If an active model was already selected, keep it selected; otherwise default to activeModelId or canvas
+    if (activeModelId) {
+      const mIdx = list.findIndex(t => t.id === activeModelId);
+      if (mIdx >= 0) {
+        selectTarget(mIdx, true);
+        return;
+      }
+    }
     const canvasIdx = list.findIndex(t => t.id === 'canvas');
     selectTarget(canvasIdx >= 0 ? canvasIdx : 0, true);
-  }, [engine, layers, setTargets, selectTarget, isPro]);
+  }, [engine, models, layers, activeModelId, setTargets, selectTarget, isPro]);
+
+  // Sync selected target when activeModelId changes from outside
+  useEffect(() => {
+    if (activeModelId) {
+      const idx = targetsRef.current.findIndex(t => t.id === activeModelId);
+      if (idx >= 0 && idx !== currentRef.current) {
+        selectTarget(idx, true);
+      }
+    }
+  }, [activeModelId, selectTarget]);
 
   useEffect(() => {
     if (activeLayerId) {
@@ -1200,11 +1256,12 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       const hit = pickHandle(pt);
 
       // If user touched the outer rim/background of the canvas, start dragging the dock!
-      if (!hit && r > m.arm * 1.3) {
+      if (!hit && r > m.arm * 1.25) {
         const dock = dockRef.current;
         if (dock) {
           e.preventDefault();
           e.stopPropagation();
+          try { gzc.setPointerCapture(e.pointerId); } catch (_) {}
           const rDock = dock.getBoundingClientRect();
           let d = { x: e.clientX, y: e.clientY, left: rDock.left, top: rDock.top, moved: false };
           const onDocDragMove = (me: PointerEvent) => {
@@ -1214,6 +1271,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
             place(d.left + me.clientX - d.x, d.top + me.clientY - d.y, true);
           };
           const onDocDragUp = (ue: PointerEvent) => {
+            try { gzc.releasePointerCapture(ue.pointerId); } catch (_) {}
             window.removeEventListener('pointermove', onDocDragMove);
             window.removeEventListener('pointerup', onDocDragUp);
             window.removeEventListener('pointercancel', onDocDragUp);
@@ -1533,6 +1591,40 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       </div>
 
       <div className="nv-menu" id="nv-menu" ref={menuRef}>
+        <div className="nv-sec" style={{ marginTop: '1px' }}>{isPro ? 'Target item' : 'Moving'}</div>
+        <button
+          className="nv-pick"
+          id="nv-pick"
+          aria-expanded={isListOpen}
+          onClick={() => {
+            setIsListOpen(prev => !prev);
+            requestAnimationFrame(() => positionMenu());
+          }}
+        >
+          <b id="nv-pick-name">{currentTarget?.name || 'Canvas'}</b><span>▾</span>
+        </button>
+
+        <div id="nv-list" className={isListOpen ? 'nv-on' : ''} role="listbox">
+          {targetsList.map((t, idx) => (
+            <button
+              key={t.id + '_' + idx}
+              className="nv-opt"
+              role="option"
+              aria-selected={currentIdx === idx}
+              onClick={() => {
+                selectTarget(idx);
+                if (gzRef.current.mode === 'look') {
+                  setMode('move');
+                }
+                setIsListOpen(false);
+              }}
+            >
+              <span className="nv-swatch"></span>
+              <span>{t.name}{t.note ? <em> {t.note}</em> : null}</span>
+            </button>
+          ))}
+        </div>
+
         {isPro && (
           <>
             <div className="nv-sec">Transform</div>
@@ -1636,38 +1728,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
           {isTourRunning ? (isPro ? 'Stop walkthrough' : 'Stop the demo') : (isPro ? 'Walkthrough' : 'Show me how')}
         </button>
 
-        <div className="nv-sec">{isPro ? 'Target' : 'Moving'}</div>
-        <button
-          className="nv-pick"
-          id="nv-pick"
-          aria-expanded={isListOpen}
-          onClick={() => {
-            setIsListOpen(prev => !prev);
-            requestAnimationFrame(() => positionMenu());
-          }}
-        >
-          <b id="nv-pick-name">{currentTarget?.name || 'Canvas'}</b><span>▾</span>
-        </button>
-
-        <div id="nv-list" className={isListOpen ? 'nv-on' : ''} role="listbox">
-          {targetsList.map((t, idx) => (
-            <button
-              key={t.id + '_' + idx}
-              className="nv-opt"
-              role="option"
-              aria-selected={currentIdx === idx}
-              onClick={() => {
-                selectTarget(idx);
-                setIsListOpen(false);
-              }}
-            >
-              <span className="nv-swatch"></span>
-              <span>{t.name}{t.note ? <em> {t.note}</em> : null}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="nv-sec" style={{ textAlign: 'center', margin: '8px 0 0' }}>
+        <div className="nv-sec" style={{ textAlign: 'center', margin: '6px 0 0' }}>
           {isPro ? 'navigator · pro' : 'build 9'}
         </div>
       </div>
