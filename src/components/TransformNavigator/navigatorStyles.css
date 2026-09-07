@@ -154,6 +154,23 @@
   pointer-events: none;
 }
 
+#nv.nv-repositioning .nv-dock {
+  transform: scale(1.08);
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.35));
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s ease;
+  cursor: grabbing !important;
+}
+
+#nv.nv-repositioning .nv-canvas {
+  cursor: grabbing !important;
+  opacity: 0.95;
+}
+
+#nv.nv-repositioning .nv-tab {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
 #nv.nv-covered .nv-canvas,
 #nv.nv-covered .nv-label {
   opacity: 0.22;
@@ -186,46 +203,6 @@
   font-weight: 600;
 }
 
-.nv-drag-handle {
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 68px;
-  height: 28px;
-  border-radius: 14px;
-  background: var(--nv-panel);
-  border: 1px solid var(--nv-edge);
-  box-shadow: 0 2px 8px rgba(51, 46, 40, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  touch-action: none;
-  pointer-events: auto;
-  z-index: 10;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-
-.nv-drag-handle::before {
-  content: '';
-  position: absolute;
-  inset: -10px -14px;
-  pointer-events: auto;
-}
-
-.nv-drag-handle:active {
-  cursor: grabbing;
-  background: var(--nv-btn-on);
-  transform: translateX(-50%) scale(0.96);
-}
-
-.nv-drag-grip {
-  width: 22px;
-  height: 3.5px;
-  border-radius: 2px;
-  background: var(--nv-ink-35);
-}
 
 .nv-tab {
   position: absolute;

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { StudioEngine } from '../../core/studioEngine';
 import { TransformTargetScope } from '../../types';
 import { useUiMode } from '../../core/uiModeStore';
+import { haptics } from '../../utils/haptics';
 import './navigatorStyles.css';
 
 export interface Option3SphereNavigatorProps {
@@ -100,7 +101,6 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const labelRef = useRef<HTMLDivElement | null>(null);
   const numRef = useRef<HTMLDivElement | null>(null);
-  const dragHandleRef = useRef<HTMLDivElement | null>(null);
 
   const axesRef = useRef<AxisDef[]>((isPro ? PRO_AXES : PLAY_AXES).map(a => ({ ...a })));
 
@@ -742,9 +742,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   const snap = (v: number, step: number) => Math.round(v / step) * step;
 
   const clampPos = () => {
-    objRef.current.pos.x = Math.max(-12, Math.min(12, objRef.current.pos.x));
-    objRef.current.pos.y = Math.max(-3, Math.min(9, objRef.current.pos.y));
-    objRef.current.pos.z = Math.max(-12, Math.min(12, objRef.current.pos.z));
+    // Unconstrained 3D movement: objects and layers can move completely freely past canvas edges and grid lines
   };
 
   const tick = (step: any) => {
@@ -1200,64 +1198,57 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   }, [drawGizmo]);
 
   // Dock dragging handling for repositioning smoothly anywhere on screen with finger or stylus
+  // Dock repositioning via the tab button (drag to move, tap to toggle menu)
   useEffect(() => {
     const tab = tabRef.current;
     const dock = dockRef.current;
-    const dragHandle = dragHandleRef.current;
-    if (!dock) return;
+    if (!dock || !tab) return;
 
-    let d: { x: number; y: number; left: number; top: number; moved: boolean; source: 'tab' | 'handle' } | null = null;
-
-    const startDrag = (clientX: number, clientY: number, source: 'tab' | 'handle') => {
-      const r = dock.getBoundingClientRect();
-      d = { x: clientX, y: clientY, left: r.left, top: r.top, moved: false, source };
-    };
+    let d: { x: number; y: number; left: number; top: number; moved: boolean } | null = null;
 
     const onTabDown = (e: PointerEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       setNavActive(true);
-      startDrag(e.clientX, e.clientY, 'tab');
-      try { tab?.setPointerCapture(e.pointerId); } catch (_) {}
+      const r = dock.getBoundingClientRect();
+      d = { x: clientX(e), y: clientY(e), left: r.left, top: r.top, moved: false };
+      try { tab.setPointerCapture(e.pointerId); } catch (_) {}
     };
 
-    const onHandleDown = (e: PointerEvent) => {
-      e.preventDefault();
-      setNavActive(true);
-      startDrag(e.clientX, e.clientY, 'handle');
-      try { dragHandle?.setPointerCapture(e.pointerId); } catch (_) {}
-    };
+    function clientX(e: PointerEvent) { return e.clientX; }
+    function clientY(e: PointerEvent) { return e.clientY; }
 
     const onPointerMove = (e: PointerEvent) => {
       if (!d) return;
-      if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return;
+      if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 3) return;
       if (!d.moved) setMenu(false);
       d.moved = true;
-      place(d.left + e.clientX - d.x, d.top + e.clientY - d.y, true);
+      place(d.left + e.clientX - d.x, d.top + e.clientY - d.y, false);
     };
 
     const onPointerUp = (e: PointerEvent) => {
       setNavActive(false);
       if (!d) return;
       const moved = d.moved;
-      const source = d.source;
+      const targetLeft = d.left + e.clientX - d.x;
+      const targetTop = d.top + e.clientY - d.y;
       d = null;
-      try { tab?.releasePointerCapture(e.pointerId); } catch (_) {}
-      try { dragHandle?.releasePointerCapture(e.pointerId); } catch (_) {}
-      if (!moved && source === 'tab') {
+      try { tab.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (moved) {
+        place(targetLeft, targetTop, true);
+      } else {
         setMenu(nvRef.current?.dataset.menu !== 'open');
       }
     };
 
-    tab?.addEventListener('pointerdown', onTabDown);
-    dragHandle?.addEventListener('pointerdown', onHandleDown);
+    tab.addEventListener('pointerdown', onTabDown);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
 
     return () => {
       setNavActive(false);
-      tab?.removeEventListener('pointerdown', onTabDown);
-      dragHandle?.removeEventListener('pointerdown', onHandleDown);
+      tab.removeEventListener('pointerdown', onTabDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
@@ -1267,63 +1258,96 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   // Gizmo pointer events
   useEffect(() => {
     const gzc = canvasRef.current;
+    const dock = dockRef.current;
     if (!gzc) return;
+
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    let isRepositioning = false;
+    let repositionDrag: { startX: number; startY: number; left: number; top: number; moved: boolean } | null = null;
+    let downX = 0;
+    let downY = 0;
 
     const onDown = (e: PointerEvent) => {
       stopTour();
       setNavActive(true);
+      downX = e.clientX;
+      downY = e.clientY;
+      isRepositioning = false;
+      repositionDrag = null;
+
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      // Long-press detection (400ms hold without dragging) unlocks moving the gizmo anywhere
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        isRepositioning = true;
+        haptics.trigger('medium');
+        if (dock) {
+          const rDock = dock.getBoundingClientRect();
+          repositionDrag = {
+            startX: downX,
+            startY: downY,
+            left: rDock.left,
+            top: rDock.top,
+            moved: false,
+          };
+        }
+        nvRef.current?.classList.add('nv-repositioning', 'nv-grabbing');
+        say(isPro ? 'Reposition gizmo' : 'Move gizmo', true);
+      }, 400);
+
       const pt = gzPoint(e);
       const m = metrics(gzRef.current.size);
       const r = Math.hypot(pt.x - m.c, pt.y - m.c);
       const hit = pickHandle(pt);
 
-      // If user touched the outer rim/background of the canvas, start dragging the dock!
-      if (!hit && r > m.arm * 1.25) {
-        const dock = dockRef.current;
-        if (dock) {
-          e.preventDefault();
-          e.stopPropagation();
-          try { gzc.setPointerCapture(e.pointerId); } catch (_) {}
-          const rDock = dock.getBoundingClientRect();
-          let d = { x: e.clientX, y: e.clientY, left: rDock.left, top: rDock.top, moved: false };
-          const onDocDragMove = (me: PointerEvent) => {
-            if (!d.moved && Math.hypot(me.clientX - d.x, me.clientY - d.y) < 4) return;
-            if (!d.moved) setMenu(false);
-            d.moved = true;
-            place(d.left + me.clientX - d.x, d.top + me.clientY - d.y, true);
-          };
-          const onDocDragUp = (ue: PointerEvent) => {
-            setNavActive(false);
-            try { gzc.releasePointerCapture(ue.pointerId); } catch (_) {}
-            window.removeEventListener('pointermove', onDocDragMove);
-            window.removeEventListener('pointerup', onDocDragUp);
-            window.removeEventListener('pointercancel', onDocDragUp);
-          };
-          window.addEventListener('pointermove', onDocDragMove);
-          window.addEventListener('pointerup', onDocDragUp);
-          window.addEventListener('pointercancel', onDocDragUp);
-          return;
-        }
-      }
-
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       if (hit) gzRef.current.active = { type: 'axis', i: hit.i, sign: hit.sign };
       else if (r <= m.hub * 1.7) gzRef.current.active = { type: 'hub' };
       else gzRef.current.active = { type: 'orbit' };
 
       dragRef.current = {
-        startX: e.clientX, startY: e.clientY, moved: false, hit,
-        pos: objRef.current.pos.clone(), quat: objRef.current.quat.clone(),
-        theta: camRef.current.theta, phi: camRef.current.phi,
-        startAngle: Math.atan2(pt.y - m.c, pt.x - m.c), committed: false
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false,
+        hit,
+        pos: objRef.current.pos.clone(),
+        quat: objRef.current.quat.clone(),
+        theta: camRef.current.theta,
+        phi: camRef.current.phi,
+        startAngle: Math.atan2(pt.y - m.c, pt.x - m.c),
+        committed: false,
       };
       lastStepRef.current = null;
       nvRef.current?.classList.add('nv-grabbing', 'nv-focus');
-      gzc.setPointerCapture(e.pointerId);
+      try { gzc.setPointerCapture(e.pointerId); } catch (_) {}
       drawGizmo();
     };
 
     const onMove = (e: PointerEvent) => {
+      if (longPressTimer) {
+        const distFromDown = Math.hypot(e.clientX - downX, e.clientY - downY);
+        if (distFromDown > 7) {
+          // Intentional drag gesture started before long-press elapsed -> cancel long-press timer
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+
+      if (isRepositioning && repositionDrag) {
+        // Gizmo is in long-press moving mode!
+        const dx = e.clientX - repositionDrag.startX;
+        const dy = e.clientY - repositionDrag.startY;
+        if (!repositionDrag.moved && Math.hypot(dx, dy) < 2) return;
+        repositionDrag.moved = true;
+        place(repositionDrag.left + dx, repositionDrag.top + dy, false);
+        return;
+      }
+
       const m = metrics(gzRef.current.size);
       const drag = dragRef.current;
       if (!drag) {
@@ -1338,6 +1362,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       if (!drag.moved && Math.hypot(dx, dy) < 4) return;
       drag.moved = true;
       const act = gzRef.current.active;
+      if (!act) return;
 
       if (act.type === 'orbit' || gzRef.current.mode === 'look') {
         camRef.current.theta = drag.theta - dx * 0.0062;
@@ -1374,7 +1399,9 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
         return;
       }
 
-      const h = drag.hit, a = (axesRef.current || PLAY_AXES)[h.i], worldDir = h.dir, p = project(worldDir, m);
+      const h = drag.hit;
+      if (!h) return;
+      const a = (axesRef.current || PLAY_AXES)[h.i], worldDir = h.dir, p = project(worldDir, m);
       if (gzRef.current.mode === 'move') {
         const len = Math.max(0.001, p.len);
         const nx = (p.x - m.c) / p.rad, ny = (p.y - m.c) / p.rad;
@@ -1408,6 +1435,30 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
 
     const onUp = (e: PointerEvent) => {
       setNavActive(false);
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      if (isRepositioning) {
+        isRepositioning = false;
+        nvRef.current?.classList.remove('nv-repositioning', 'nv-grabbing', 'nv-focus');
+        if (repositionDrag) {
+          const dx = e.clientX - repositionDrag.startX;
+          const dy = e.clientY - repositionDrag.startY;
+          place(repositionDrag.left + dx, repositionDrag.top + dy, true);
+          saveLayout();
+          haptics.trigger('light');
+        }
+        repositionDrag = null;
+        dragRef.current = null;
+        gzRef.current.active = null;
+        try { gzc.releasePointerCapture(e.pointerId); } catch (_) {}
+        drawGizmo();
+        idleHint();
+        return;
+      }
+
       const drag = dragRef.current;
       if (!drag) return;
       if (!drag.moved && drag.hit) {
@@ -1440,13 +1491,14 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
 
     return () => {
       setNavActive(false);
+      if (longPressTimer) clearTimeout(longPressTimer);
       gzc.removeEventListener('pointerdown', onDown);
       gzc.removeEventListener('pointermove', onMove);
       gzc.removeEventListener('pointerup', onUp);
       gzc.removeEventListener('pointercancel', onUp);
       gzc.removeEventListener('wheel', onWheel);
     };
-  }, [drawGizmo, applyCamera, applyObject, idleHint, say, engine]);
+  }, [drawGizmo, applyCamera, applyObject, idleHint, say, engine, place, saveLayout]);
 
   // Stepping aside while drawing on main canvas
   useEffect(() => {
@@ -1593,22 +1645,14 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       data-ui-mode={effectiveUiMode}
     >
       <div className="nv-dock" id="nv-dock" ref={dockRef}>
-        <div
-          className="nv-drag-handle"
-          id="nv-drag-handle"
-          ref={dragHandleRef}
-          title="Drag to reposition navigator"
-          aria-label="Drag to reposition navigator"
-        >
-          <span className="nv-drag-grip" />
-        </div>
+
         <canvas className="nv-canvas" id="nv-canvas" ref={canvasRef}></canvas>
         <button
           className="nv-tab"
           id="nv-tab"
           ref={tabRef}
           aria-expanded={isMenuOpen}
-          title="Menu · drag to move"
+          title="Menu · hold gizmo to move"
         >
           ⋯
         </button>
