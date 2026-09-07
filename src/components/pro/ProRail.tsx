@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { IcPointer, IcDraw, IcCreate, IcDeform, IcLayers } from './StudioIcons';
 import { ProMode, toggleSheet, useOpenSheet, closeSheet } from '../play/sheetStore';
 import { haptics } from '../../utils/haptics';
@@ -10,7 +10,7 @@ import {
   getBrushesForTab,
   BrushCategoryTab,
 } from '../../presets/curatedBrushes';
-import { ChevronRight, Star } from 'lucide-react';
+import { ChevronRight, Star, Check, Palette } from 'lucide-react';
 import { useDismissibleSurface } from '../../hooks/useDismissibleSurface';
 import { MenuShelf } from '../ui/MenuPrimitives';
 
@@ -55,9 +55,31 @@ export const ProRail: React.FC<ProRailProps> = ({
   const light = theme === 'light';
   const isLight = light;
   const rootRef = useRef<HTMLElement>(null);
+  const colorBtnRef = useRef<HTMLButtonElement>(null);
+  const sizeBtnRef = useRef<HTMLButtonElement>(null);
+  const brushBtnRef = useRef<HTMLButtonElement>(null);
+  const [shelfTop, setShelfTop] = useState<number | null>(null);
 
   const [panel, setPanel] = useState<'color' | 'size' | 'brush' | null>(null);
   const [activeTab, setActiveTab] = useState<BrushCategoryTab>('Core');
+
+  // Align popover shelf dynamically beside the active trigger button
+  useEffect(() => {
+    if (!panel) {
+      setShelfTop(null);
+      return;
+    }
+    const targetBtn =
+      panel === 'color'
+        ? colorBtnRef.current
+        : panel === 'size'
+        ? sizeBtnRef.current
+        : brushBtnRef.current;
+    if (targetBtn) {
+      const top = targetBtn.offsetTop + targetBtn.offsetHeight / 2;
+      setShelfTop(top);
+    }
+  }, [panel]);
 
   useDismissibleSurface({
     isOpen: panel !== null,
@@ -119,6 +141,7 @@ export const ProRail: React.FC<ProRailProps> = ({
 
         {/* Color swatch disc */}
         <button
+          ref={colorBtnRef}
           type="button"
           onClick={() => {
             haptics.trigger('light');
@@ -141,6 +164,7 @@ export const ProRail: React.FC<ProRailProps> = ({
 
         {/* Size button - Sleek concentric target circle */}
         <button
+          ref={sizeBtnRef}
           type="button"
           onClick={() => {
             haptics.trigger('light');
@@ -180,6 +204,7 @@ export const ProRail: React.FC<ProRailProps> = ({
 
         {/* Brushes button - Sleek spline wave curve */}
         <button
+          ref={brushBtnRef}
           type="button"
           onClick={() => {
             haptics.trigger('light');
@@ -212,9 +237,12 @@ export const ProRail: React.FC<ProRailProps> = ({
         <MenuShelf
           theme={theme}
           padding={panel === 'brush' ? 'standard' : 'tight'}
-          className={`pointer-events-auto absolute left-full ml-3 top-1/2 -translate-y-1/2 z-50 animate-in fade-in slide-in-from-left-2 duration-150 ${
+          style={shelfTop !== null ? { top: `${shelfTop}px`, transform: 'translateY(-50%)' } : undefined}
+          className={`pointer-events-auto absolute left-full ml-3 z-50 animate-in fade-in slide-in-from-left-2 duration-150 ${
+            shelfTop === null ? 'top-1/2 -translate-y-1/2' : ''
+          } ${
             panel === 'color'
-              ? 'w-[172px]'
+              ? 'w-[188px]'
               : panel === 'size'
               ? 'w-[154px]'
               : 'w-[320px] max-w-[calc(100vw-88px)]'
@@ -224,26 +252,83 @@ export const ProRail: React.FC<ProRailProps> = ({
             {/* Color Panel */}
             {panel === 'color' && (
               <div className="flex flex-col gap-2.5">
-                <div className="grid grid-cols-4 gap-2">
-                  {COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => {
-                        haptics.trigger('light');
-                        if (setBrushSettings) {
-                          setBrushSettings((p) => ({ ...p, color }));
-                        }
-                        setPanel(null);
-                      }}
-                      className={`w-8 h-8 rounded-full border active:scale-90 transition-transform shadow-sm ${
-                        isLight ? 'border-black/20' : 'border-white/20'
-                      }`}
-                      style={{ background: color }}
-                      aria-label={`Use ${color}`}
+                {/* Active Color Preview & Quick Native Color Picker */}
+                <div className="flex items-center justify-between px-0.5 pb-1.5 border-b border-black/10 dark:border-white/10">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-5 h-5 rounded-full border border-black/15 dark:border-white/20 shadow-xs shrink-0"
+                      style={{ background: currentBrushSettings.color || '#38bdf8' }}
                     />
-                  ))}
+                    <span className="font-mono text-[11px] font-bold tracking-tight opacity-80">
+                      {(currentBrushSettings.color || '#38bdf8').toUpperCase()}
+                    </span>
+                  </div>
+                  {/* Quick Native Color Picker */}
+                  <label
+                    title="Pick custom color"
+                    className="relative cursor-pointer w-6 h-6 rounded-md flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                  >
+                    <input
+                      type="color"
+                      value={currentBrushSettings.color || '#38bdf8'}
+                      onChange={(e) => {
+                        const newColor = e.target.value;
+                        if (setBrushSettings) {
+                          setBrushSettings((p) => ({ ...p, color: newColor }));
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    <Palette className="w-3.5 h-3.5 opacity-70" />
+                  </label>
                 </div>
+
+                {/* Preset Swatches with Selection Indicator */}
+                <div className="grid grid-cols-4 gap-2">
+                  {COLORS.map((color) => {
+                    const isSelected = (currentBrushSettings.color || '#38bdf8').toLowerCase() === color.toLowerCase();
+                    const isWhite = color.toLowerCase() === '#ffffff';
+                    const isLightColor = color === '#ffffff' || color === '#f59e0b';
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => {
+                          haptics.trigger('light');
+                          if (setBrushSettings) {
+                            setBrushSettings((p) => ({ ...p, color }));
+                          }
+                          setPanel(null);
+                        }}
+                        className={`w-8 h-8 rounded-full border active:scale-90 transition-all shadow-sm flex items-center justify-center ${
+                          isSelected
+                            ? isLight
+                              ? 'ring-2 ring-neutral-900 ring-offset-2 ring-offset-[#FAF9F5] scale-105 border-transparent'
+                              : 'ring-2 ring-white ring-offset-2 ring-offset-[#131518] scale-105 border-transparent'
+                            : isWhite
+                            ? isLight
+                              ? 'border-black/30 ring-1 ring-black/10 hover:scale-105'
+                              : 'border-white/30 hover:scale-105'
+                            : isLight
+                            ? 'border-black/20 hover:scale-105'
+                            : 'border-white/20 hover:scale-105'
+                        }`}
+                        style={{ background: color }}
+                        aria-label={`Use ${color}`}
+                        title={color}
+                      >
+                        {isSelected && (
+                          <Check
+                            className={`w-4 h-4 ${isLightColor ? 'text-neutral-950' : 'text-white'}`}
+                            strokeWidth={3}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* More Colors Button -> Opens Full Color Studio */}
                 <button
                   type="button"
                   onClick={() => {

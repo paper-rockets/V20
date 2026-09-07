@@ -370,13 +370,18 @@ export const ColorStudioModal: React.FC<ColorStudioModalProps> = ({
   );
 
   return createPortal(
-    <div className="paperrocket-modal-overlay fixed inset-0 z-50" onPointerDown={onClose}>
+    <div
+      className="paperrocket-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <section
         id="mody-color-studio-modal"
         data-theme={theme}
         aria-label="Color studio"
-        onPointerDown={(event) => event.stopPropagation()}
-        className={`paperrocket-color-studio fixed bottom-3 left-3 sm:bottom-16 sm:left-[clamp(76px,8vw,136px)] flex max-h-[calc(100dvh-24px)] w-[calc(100vw-24px)] max-w-[580px] flex-col overflow-hidden rounded-[16px] border select-none ${shell}`}
+        onClick={(event) => event.stopPropagation()}
+        className={`paperrocket-color-studio relative flex max-h-[calc(100dvh-24px)] w-[calc(100vw-24px)] max-w-[580px] flex-col overflow-hidden rounded-[16px] border select-none ${shell}`}
       >
         <header className={`flex min-h-14 items-center justify-between border-b px-3 ${divider}`}>
           <div className="flex min-w-0 items-center gap-2.5">

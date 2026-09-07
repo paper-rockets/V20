@@ -356,13 +356,6 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
             }`
       }
     >
-      {/* Mobile grab handle */}
-      {!inline && (
-        <div className="flex justify-center pt-0.5 pb-0.5 sm:hidden shrink-0">
-          <div className={`w-9 h-1 rounded-full ${isLight ? 'bg-black/20' : 'bg-white/20'}`} />
-        </div>
-      )}
-
       {/* Header (floating only; ProPanel already provides its own header) */}
       {!inline && (
         <div className={`flex items-center justify-between pb-2 border-b shrink-0 ${isLight ? 'border-black/10' : 'border-neutral-800'}`}>

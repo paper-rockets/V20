@@ -85,9 +85,7 @@ const CustomMirrorModal = lazy(() =>
 );
 const BentGuideModal = lazy(() => import('./components/BentGuideModal').then((m) => ({ default: m.BentGuideModal })));
 const ARViewerModal = lazy(() => import('./components/ARViewerModal').then((m) => ({ default: m.ARViewerModal })));
-const ColorStudioModal = lazy(() =>
-  import('./components/CompactColorStudioModal').then((m) => ({ default: m.ColorStudioModal }))
-);
+import { ColorStudioModal } from './components/CompactColorStudioModal';
 const HolisticDNAInspector = lazy(() =>
   import('./components/HolisticDNAInspector').then((m) => ({ default: m.HolisticDNAInspector }))
 );
@@ -1512,23 +1510,21 @@ export function App() {
       </DeferredPanel>
 
       {/* Advanced Color Studio Modal (HSV + OKLCh Polar + 1-Click Shaders) */}
-      <DeferredPanel active={isColorStudioOpen}>
-        <ColorStudioModal
-          isOpen={isColorStudioOpen}
-          onClose={() => setIsColorStudioOpen(false)}
-          currentColor={brushSettings.color || '#38bdf8'}
-          onChangeColor={(hex) => setBrushSettings((prev) => ({ ...prev, color: hex }))}
-          onApplyBrushSettings={(newSettings) =>
-            setBrushSettings((prev) => ({ ...prev, ...newSettings }))
-          }
-          onApplyToModel={(mat) => engine?.setModelCustomMaterial(mat)}
-          onSampleFromScreen={() => {
-            setIsColorStudioOpen(false);
-            setTool('eyedropper');
-          }}
-          theme={theme}
-        />
-      </DeferredPanel>
+      <ColorStudioModal
+        isOpen={isColorStudioOpen}
+        onClose={() => setIsColorStudioOpen(false)}
+        currentColor={brushSettings.color || '#38bdf8'}
+        onChangeColor={(hex) => setBrushSettings((prev) => ({ ...prev, color: hex }))}
+        onApplyBrushSettings={(newSettings) =>
+          setBrushSettings((prev) => ({ ...prev, ...newSettings }))
+        }
+        onApplyToModel={(mat) => engine?.setModelCustomMaterial(mat)}
+        onSampleFromScreen={() => {
+          setIsColorStudioOpen(false);
+          setTool('eyedropper');
+        }}
+        theme={theme}
+      />
 
       {/* Holistic DNA Inspector & Injector Popup */}
       <DeferredPanel active={activeDNA !== null}>

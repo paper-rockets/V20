@@ -149,11 +149,6 @@ export const ProPanel: React.FC<ProPanelProps> = ({
           : 'bg-[#14161a]/98 border-white/15 text-neutral-200 shadow-[0_24px_70px_rgba(0,0,0,0.6)]'
       }`}
     >
-      {/* Mobile top pull-handle */}
-      <div className="flex justify-center pt-2 pb-0.5 sm:hidden shrink-0">
-        <div className={`w-9 h-1 rounded-full ${light ? 'bg-black/20' : 'bg-white/20'}`} />
-      </div>
-
       {/* Header - Sticky at top so close button is ALWAYS reachable */}
       <div
         className={`flex items-center justify-between px-3.5 py-2 border-b min-h-[40px] shrink-0 sticky top-0 z-10 ${
