@@ -293,8 +293,19 @@ export class ConformalBeadGenerator {
       } else {
         t.subVectors(positions[i + 1], positions[i - 1]);
       }
-      if (t.lengthSq() < 1e-8) t.set(0, 0, 1);
-      else t.normalize();
+      if (t.lengthSq() < 1e-8) {
+        if (i > 0 && tangents[i - 1]) {
+          t.copy(tangents[i - 1]);
+        } else if (i < n - 1) {
+          t.subVectors(positions[i + 1], positions[i]);
+          if (t.lengthSq() < 1e-8) t.set(1, 0, 0);
+          else t.normalize();
+        } else {
+          t.set(1, 0, 0);
+        }
+      } else {
+        t.normalize();
+      }
       tangents.push(t);
     }
 
@@ -325,17 +336,13 @@ export class ConformalBeadGenerator {
       }
       norm.normalize();
 
-      // Compute binormal as tangent cross surface normal
-      const binorm = _vecPool.get().crossVectors(t, norm).normalize();
-
-      // Smooth phase continuity: prevent sudden 180-degree flipping between consecutive samples
-      if (i > 0) {
-        const prevBinorm = binormals[i - 1];
-        if (binorm.dot(prevBinorm) < 0) {
-          binorm.negate();
-          norm.crossVectors(binorm, t).normalize();
-        }
+      // Ensure normal always points outward, aligned with surface normal (never into the mesh or canvas)
+      if (norm.dot(targetNorm) < 0) {
+        norm.negate();
       }
+
+      // Compute binormal as tangent cross surface normal (lateral axis across stroke width)
+      const binorm = _vecPool.get().crossVectors(t, norm).normalize();
 
       normals.push(norm);
       binormals.push(binorm);
