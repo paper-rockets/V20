@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { User } from 'lucide-react';
 import {
   IcMove as Move,
   IcArmature as Shield,
@@ -30,6 +31,7 @@ export interface DeformPanelProps {
   onApplyLiquify?: () => void;
   onCancelLiquify?: () => void;
   onOpenBentGuide?: () => void;
+  onOpenScaffolding?: () => void;
   onOpenCustomMirror?: () => void;
   onOpenDecimate?: () => void;
   onOpenNumpad?: (target: NumpadTarget) => void;
@@ -49,6 +51,7 @@ export const DeformPanel: React.FC<DeformPanelProps> = ({
   onApplyLiquify,
   onCancelLiquify,
   onOpenBentGuide = () => {},
+  onOpenScaffolding,
   onOpenCustomMirror = () => {},
   onOpenDecimate = () => {},
   onOpenNumpad,
@@ -259,22 +262,49 @@ export const DeformPanel: React.FC<DeformPanelProps> = ({
           <span className={subHeadingClass}>Guides & Curves</span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            haptics.trigger('light');
-            onOpenBentGuide();
-          }}
-          className={`w-full h-8 min-h-[32px] px-2 py-1 rounded-lg border font-semibold flex items-center justify-center gap-1.5 transition-all text-xs ${
-            isLight
-              ? 'bg-white hover:bg-neutral-100 border-black/10 text-neutral-800'
-              : 'bg-black/30 hover:bg-white/10 border-white/10 text-neutral-200'
-          }`}
-          title="3D Bent Guide & Lofting Engine"
-        >
-          <Spline className="w-3.5 h-3.5 shrink-0" />
-          <span>Bend Path & Lofting Guide</span>
-        </button>
+        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.trigger('light');
+              onOpenBentGuide();
+            }}
+            className={`h-11 min-h-[44px] px-2.5 py-1 rounded-lg border flex items-center gap-2 font-medium transition-all active:scale-[0.98] ${
+              isLight
+                ? 'bg-white hover:bg-neutral-100 border-black/10 text-neutral-800 shadow-xs'
+                : 'bg-black/30 hover:bg-white/10 border-white/10 text-neutral-200 shadow-xs'
+            }`}
+            title="3D Bent Guide & Lofting Engine"
+          >
+            <Spline className="w-4 h-4 shrink-0 text-teal-400" />
+            <div className="flex flex-col text-left leading-tight overflow-hidden">
+              <span className="text-xs font-semibold truncate">Bend Along Path</span>
+              <span className="text-[9.5px] opacity-65 truncate">Curved Ribbons</span>
+            </div>
+          </button>
+
+          {onOpenScaffolding && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.trigger('light');
+                onOpenScaffolding();
+              }}
+              className={`h-11 min-h-[44px] px-2.5 py-1 rounded-lg border flex items-center gap-2 font-medium transition-all active:scale-[0.98] ${
+                isLight
+                  ? 'bg-white hover:bg-neutral-100 border-black/10 text-neutral-800 shadow-xs'
+                  : 'bg-black/30 hover:bg-white/10 border-white/10 text-neutral-200 shadow-xs'
+              }`}
+              title="3D Armatures & Form Guides"
+            >
+              <User className="w-4 h-4 shrink-0 text-sky-400" />
+              <div className="flex flex-col text-left leading-tight overflow-hidden">
+                <span className="text-xs font-semibold truncate">3D Armatures</span>
+                <span className="text-[9.5px] opacity-65 truncate">Mannequins & Forms</span>
+              </div>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 4. Simplify & Decimate */}

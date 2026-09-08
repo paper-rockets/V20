@@ -1,7 +1,7 @@
 {
-  "name": "Remix 3D Model Painting Studio",
+  "name": "Remix 3D — Draw and Paint in 3D",
   "short_name": "Remix 3D",
-  "description": "3D model painting studio and Draco compression suite with universal file conversion, orientation adjustment, and in-app local storage.",
+  "description": "A touch-first studio for drawing in 3D space and painting directly on 3D models.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
@@ -9,7 +9,7 @@
   "background_color": "#0c0e14",
   "theme_color": "#0c0e14",
   "orientation": "any",
-  "categories": ["graphics", "productivity", "utilities", "photo"],
+  "categories": ["graphics", "design", "productivity"],
   "icons": [
     {
       "src": "./icons/icon-192.png",

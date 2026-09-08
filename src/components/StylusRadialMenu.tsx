@@ -6,25 +6,19 @@ import {
   Layer,
 } from '../types';
 import {
-  Paintbrush,
-  Eraser,
-  Pipette,
-  Layers,
-  Sparkles,
-  RotateCcw,
-  RotateCw,
-  Compass,
-  X,
   Sliders,
-  ShieldAlert,
-  Minimize2,
-  Maximize2,
   Check,
-  Split,
-  Palette,
-  Circle,
   Hash,
 } from 'lucide-react';
+import {
+  IcDraw as Paintbrush,
+  IcErase as Eraser,
+  IcSample as Pipette,
+  IcUndo as RotateCcw,
+  IcRedo as RotateCw,
+  IcPalette as Palette,
+  IcMirror as Split,
+} from './pro/StudioIcons';
 
 export interface RadialMenuPosition {
   x: number;
@@ -232,11 +226,25 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
     <div
       className="fixed inset-0 z-50 pointer-events-auto select-none font-sans"
       onPointerDown={(e) => {
+        e.stopPropagation();
         if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
           onClose();
         }
       }}
-      onContextMenu={(e) => e.preventDefault()}
+      onPointerMove={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
+      onPointerCancel={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseMove={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
+      onWheel={(e) => e.stopPropagation()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 animate-in fade-in duration-100" />
@@ -244,6 +252,15 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
       {/* Radial Menu Container centered at stylus tip */}
       <div
         ref={menuRef}
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerMove={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseMove={(e) => e.stopPropagation()}
+        onMouseUp={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
         style={{
           left: `${clampedX}px`,
           top: `${clampedY}px`,
@@ -251,8 +268,12 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
         className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto animate-in zoom-in-75 fade-in duration-150"
       >
         {/* Center Stylus Reticle Hub */}
-        <div
-          onClick={onClose}
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic(10);
+            setActiveSubmenu(activeSubmenu === 'size' ? null : 'size');
+          }}
           className={`relative z-20 w-14 h-14 rounded-full flex flex-col items-center justify-center cursor-pointer shadow-2xl border transition-transform hover:scale-105 active:scale-95 ${
             isDark
               ? 'bg-neutral-900/95 border-neutral-700 text-white'
@@ -263,7 +284,8 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
               ? '0 0 30px rgba(56, 189, 248, 0.3), 0 10px 25px rgba(0,0,0,0.6)'
               : '0 0 25px rgba(56, 189, 248, 0.25), 0 10px 20px rgba(0,0,0,0.15)',
           }}
-          title="Close Radial Menu"
+          title="Change brush size"
+          aria-label={`Change brush size, currently ${Math.round(brushSettings.size * 1000)} millimeters`}
         >
           <div
             className="w-4 h-4 rounded-full border border-white/60 mb-0.5"
@@ -272,7 +294,7 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
           <span className="text-[9px] font-mono font-bold leading-none">
             {Math.round(brushSettings.size * 1000)}mm
           </span>
-        </div>
+        </button>
 
         {/* Primary Circular Orbital Ring */}
         {primaryItems.map((item) => {
@@ -310,6 +332,9 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
         {/* Submenu Popout: Color Palette */}
         {activeSubmenu === 'colors' && (
           <div
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
             className={`absolute top-1/2 left-1/2 -translate-y-1/2 translate-x-24 z-30 p-2.5 rounded-2xl shadow-2xl border flex flex-col gap-2 animate-in fade-in slide-in-from-left-4 duration-150 ${
               isDark ? 'bg-[#18191d] border-neutral-700' : 'bg-white border-neutral-200'
             }`}
@@ -322,12 +347,14 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
               {QUICK_COLORS.map((c) => (
                 <button
                   key={c}
-                  onClick={() => {
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
                     triggerHaptic(10);
                     onUpdateBrushSettings({ color: c });
                     onClose();
                   }}
-                  className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
+                  className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 cursor-pointer ${
                     brushSettings.color.toLowerCase() === c.toLowerCase()
                       ? 'ring-2 ring-neutral-900 dark:ring-white scale-110'
                       : 'border-black/20'
@@ -339,11 +366,13 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
             </div>
             {onOpenColorPanel && (
               <button
-                onClick={() => {
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
                   onClose();
                   onOpenColorPanel();
                 }}
-                className="w-full py-1 rounded-lg text-xs font-semibold bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-zinc-100 text-white dark:text-zinc-950 flex items-center justify-center gap-1 mt-1 transition-colors"
+                className="w-full py-1 rounded-lg text-xs font-semibold bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-zinc-100 text-white dark:text-zinc-950 flex items-center justify-center gap-1 mt-1 transition-colors cursor-pointer"
               >
                 <Palette className="w-3.5 h-3.5" />
                 <span>Full Color Studio</span>
@@ -355,17 +384,57 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
         {/* Submenu Popout: Brush Size */}
         {activeSubmenu === 'size' && (
           <div
-            className={`absolute top-1/2 left-1/2 -translate-y-1/2 translate-x-24 z-30 p-3 rounded-2xl shadow-2xl border flex flex-col gap-2.5 animate-in fade-in slide-in-from-left-4 duration-150 ${
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseMove={(e) => e.stopPropagation()}
+            onMouseUp={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            onWheel={(e) => {
+              e.stopPropagation();
+              const delta = e.deltaY < 0 ? 0.002 : -0.002;
+              const newSize = Math.max(0.002, Math.min(0.25, +(brushSettings.size + delta).toFixed(3)));
+              onUpdateBrushSettings({ size: newSize });
+            }}
+            className={`absolute top-1/2 left-1/2 -translate-y-1/2 translate-x-24 z-30 p-3 rounded-2xl shadow-2xl border flex flex-col gap-2.5 animate-in fade-in slide-in-from-left-4 duration-150 select-none ${
               isDark ? 'bg-[#18191d] border-neutral-700' : 'bg-white border-neutral-200'
             }`}
-            style={{ width: '180px' }}
+            style={{ width: '190px' }}
           >
             <div className="flex items-center justify-between text-[11px] font-semibold text-neutral-400">
               <span>Stroke Radius</span>
-              <span className="flex items-center gap-0.5 font-mono text-neutral-900 dark:text-zinc-300">
-                <Hash className="w-2.5 h-2.5" />
-                <span>{(brushSettings.size * 1000).toFixed(1)}mm</span>
-              </span>
+              {onOpenNumpad ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                    onOpenNumpad({
+                      id: 'brush-size',
+                      title: 'Stroke Radius',
+                      value: Math.round(brushSettings.size * 1000),
+                      min: 2,
+                      max: 250,
+                      step: 1,
+                      unit: 'mm',
+                      onConfirm: (val) => onUpdateBrushSettings({ size: val / 1000 }),
+                    });
+                  }}
+                  className="flex items-center gap-0.5 font-mono text-neutral-900 dark:text-zinc-300 hover:text-sky-500 dark:hover:text-sky-400 cursor-pointer transition-colors"
+                  title="Click to type exact size"
+                >
+                  <Hash className="w-2.5 h-2.5" />
+                  <span>{(brushSettings.size * 1000).toFixed(1)}mm</span>
+                </button>
+              ) : (
+                <span className="flex items-center gap-0.5 font-mono text-neutral-900 dark:text-zinc-300">
+                  <Hash className="w-2.5 h-2.5" />
+                  <span>{(brushSettings.size * 1000).toFixed(1)}mm</span>
+                </span>
+              )}
             </div>
             <input
               type="range"
@@ -374,24 +443,40 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
               step="0.002"
               value={brushSettings.size}
               onChange={(e) => {
-                onUpdateBrushSettings({ size: parseFloat(e.target.value) });
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val)) {
+                  onUpdateBrushSettings({ size: val });
+                }
               }}
-              className="w-full h-2 bg-neutral-200 dark:bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-neutral-900 dark:accent-neutral-100"
+              onInput={(e) => {
+                const val = parseFloat((e.target as HTMLInputElement).value);
+                if (!isNaN(val)) {
+                  onUpdateBrushSettings({ size: val });
+                }
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="w-full h-2 bg-neutral-200 dark:bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-neutral-900 dark:accent-neutral-100 touch-auto"
+              style={{ touchAction: 'auto' }}
+              aria-label="Stroke radius slider"
             />
             <div className="grid grid-cols-4 gap-1">
               {[0.005, 0.015, 0.035, 0.08].map((s) => (
                 <button
                   key={s}
-                  onClick={() => {
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
                     triggerHaptic(10);
                     onUpdateBrushSettings({ size: s });
                   }}
-                  className={`py-1 rounded-lg text-[10px] font-mono font-semibold border ${
+                  className={`py-1 rounded-lg text-[10px] font-mono font-semibold border transition-colors cursor-pointer ${
                     Math.abs(brushSettings.size - s) < 0.001
                       ? 'bg-neutral-900 dark:bg-white border-neutral-700 dark:border-neutral-300 text-white dark:text-zinc-950'
                       : isDark
-                      ? 'bg-neutral-800 border-neutral-700 text-neutral-300'
-                      : 'bg-neutral-100 border-neutral-300 text-neutral-700'
+                      ? 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700'
+                      : 'bg-neutral-100 border-neutral-300 text-neutral-700 hover:bg-neutral-200'
                   }`}
                 >
                   {Math.round(s * 1000)}mm
@@ -404,6 +489,9 @@ export const StylusRadialMenu: React.FC<StylusRadialMenuProps> = ({
         {/* Submenu Popout: Symmetry Modes */}
         {activeSubmenu === 'symmetry' && (
           <div
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
             className={`absolute top-1/2 left-1/2 -translate-y-1/2 -translate-x-[260px] z-30 p-2.5 rounded-2xl shadow-2xl border flex flex-col gap-1 animate-in fade-in slide-in-from-right-4 duration-150 ${
               isDark ? 'bg-[#18191d] border-neutral-700' : 'bg-white border-neutral-200'
             }`}

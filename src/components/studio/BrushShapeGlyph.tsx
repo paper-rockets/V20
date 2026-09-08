@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StrokeProfile, MaterialType } from '../../types';
-import { resolveAssetUrl } from '../../utils/assetUrl';
 
 export interface BrushShapeGlyphProps {
   brushId?: string;
@@ -16,73 +15,66 @@ export interface BrushShapeGlyphProps {
   className?: string;
 }
 
-const bImg = (name: string) => resolveAssetUrl(`assets/brushes/${name}`);
-
-export const BRUSH_IMAGES: Record<string, string> = {
-  clay: bImg('clay.png'),
-  build: bImg('build.png'),
-  move: bImg('move.png'),
-  inflate: bImg('inflate.png'),
-  pinch: bImg('pinch.png'),
-  crease: bImg('crease.png'),
-  flatten: bImg('flatten.png'),
-  smooth: bImg('smooth.png'),
-  // Legacy / Surface fallbacks
-  streamline_ink: bImg('clay.png'),
-  spatial_pipe: bImg('build.png'),
-  chisel_marker: bImg('pinch.png'),
-  drafting_wire: bImg('crease.png'),
-  neon_cable: bImg('inflate.png'),
-  conformal_bead: bImg('flatten.png'),
-  stipple_texture: bImg('smooth.png'),
-  matte_clay: bImg('flatten.png'),
+const PROFILE_BY_BRUSH: Record<string, StrokeProfile> = {
+  spatial_pipe: 'tube',
+  drafting_wire: 'tube',
+  neon_cable: 'tube',
+  chisel_marker: 'marker',
+  conformal_bead: 'conformal',
+  terrazzo_fleck: 'conformal',
+  matte_clay: 'conformal',
 };
 
-/**
- * Normalizes size into a scale ratio (0.5 to 1.15) for visually scaling 3D sculpt marks.
- */
-function getScaleFactor(size: number | undefined): number {
-  if (size === undefined) return 0.85;
-  const clamped = Math.max(0.012, Math.min(0.14, size));
-  return 0.52 + ((clamped - 0.012) / (0.13 - 0.012)) * 0.58;
-}
+const PATTERN_BRUSHES = new Set(['halftone_dot', 'stipple_texture', 'line_hatch', 'crosshatch', 'terrazzo_fleck']);
 
 export const BrushShapeGlyph: React.FC<BrushShapeGlyphProps> = ({
   brushId = 'clay',
-  size = 0.04,
+  profile,
+  patternType,
   boxSize = 44,
   className = '',
 }) => {
-  const [loadError, setLoadError] = useState(false);
-  const imageSrc = BRUSH_IMAGES[brushId] || BRUSH_IMAGES.clay;
-  const scale = getScaleFactor(size);
+  const resolvedProfile = profile || PROFILE_BY_BRUSH[brushId] || 'ribbon';
+  const showPattern = patternType !== 'none' && (Boolean(patternType) || PATTERN_BRUSHES.has(brushId));
 
   return (
     <div
-      className={`relative flex items-center justify-center overflow-hidden shrink-0 select-none ${className}`}
+      className={`relative flex items-center justify-center shrink-0 select-none text-current ${className}`}
       style={{ width: boxSize, height: boxSize }}
+      aria-hidden="true"
     >
-      {!loadError ? (
-        <img
-          src={imageSrc}
-          alt={brushId}
-          draggable={false}
-          className="object-contain pointer-events-none transition-transform duration-100 ease-out"
-          style={{
-            width: `${Math.round(boxSize * 0.9)}px`,
-            height: `${Math.round(boxSize * 0.9)}px`,
-            transform: `scale(${scale.toFixed(2)})`,
-          }}
-          onError={() => setLoadError(true)}
-        />
-      ) : (
-        <div
-          data-testid="glyph-fallback"
-          className="glyph-fallback w-full h-full rounded-full border border-current opacity-40 flex items-center justify-center text-[10px] font-bold"
-        >
-          {brushId.slice(0, 2).toUpperCase()}
-        </div>
-      )}
+      <svg viewBox="0 0 40 40" className="h-full w-full fill-none stroke-current" role="presentation">
+        {resolvedProfile === 'tube' && (
+          <>
+            <path d="M6 26C13 10 25 31 34 14" strokeWidth="4.5" strokeLinecap="round" opacity="0.16" />
+            <path d="M6 26C13 10 25 31 34 14" strokeWidth="1.6" strokeLinecap="round" />
+            <circle cx="34" cy="14" r="2.3" strokeWidth="1.5" />
+          </>
+        )}
+        {resolvedProfile === 'ribbon' && (
+          <path d="M5 26C12 8 23 31 35 12L35 18C24 35 13 14 5 30Z" strokeWidth="1.5" strokeLinejoin="round" fill="currentColor" fillOpacity="0.12" />
+        )}
+        {resolvedProfile === 'marker' && (
+          <>
+            <path d="M7 29L25 11L34 15L16 33Z" strokeWidth="1.5" strokeLinejoin="round" fill="currentColor" fillOpacity="0.12" />
+            <path d="M25 11L29 7L38 11L34 15" strokeWidth="1.5" strokeLinejoin="round" />
+          </>
+        )}
+        {resolvedProfile === 'conformal' && (
+          <>
+            <path d="M5 27C13 15 27 15 35 27" strokeWidth="5" strokeLinecap="round" opacity="0.16" />
+            <path d="M5 27C13 15 27 15 35 27" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M4 31H36" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 3" opacity="0.55" />
+          </>
+        )}
+        {showPattern && (
+          <>
+            <circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none" />
+            <circle cx="19" cy="9" r="1" fill="currentColor" stroke="none" />
+            <circle cx="27" cy="12" r="1.25" fill="currentColor" stroke="none" />
+          </>
+        )}
+      </svg>
     </div>
   );
 };

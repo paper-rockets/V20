@@ -9,3 +9,5 @@ coverage/
 target/
 crates/**/target/
 .claude/
+scripts/*.png
+scripts/screenshots/

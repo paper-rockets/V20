@@ -14,7 +14,6 @@ import {
   ModelDisplayMode,
   ModelMetadata,
   GizmoMode,
-  Guide3D,
   ActiveControllerType,
   ProjectSaveData,
   PathTracingProgressInfo,
@@ -26,11 +25,13 @@ import { BrushSettingsPanel } from './components/BrushSettingsPanel';
 import { ModelDisplayPanel } from './components/ModelDisplayPanel';
 import { ScreenCenterCrosshair } from './components/ScreenCenterCrosshair';
 import { Option3SphereNavigator } from './components/TransformNavigator/Option3SphereNavigator';
+import { JoystickNavigator, type NavigatorLayout } from './components/TransformNavigator/JoystickNavigator';
 import { FpsCounter } from './components/FpsCounter';
 import { DeferredPanel } from './components/DeferredPanel';
 import { publishCameraPose, publishFps } from './core/telemetryStore';
 import { useHasOnboarded } from './core/onboardingStore';
 import { ProShell } from './components/pro/ProShell';
+import { GuideControlBar } from './components/studio/GuideControlBar';
 import { useOpenSheet, openSheetId, closeSheet, toggleSheet } from './components/studio/panelStore';
 import { StudioTopStrip } from './components/studio/StudioTopStrip';
 import { StudioSettingsSheet } from './components/studio/StudioSettingsSheet';
@@ -89,6 +90,9 @@ const CustomMirrorModal = lazy(() =>
   import('./components/CustomMirrorModal').then((m) => ({ default: m.CustomMirrorModal }))
 );
 const BentGuideModal = lazy(() => import('./components/BentGuideModal').then((m) => ({ default: m.BentGuideModal })));
+const ScaffoldingModal = lazy(() =>
+  import('./components/ScaffoldingModal').then((m) => ({ default: m.ScaffoldingModal }))
+);
 const ARViewerModal = lazy(() => import('./components/ARViewerModal').then((m) => ({ default: m.ARViewerModal })));
 const ColorStudioModal = lazy(() =>
   import('./components/CompactColorStudioModal').then((m) => ({ default: m.ColorStudioModal }))
@@ -114,6 +118,7 @@ import {
   LoadedModelInfo,
   TransformTargetScope,
   SavedProjectSession,
+  ActiveGuideReference,
 } from './types';
 
 const DEFAULT_BRUSH_SETTINGS: BrushSettings = {
@@ -252,12 +257,12 @@ export function App() {
     }
   };
 
-  const [navigatorStyle, setNavigatorStyle] = useState<'opt3' | 'opt1' | 'classic'>(() => {
+  const [navigatorStyle, setNavigatorStyle] = useState<NavigatorLayout>(() => {
     try {
       const saved = localStorage.getItem('paperrocket_nav_style');
-      if (saved === 'opt3' || saved === 'opt1' || saved === 'classic') return saved;
+      if (saved === 'disc' || saved === 'petal' || saved === 'collar') return saved;
     } catch (_) {}
-    return 'opt3';
+    return 'sphere';
   });
 
   const [pendingWorkLoss, setPendingWorkLoss] = useState<{
@@ -268,7 +273,7 @@ export function App() {
   } | null>(null);
   const [workLossBusy, setWorkLossBusy] = useState<boolean>(false);
 
-  const handleNavigatorStyleChange = (style: 'opt3' | 'opt1' | 'classic') => {
+  const handleNavigatorStyleChange = (style: NavigatorLayout) => {
     setNavigatorStyle(style);
     try {
       localStorage.setItem('paperrocket_nav_style', style);
@@ -386,6 +391,7 @@ export function App() {
   });
   const [isDecimateOpen, setIsDecimateOpen] = useState<boolean>(false);
   const [isBentGuideOpen, setIsBentGuideOpen] = useState<boolean>(false);
+  const [isScaffoldingOpen, setIsScaffoldingOpen] = useState<boolean>(false);
   const [isCustomMirrorOpen, setIsCustomMirrorOpen] = useState<boolean>(false);
   const [customMirrorConfig, setCustomMirrorConfig] = useState<CustomMirrorConfig>({
     planeOrigin: [0, 0, 0],
@@ -428,8 +434,6 @@ export function App() {
   const [isColorStudioOpen, setIsColorStudioOpen] = useState<boolean>(false);
   const [activeDNA, setActiveDNA] = useState<HolisticStrokeDNA | null>(null);
   const [snappedShapeNotice, setSnappedShapeNotice] = useState<string | null>(null);
-
-  const [activeGuide, setActiveGuide] = useState<Guide3D | null>(null);
 
   // Storage Permission & Bulletproof IndexedDB Auto-Save
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('idle');
@@ -564,6 +568,19 @@ export function App() {
   const [loadedModels, setLoadedModels] = useState<LoadedModelInfo[]>([]);
   const [activeModelId, setActiveModelId] = useState<string | null>(null);
   const [targetScope, setTargetScope] = useState<TransformTargetScope>('all');
+  const [activeGuide, setActiveGuide] = useState<ActiveGuideReference | null>(null);
+
+  useEffect(() => {
+    if (!engine) return;
+    setActiveGuide(engine.getActiveGuide());
+    return engine.subscribeActiveGuideChange((guide) => {
+      setActiveGuide(guide);
+      if (guide) {
+        setTargetScope('guide');
+        setGizmoMode('Standard');
+      }
+    });
+  }, [engine]);
 
   useEffect(() => {
     const handleModelsChanged = (e: any) => {
@@ -883,6 +900,7 @@ export function App() {
           case 'export': setIsExportOpen(true); break;
           case 'curveDecimate': setIsDecimateOpen(true); break;
           case 'bentGuide': setIsBentGuideOpen(true); break;
+          case 'scaffolding': setIsScaffoldingOpen(true); break;
           case 'customMirror': setIsCustomMirrorOpen(true); break;
           case 'arViewer': setIsARViewerOpen(true); break;
           case 'clipboard': setIsClipboardOpen(true); break;
@@ -916,13 +934,17 @@ export function App() {
         setIsExportOpen(false);
         setIsDecimateOpen(false);
         setIsBentGuideOpen(false);
+        setIsScaffoldingOpen(false);
         setIsCustomMirrorOpen(false);
         setIsARViewerOpen(false);
         setActiveDNA(null);
         setIsClipboardOpen(false);
-      }
+      },
+      getActiveGuide: () => activeGuide,
+      getTargetScope: () => targetScope,
+      setTargetScope: (scope: any) => handleSelectTargetScope(scope),
     };
-  }, [engine, handleSetTheme, setTool, setBrushSettings]);
+  }, [engine, handleSetTheme, setTool, setBrushSettings, activeGuide, targetScope, handleSelectTargetScope]);
 
   // 1-Tap Quick Save (Ctrl+S / Top Bar Quick Save button)
   const handleQuickSave = useCallback(async () => {
@@ -1268,6 +1290,7 @@ export function App() {
         canRedo={canRedo}
         theme={theme}
         onOpenIllumination={() => setIsIlluminationOpen(true)}
+        onOpenScaffolding={() => setIsScaffoldingOpen(true)}
         onQuickSave={handleQuickSave}
         onOpenSessions={() => setIsSessionModalOpen(true)}
       />
@@ -1347,6 +1370,10 @@ export function App() {
               closeSheet();
               setIsBentGuideOpen(true);
             }}
+            onOpenScaffolding={() => {
+              closeSheet();
+              setIsScaffoldingOpen(true);
+            }}
             onOpenCustomMirror={() => {
               closeSheet();
               setIsCustomMirrorOpen(true);
@@ -1392,18 +1419,48 @@ export function App() {
       {gizmoMode !== 'Hidden' && activeController !== 'hidden' && showStudioNavigator &&
         !isModelsOpen && !isExportOpen &&
         !isIlluminationOpen && !isColorStudioOpen && !isARViewerOpen && !isClipboardOpen && (
-          <Option3SphereNavigator
-            engine={engine}
-            theme={theme}
-            layers={layers}
-            activeLayerId={activeLayerId}
-            onSelectLayer={handleSelectLayer}
-            models={loadedModels}
-            activeModelId={activeModelId}
-            onSelectModel={handleSelectModel}
-            onClose={() => handleControllerChange('hidden')}
-          />
+          navigatorStyle === 'sphere' ? (
+            <Option3SphereNavigator
+              engine={engine}
+              theme={theme}
+              layers={layers}
+              activeLayerId={activeLayerId}
+              onSelectLayer={handleSelectLayer}
+              models={loadedModels}
+              activeModelId={activeModelId}
+              onSelectModel={handleSelectModel}
+              navigatorLayout={navigatorStyle}
+              onNavigatorLayoutChange={handleNavigatorStyleChange}
+              onClose={() => handleControllerChange('hidden')}
+            />
+          ) : (
+            <JoystickNavigator
+              engine={engine}
+              theme={theme}
+              layout={navigatorStyle}
+              onLayoutChange={handleNavigatorStyleChange}
+              onClose={() => handleControllerChange('hidden')}
+            />
+          )
       )}
+
+      {/* 3D Guide On-Canvas HUD Control Bar */}
+      <GuideControlBar
+        activeGuide={activeGuide}
+        engine={engine}
+        targetScope={targetScope}
+        onSelectTargetScope={handleSelectTargetScope}
+        isGizmoActive={gizmoMode !== 'Hidden'}
+        onToggleGizmo={() => setGizmoMode(gizmoMode === 'Hidden' ? 'Standard' : 'Hidden')}
+        onOpenBentGuide={() => setIsBentGuideOpen(true)}
+        onOpenScaffolding={() => setIsScaffoldingOpen(true)}
+        setTool={setTool}
+        onGuideDone={() => {
+          setSnappedShapeNotice('Surface snap active: strokes will draw across this 3D guide!');
+          setTimeout(() => setSnappedShapeNotice(null), 3000);
+        }}
+        theme={theme}
+      />
 
       {/* Layer Panel */}
       {isLayersOpen && (
@@ -1539,6 +1596,16 @@ export function App() {
           onClose={() => setIsBentGuideOpen(false)}
           engine={engine}
           theme={theme}
+        />
+      </DeferredPanel>
+
+      {/* 3D Scaffolding & Armature Guides Modal */}
+      <DeferredPanel active={isScaffoldingOpen}>
+        <ScaffoldingModal
+          isOpen={isScaffoldingOpen}
+          onClose={() => setIsScaffoldingOpen(false)}
+          engine={engine}
+          theme={theme === 'light' ? 'light' : 'dark'}
         />
       </DeferredPanel>
 
@@ -1705,6 +1772,10 @@ export function App() {
         storageEstimate={storageEstimate}
         autoSaveMeta={autoSaveMeta}
         onRestoreAutoSave={handleRestoreAutoSave}
+        navigatorStyle={navigatorStyle}
+        onNavigatorStyleChange={handleNavigatorStyleChange}
+        navigatorSensitivity={navigatorSensitivity}
+        onSensitivityChange={setNavigatorSensitivity}
         showNavigator={showStudioNavigator}
         onToggleNavigator={setShowStudioNavigator}
         showStats={showPerformanceStats}

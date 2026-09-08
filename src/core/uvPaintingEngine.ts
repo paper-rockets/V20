@@ -16,31 +16,19 @@ export interface LayerCanvasEntry {
  * Implements direct multi-layer GPU texture painting and real-time shader compositing
  * supporting Multiply, Screen, Overlay, Add, Subtract, and Normal blend modes.
  */
-export interface DirtyPatch {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  beforeData: ImageData;
-  afterData: ImageData;
-}
-
 export class UVPaintingEngine {
   private width: number = 2048;
   private height: number = 2048;
 
   // Per-layer offscreen canvas textures
   private layerCanvases: Map<string, LayerCanvasEntry> = new Map();
-  private layerHistory: Map<string, { stack: DirtyPatch[]; index: number }> = new Map();
+  private layerHistory: Map<string, { stack: ImageData[]; index: number }> = new Map();
   /**
-   * Undo depth per layer using compact dirty patch bounding boxes (99% less memory than full canvas).
+   * Undo depth per layer. Each entry is a full-canvas ImageData, so at 2048^2 a
+   * single snapshot is 16 MB of JS heap - the profile trims both the resolution
+   * and the depth on memory-constrained devices.
    */
-  private maxHistory: number = 16;
-
-  // Reusable stroke-start buffer for dirty-region delta capture
-  private strokeStartCanvas: HTMLCanvasElement | null = null;
-  private strokeStartCtx: CanvasRenderingContext2D | null = null;
-  private currentStrokeBBox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  private maxHistory: number = 8;
 
   // GPU Compositing Engine
   private gpuCompositor: GPULayerCompositor;
@@ -54,17 +42,11 @@ export class UVPaintingEngine {
   private activeMeshes: THREE.Mesh[] = [];
   private overlayMeshes: THREE.Mesh[] = [];
 
-  constructor(resolution: number = 2048, historyDepth: number = 16) {
+  constructor(resolution: number = 2048, historyDepth: number = 8) {
     this.width = resolution;
     this.height = resolution;
     this.maxHistory = Math.max(1, historyDepth);
     this.gpuCompositor = new GPULayerCompositor(this.width);
-
-    // Initialize reusable scratch canvas for dirty patch extraction
-    this.strokeStartCanvas = document.createElement('canvas');
-    this.strokeStartCanvas.width = this.width;
-    this.strokeStartCanvas.height = this.height;
-    this.strokeStartCtx = this.strokeStartCanvas.getContext('2d', { willReadFrequently: true })!;
 
     // Initialize default base layer canvas
     this.getOrCreateLayerEntry('layer_base_1');
@@ -101,7 +83,8 @@ export class UVPaintingEngine {
       this.layerCanvases.set(layerId, entry);
 
       // Initialize history for layer
-      this.layerHistory.set(layerId, { stack: [], index: -1 });
+      const initData = ctx.getImageData(0, 0, this.width, this.height);
+      this.layerHistory.set(layerId, { stack: [initData], index: 0 });
     }
     return entry;
   }
@@ -157,6 +140,10 @@ export class UVPaintingEngine {
 
   public resetHistory(): void {
     this.layerHistory.clear();
+    this.layerCanvases.forEach((entry) => {
+      const data = entry.ctx.getImageData(0, 0, this.width, this.height);
+      this.layerHistory.set(entry.id, { stack: [data], index: 0 });
+    });
   }
 
   /**
@@ -371,17 +358,6 @@ export class UVPaintingEngine {
     }
     this.isDrawing = true;
     this.lastUV = uv.clone();
-
-    // Reset stroke dirty bounding box
-    this.currentStrokeBBox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-
-    // Snapshot active layer before painting so we can extract exact beforeData patch upon completion
-    const activeEntry = this.getOrCreateLayerEntry(this.activeLayerId);
-    if (this.strokeStartCtx && this.strokeStartCanvas) {
-      this.strokeStartCtx.clearRect(0, 0, this.width, this.height);
-      this.strokeStartCtx.drawImage(activeEntry.canvas, 0, 0);
-    }
-
     this.paintStamp(uv, settings, 1.0);
   }
 
@@ -485,13 +461,6 @@ export class UVPaintingEngine {
     const rx = radius * widthMult;
     const ry = radius;
 
-    // Track dirty bounding box for compact patch undo and seam dilation
-    const pad = Math.max(rx, ry) + 4;
-    this.currentStrokeBBox.minX = Math.min(this.currentStrokeBBox.minX, x - pad);
-    this.currentStrokeBBox.minY = Math.min(this.currentStrokeBBox.minY, y - pad);
-    this.currentStrokeBBox.maxX = Math.max(this.currentStrokeBBox.maxX, x + pad);
-    this.currentStrokeBBox.maxY = Math.max(this.currentStrokeBBox.maxY, y + pad);
-
     if (shape === 'wide_flat' || shape === 'chisel' || shape === 'line') {
       // Oriented Ellipse / Rounded Wide Stamp for wide straight lines
       ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
@@ -522,93 +491,16 @@ export class UVPaintingEngine {
       this.lastUV = null;
       const activeEntry = this.layerCanvases.get(this.activeLayerId);
       if (activeEntry) {
-        // 1. Seam color dilation: Push edge colors 2px into transparent neighbor pixels
-        this.applySeamDilation(activeEntry.ctx, this.currentStrokeBBox);
-
-        // 2. Extract compact dirty patch for undo (saves 99% RAM)
-        this.recordStrokePatch(this.activeLayerId, this.currentStrokeBBox);
-
         activeEntry.texture.needsUpdate = true;
       }
       this.compositeLayers();
+      this.saveLayerState(this.activeLayerId);
     }
   }
 
-  /**
-   * Pushes painted edge pixel colors 2-3 pixels outwards into transparent neighbor pixels.
-   * Eliminates black seam lines when models are rendered with bilinear/mipmap texture filtering.
-   */
-  private applySeamDilation(
-    ctx: CanvasRenderingContext2D,
-    bbox: { minX: number; minY: number; maxX: number; maxY: number },
-    radius: number = 2
-  ): void {
-    if (!isFinite(bbox.minX) || !isFinite(bbox.minY)) return;
-
-    const pad = radius + 2;
-    const x0 = Math.max(0, Math.floor(bbox.minX) - pad);
-    const y0 = Math.max(0, Math.floor(bbox.minY) - pad);
-    const x1 = Math.min(this.width, Math.ceil(bbox.maxX) + pad);
-    const y1 = Math.min(this.height, Math.ceil(bbox.maxY) + pad);
-    const w = x1 - x0;
-    const h = y1 - y0;
-
-    if (w <= 0 || h <= 0) return;
-
-    const img = ctx.getImageData(x0, y0, w, h);
-    const data = img.data;
-
-    for (let pass = 0; pass < radius; pass++) {
-      for (let y = 1; y < h - 1; y++) {
-        for (let x = 1; x < w - 1; x++) {
-          const idx = (y * w + x) * 4;
-          if (data[idx + 3] === 0) {
-            const up = ((y - 1) * w + x) * 4;
-            const down = ((y + 1) * w + x) * 4;
-            const left = (y * w + (x - 1)) * 4;
-            const right = (y * w + (x + 1)) * 4;
-
-            let refIdx = -1;
-            if (data[up + 3] > 0) refIdx = up;
-            else if (data[down + 3] > 0) refIdx = down;
-            else if (data[left + 3] > 0) refIdx = left;
-            else if (data[right + 3] > 0) refIdx = right;
-
-            if (refIdx !== -1) {
-              data[idx] = data[refIdx];
-              data[idx + 1] = data[refIdx + 1];
-              data[idx + 2] = data[refIdx + 2];
-              data[idx + 3] = 1; // subtle alpha anchor so WebGL interpolator never samples black
-            }
-          }
-        }
-      }
-    }
-
-    ctx.putImageData(img, x0, y0);
-  }
-
-  /**
-   * Captures only the modified pixel box for undo, cutting memory from 16.7MB to ~150KB.
-   */
-  private recordStrokePatch(
-    layerId: string,
-    bbox: { minX: number; minY: number; maxX: number; maxY: number }
-  ): void {
+  public saveLayerState(layerId: string): void {
     const entry = this.layerCanvases.get(layerId);
-    if (!entry || !this.strokeStartCtx) return;
-
-    if (!isFinite(bbox.minX) || !isFinite(bbox.minY)) return;
-
-    const pad = 4;
-    const x0 = Math.max(0, Math.floor(bbox.minX) - pad);
-    const y0 = Math.max(0, Math.floor(bbox.minY) - pad);
-    const x1 = Math.min(this.width, Math.ceil(bbox.maxX) + pad);
-    const y1 = Math.min(this.height, Math.ceil(bbox.maxY) + pad);
-    const w = x1 - x0;
-    const h = y1 - y0;
-
-    if (w <= 0 || h <= 0) return;
+    if (!entry) return;
 
     let hist = this.layerHistory.get(layerId);
     if (!hist) {
@@ -616,22 +508,11 @@ export class UVPaintingEngine {
       this.layerHistory.set(layerId, hist);
     }
 
-    const beforeData = this.strokeStartCtx.getImageData(x0, y0, w, h);
-    const afterData = entry.ctx.getImageData(x0, y0, w, h);
-
+    const data = entry.ctx.getImageData(0, 0, this.width, this.height);
     if (hist.index < hist.stack.length - 1) {
       hist.stack = hist.stack.slice(0, hist.index + 1);
     }
-
-    hist.stack.push({
-      x: x0,
-      y: y0,
-      width: w,
-      height: h,
-      beforeData,
-      afterData,
-    });
-
+    hist.stack.push(data);
     if (hist.stack.length > this.maxHistory) {
       hist.stack.shift();
     } else {
@@ -639,19 +520,12 @@ export class UVPaintingEngine {
     }
   }
 
-  public saveLayerState(layerId: string): void {
-    const entry = this.layerCanvases.get(layerId);
-    if (!entry || !this.strokeStartCtx) return;
-    this.recordStrokePatch(layerId, { minX: 0, minY: 0, maxX: this.width, maxY: this.height });
-  }
-
   public undo(layerId: string = this.activeLayerId): boolean {
     const entry = this.layerCanvases.get(layerId);
     const hist = this.layerHistory.get(layerId);
-    if (entry && hist && hist.index >= 0) {
-      const patch = hist.stack[hist.index];
-      entry.ctx.putImageData(patch.beforeData, patch.x, patch.y);
+    if (entry && hist && hist.index > 0) {
       hist.index--;
+      entry.ctx.putImageData(hist.stack[hist.index], 0, 0);
       entry.texture.needsUpdate = true;
       this.compositeLayers();
       return true;
@@ -664,8 +538,7 @@ export class UVPaintingEngine {
     const hist = this.layerHistory.get(layerId);
     if (entry && hist && hist.index < hist.stack.length - 1) {
       hist.index++;
-      const patch = hist.stack[hist.index];
-      entry.ctx.putImageData(patch.afterData, patch.x, patch.y);
+      entry.ctx.putImageData(hist.stack[hist.index], 0, 0);
       entry.texture.needsUpdate = true;
       this.compositeLayers();
       return true;

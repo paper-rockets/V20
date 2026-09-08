@@ -1,4 +1,4 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import { TransformTargetScope, PerfectViewType, StrokeDescriptor } from '../types';
 
 export interface TransformUndoItem {
@@ -36,6 +36,9 @@ export interface TransformContext {
     timestamp: number;
   }) => void;
   clearHistoryRedo: () => void;
+  getActiveGuideMesh?: () => THREE.Object3D | null;
+  getGuideRoot?: () => THREE.Group;
+  getScaffoldRoot?: () => THREE.Group;
 }
 
 export class TransformController {
@@ -115,6 +118,24 @@ export class TransformController {
       if (layerFound && !layerBox.isEmpty()) {
         box.copy(layerBox);
         hasContent = true;
+      }
+    }
+
+    if (scope === 'guide') {
+      const guideMesh = this.ctx.getActiveGuideMesh?.();
+      if (guideMesh) {
+        box.setFromObject(guideMesh);
+        if (!box.isEmpty()) hasContent = true;
+      } else {
+        const guideRoot = this.ctx.getGuideRoot?.();
+        const scaffoldRoot = this.ctx.getScaffoldRoot?.();
+        if (guideRoot && guideRoot.children.length > 0) {
+          box.setFromObject(guideRoot);
+          if (!box.isEmpty()) hasContent = true;
+        } else if (scaffoldRoot && scaffoldRoot.children.length > 0) {
+          box.setFromObject(scaffoldRoot);
+          if (!box.isEmpty()) hasContent = true;
+        }
       }
     }
 
@@ -278,6 +299,28 @@ export class TransformController {
             mesh.geometry.computeBoundingBox();
           }
         });
+      }
+    } else if (scope === 'guide') {
+      const guideMesh = this.ctx.getActiveGuideMesh?.();
+      if (guideMesh) {
+        guideMesh.applyMatrix4(matrix);
+        guideMesh.updateMatrixWorld(true);
+        guideMesh.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.geometry) {
+            child.geometry.computeBoundingSphere?.();
+            child.geometry.computeBoundingBox?.();
+          }
+        });
+      } else {
+        const guideRoot = this.ctx.getGuideRoot?.();
+        const scaffoldRoot = this.ctx.getScaffoldRoot?.();
+        if (guideRoot && guideRoot.children.length > 0) {
+          guideRoot.applyMatrix4(matrix);
+          guideRoot.updateMatrixWorld(true);
+        } else if (scaffoldRoot && scaffoldRoot.children.length > 0) {
+          scaffoldRoot.applyMatrix4(matrix);
+          scaffoldRoot.updateMatrixWorld(true);
+        }
       }
     }
     this.ctx.markDirty();
@@ -807,6 +850,30 @@ export class TransformController {
           m.updateMatrixWorld(true);
         });
       });
+    }
+    if (scope === 'all' || scope === 'guide') {
+      const guideMesh = this.ctx.getActiveGuideMesh?.();
+      if (guideMesh) {
+        guideMesh.position.set(0, 0, 0);
+        guideMesh.rotation.set(0, 0, 0);
+        guideMesh.scale.set(1, 1, 1);
+        guideMesh.updateMatrixWorld(true);
+      } else {
+        const guideRoot = this.ctx.getGuideRoot?.();
+        const scaffoldRoot = this.ctx.getScaffoldRoot?.();
+        if (guideRoot) {
+          guideRoot.position.set(0, 0, 0);
+          guideRoot.rotation.set(0, 0, 0);
+          guideRoot.scale.set(1, 1, 1);
+          guideRoot.updateMatrixWorld(true);
+        }
+        if (scaffoldRoot) {
+          scaffoldRoot.position.set(0, 0, 0);
+          scaffoldRoot.rotation.set(0, 0, 0);
+          scaffoldRoot.scale.set(1, 1, 1);
+          scaffoldRoot.updateMatrixWorld(true);
+        }
+      }
     }
   }
 

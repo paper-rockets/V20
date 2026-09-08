@@ -81,15 +81,15 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
     });
   }, [savedModels, searchQuery]);
 
-  const [loadChoice, setLoadChoice] = useState<'ask' | 'add' | 'clear'>(() => {
+  const [loadChoice, setLoadChoice] = useState<'add' | 'clear'>(() => {
     try {
-      return (localStorage.getItem('remix3d.modelLoadChoice') as any) || 'ask';
+      return localStorage.getItem('remix3d.modelLoadChoice') === 'clear' ? 'clear' : 'add';
     } catch {
-      return 'ask';
+      return 'add';
     }
   });
 
-  const handleSetLoadChoice = (choice: 'ask' | 'add' | 'clear') => {
+  const handleSetLoadChoice = (choice: 'add' | 'clear') => {
     setLoadChoice(choice);
     try {
       localStorage.setItem('remix3d.modelLoadChoice', choice);
@@ -106,10 +106,6 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
       else void doLoad('clear');
       return;
     }
-    // Replacement is always deliberate. This also protects model-only and UV-only
-    // scenes, which are not detected by the stroke-only hasActiveDrawings check.
-    if (onBeforeReplace) onBeforeReplace(modelName, () => doLoad('clear'));
-    else void doLoad('clear');
   };
 
   const handleSelectPreset = (preset: PresetModelDefinition) => {
@@ -327,34 +323,19 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* On Load behavior switch */}
-            <div className={`flex items-center gap-0.5 p-0.5 rounded-xl border ${
-              isLight ? 'bg-neutral-100 border-black/10' : 'bg-zinc-950 border-zinc-800'
-            }`}>
-              <span className={`px-2 text-[11px] font-medium ${isLight ? 'text-neutral-500' : 'text-zinc-500'}`}>
-                On load:
-              </span>
-              <button
-                type="button"
-                onClick={() => handleSetLoadChoice('ask')}
-                className={`px-2 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  loadChoice === 'ask'
-                    ? isLight
-                      ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
-                      : 'bg-white text-zinc-950 font-bold shadow-sm'
-                    : isLight
-                    ? 'text-neutral-600 hover:text-neutral-900'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-                title="Ask whether to keep drawings or start fresh"
-              >
-                Ask
-              </button>
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+            {/* New model behavior */}
+            <div className="min-w-0 space-y-1">
+              <div className={`text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-neutral-500' : 'text-zinc-500'}`}>
+                When opening a model
+              </div>
+              <div className={`grid grid-cols-2 gap-1 p-1 rounded-xl border ${
+                isLight ? 'bg-neutral-100 border-black/10' : 'bg-zinc-950 border-zinc-800'
+              }`}>
               <button
                 type="button"
                 onClick={() => handleSetLoadChoice('add')}
-                className={`px-2 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`min-h-[40px] px-2 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   loadChoice === 'add'
                     ? isLight
                       ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
@@ -363,14 +344,14 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
                     ? 'text-neutral-600 hover:text-neutral-900'
                     : 'text-zinc-400 hover:text-white'
                 }`}
-                title="Always add to scene (keep drawings)"
+                title="Keep the current scene and add this model"
               >
-                Add
+                Add to scene
               </button>
               <button
                 type="button"
                 onClick={() => handleSetLoadChoice('clear')}
-                className={`px-2 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`min-h-[40px] px-2 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   loadChoice === 'clear'
                     ? isLight
                       ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
@@ -379,20 +360,25 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
                     ? 'text-neutral-600 hover:text-neutral-900'
                     : 'text-zinc-400 hover:text-white'
                 }`}
-                title="Always clear scene & start fresh"
+                title="Clear the current scene before loading this model"
               >
-                Clear
+                Replace current
               </button>
+              </div>
             </div>
 
             {/* Display Mode (Original vs White clay) */}
-            <div className={`flex items-center gap-1 p-0.5 rounded-xl border ${
-              isLight ? 'bg-neutral-100 border-black/10' : 'bg-zinc-950 border-zinc-800'
-            }`}>
+            <div className="min-w-0 space-y-1">
+              <div className={`text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-neutral-500' : 'text-zinc-500'}`}>
+                Appearance
+              </div>
+              <div className={`grid grid-cols-2 gap-1 p-1 rounded-xl border ${
+                isLight ? 'bg-neutral-100 border-black/10' : 'bg-zinc-950 border-zinc-800'
+              }`}>
               <button
                 type="button"
                 onClick={() => setLoadDisplayMode('texture')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`min-h-[40px] flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   loadDisplayMode === 'texture'
                     ? isLight
                       ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
@@ -408,7 +394,7 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
               <button
                 type="button"
                 onClick={() => setLoadDisplayMode('clay')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`min-h-[40px] flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   loadDisplayMode === 'clay'
                     ? isLight
                       ? 'bg-white text-neutral-900 font-bold shadow-xs border border-black/10'
@@ -421,6 +407,7 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
                 <Sparkles className="w-3 h-3" />
                 <span>White clay</span>
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -459,7 +446,7 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
               <p className="text-xs font-semibold">{loadingMessage}</p>
             </div>
           ) : activeTab === 'presets' ? (
-            <div className="paperrocket-model-grid grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="paperrocket-model-grid grid grid-cols-1 gap-2.5">
               {filteredPresets.map((preset) => {
                 const isCurrent =
                   activeModelName.toLowerCase() === preset.name.toLowerCase() ||
@@ -496,7 +483,7 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-0.5">
-                        <h3 className={`text-xs font-bold leading-tight truncate ${
+                        <h3 className={`text-xs font-bold leading-tight ${
                           isLight ? 'text-neutral-900' : 'text-zinc-100 group-hover:text-white'
                         }`}>
                           {preset.name}
@@ -509,13 +496,13 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
                           </span>
                         )}
                       </div>
-                      <p className={`text-[11px] line-clamp-1 leading-snug ${isLight ? 'text-neutral-600' : 'text-zinc-400'}`}>
+                      <p className={`text-[10px] line-clamp-2 leading-snug ${isLight ? 'text-neutral-600' : 'text-zinc-400'}`}>
                         {preset.description}
                       </p>
                       <div className="mt-1 flex items-center justify-between text-[10px] text-neutral-400">
-                        <span>{preset.file ? 'Draco GLB' : 'Mesh'}</span>
+                        <span>{preset.category}</span>
                         <span className="font-semibold text-neutral-400 group-hover:text-neutral-200">
-                          Load Model →
+                          Open →
                         </span>
                       </div>
                     </div>
@@ -524,7 +511,7 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
               })}
             </div>
           ) : (
-            <div className="paperrocket-model-grid grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="paperrocket-model-grid grid grid-cols-1 gap-2.5">
               {filteredSavedModels.map((model) => {
                 const isCurrent = activeModelName.toLowerCase() === model.name.toLowerCase();
                 return (
@@ -563,7 +550,7 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
                       onClick={() => handleSelectSavedModel(model)}
                     >
                       <div className="flex items-center justify-between gap-1.5 mb-0.5">
-                        <h3 className={`text-xs font-bold leading-tight truncate ${
+                        <h3 className={`text-xs font-bold leading-tight ${
                           isLight ? 'text-neutral-900' : 'text-zinc-100 group-hover:text-white'
                         }`}>
                           {model.name}

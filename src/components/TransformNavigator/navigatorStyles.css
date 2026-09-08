@@ -412,9 +412,16 @@
   grid-template-columns: repeat(4, 1fr);
 }
 
+.nv-layouts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+}
+
 .nv-mode,
 .nv-chip,
-.nv-act {
+.nv-act,
+.nv-layout {
   font: inherit;
   font-size: 11px;
   line-height: 1.1;
@@ -437,7 +444,8 @@
 #nv .nv-pick,
 #nv .nv-mode,
 #nv .nv-chip,
-#nv .nv-act {
+#nv .nv-act,
+#nv .nv-layout {
   min-height: 27px !important;
 }
 
@@ -447,7 +455,8 @@
 }
 
 .nv-mode[aria-pressed="true"],
-.nv-chip[aria-pressed="true"] {
+.nv-chip[aria-pressed="true"],
+.nv-layout[aria-pressed="true"] {
   background: var(--nv-btn-on);
   border-color: var(--nv-ink);
   font-weight: 600;
@@ -464,6 +473,8 @@
   cursor: default;
 }
 
+.nv-layout { min-height: 29px; }
+
 .nv-wide {
   width: 100%;
   margin-top: 3px;
@@ -473,6 +484,7 @@
 .nv-mode:focus-visible,
 .nv-chip:focus-visible,
 .nv-act:focus-visible,
+.nv-layout:focus-visible,
 .nv-opt:focus-visible,
 .nv-tab:focus-visible {
   outline: 2px solid var(--nv-ink);

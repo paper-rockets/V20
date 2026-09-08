@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, Shield } from 'lucide-react';
 import {
   IcDraw as PenLine,
   IcErase as Eraser,
@@ -13,7 +13,6 @@ import {
   IcCheck as Check,
   IcCurve as Spline,
   IcRuler as Ruler,
-  IcStar as Star,
 } from './StudioIcons';
 import { StudioEngine } from '../../core/studioEngine';
 import {
@@ -32,12 +31,27 @@ import {
   CURATED_BRUSHES,
   getActiveCuratedBrush,
   applyCuratedBrush,
-  getBrushesForTab,
-  BrushCategoryTab,
 } from '../../presets/curatedBrushes';
 import { BrushShapeGlyph } from '../studio/BrushShapeGlyph';
 import { RealBrushSizeControl } from '../common/RealBrushSizeControl';
 import { haptics } from '../../utils/haptics';
+
+const BRUSH_HELP: Record<string, string> = {
+  streamline_ink: 'Flat paint',
+  conformal_bead: 'Hugs models',
+  spatial_pipe: 'Round line',
+  chisel_marker: 'Wide edge',
+  neon_cable: 'Glowing tube',
+  halftone_dot: 'Dot pattern',
+  stipple_texture: 'Speckled',
+  line_hatch: 'Parallel lines',
+  crosshatch: 'Grid lines',
+  terrazzo_fleck: 'Stone pattern',
+  mask_cutout: 'Erase shape',
+};
+
+const ESSENTIAL_BRUSH_IDS = ['streamline_ink', 'conformal_bead', 'spatial_pipe', 'chisel_marker'];
+const MORE_BRUSH_IDS = ['neon_cable', 'halftone_dot', 'stipple_texture', 'line_hatch', 'crosshatch', 'terrazzo_fleck', 'mask_cutout'];
 
 
 interface DrawPanelProps {
@@ -47,6 +61,8 @@ interface DrawPanelProps {
   brushSettings: BrushSettings;
   setBrushSettings: React.Dispatch<React.SetStateAction<BrushSettings>>;
   onOpenColorStudio?: () => void;
+  onOpenScaffolding?: () => void;
+  onOpenBentGuide?: () => void;
   theme?: 'light' | 'dark';
 }
 
@@ -56,13 +72,16 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
   brushSettings,
   setBrushSettings,
   onOpenColorStudio,
+  onOpenScaffolding,
+  onOpenBentGuide,
   theme = 'dark',
 }) => {
   const isLight = theme === 'light';
-  const [activeTab, setActiveTab] = useState<BrushCategoryTab>('Core');
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean>(false);
+  const [panelView, setPanelView] = useState<'paint' | 'brush' | 'advanced'>('paint');
+  const [showMoreBrushes, setShowMoreBrushes] = useState(false);
   const activeBrush = getActiveCuratedBrush(brushSettings);
-  const displayedBrushes = getBrushesForTab(activeTab);
+  const essentialBrushes = ESSENTIAL_BRUSH_IDS.flatMap((id) => CURATED_BRUSHES.filter((brush) => brush.id === id));
+  const moreBrushes = MORE_BRUSH_IDS.flatMap((id) => CURATED_BRUSHES.filter((brush) => brush.id === id));
 
   const isConformal = brushSettings.drawingMode !== 'spatial_3d' && tool !== 'free_brush';
   const isFlat = brushSettings.profile === 'ribbon' || brushSettings.profile === 'conformal';
@@ -101,6 +120,47 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
     }));
   };
 
+  const renderBrushCards = (presets: typeof CURATED_BRUSHES) => presets.map((preset) => {
+    const isSelected = activeBrush.id === preset.id;
+    return (
+      <button
+        key={preset.id}
+        type="button"
+        onClick={() => {
+          haptics.trigger('medium');
+          setBrushSettings((prev) => applyCuratedBrush(preset, prev));
+        }}
+        className={`paperrocket-brush-card relative min-h-[64px] rounded-xl p-2 flex items-center gap-2 text-left transition-all active:scale-[0.98] border ${
+          isSelected
+            ? isLight
+              ? 'border-neutral-900 bg-black/[0.08] shadow-xs ring-1 ring-neutral-900/60'
+              : 'border-white bg-white/[0.12] shadow-[0_0_10px_rgba(255,255,255,0.2)] ring-1 ring-white/70'
+            : isLight
+              ? 'border-black/10 bg-white hover:border-black/20 text-neutral-800'
+              : 'border-white/[0.06] bg-[#18191e] hover:border-white/20 hover:bg-[#1f2127] text-white/80'
+        }`}
+        title={preset.description}
+      >
+        {isSelected && (
+          <span className={`absolute right-1.5 top-1.5 grid h-4 w-4 place-items-center rounded-full ${isLight ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-950'}`}>
+            <Check className="h-2.5 w-2.5" strokeWidth={3} />
+          </span>
+        )}
+        <div className={`h-10 w-10 shrink-0 rounded-lg grid place-items-center ${isLight ? 'bg-black/[0.04]' : 'bg-white/[0.07]'}`}>
+          <BrushShapeGlyph brushId={preset.id} profile={preset.profile} patternType={preset.patternType} boxSize={30} />
+        </div>
+        <span className="min-w-0 flex-1">
+          <span className={`block text-[11px] leading-[1.15] [overflow-wrap:normal] [word-break:normal] ${isSelected ? (isLight ? 'text-neutral-950 font-bold' : 'text-white font-bold') : 'opacity-80 font-medium'}`}>
+            {preset.name}
+          </span>
+          <span className={`mt-1 block text-[9px] leading-none ${isLight ? 'text-neutral-500' : 'text-white/45'}`}>
+            {BRUSH_HELP[preset.id] || 'Creative brush'}
+          </span>
+        </span>
+      </button>
+    );
+  });
+
   const cardClass = isLight
     ? 'p-2.5 rounded-xl bg-neutral-100/50 border border-black/5 space-y-1.5'
     : 'p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-1.5';
@@ -131,6 +191,38 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
 
   return (
     <div className="space-y-2 text-xs select-none">
+      <div
+        className={`sticky top-0 z-10 grid grid-cols-3 gap-1 rounded-xl p-1 shadow-sm ${
+          isLight ? 'bg-[#e8e4dd]' : 'bg-[#0d0f12]'
+        }`}
+        aria-label="Draw controls"
+      >
+        {([
+          ['paint', 'Paint'],
+          ['brush', 'Brush'],
+          ['advanced', 'Fine tune'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => {
+              haptics.trigger('light');
+              setPanelView(id);
+            }}
+            className={`min-h-[40px] rounded-lg text-xs font-bold transition-colors ${
+              panelView === id
+                ? isLight ? 'bg-white text-neutral-950 shadow-sm' : 'bg-white/[0.14] text-white shadow-sm'
+                : isLight ? 'text-neutral-600' : 'text-white/55'
+            }`}
+            aria-pressed={panelView === id}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {panelView === 'paint' ? (
+        <>
       {/* 1. UNIFIED TOOL ROW: Draw / Erase / Eyedropper */}
       <div className={cardClass}>
         <div className={subHeadingClass}>Active Tool</div>
@@ -296,6 +388,65 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
         </div>
       </div>
 
+      {/* DRAWING GUIDES & ARMATURES */}
+      {(onOpenScaffolding || onOpenBentGuide) && (
+        <div className={cardClass}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Shield className={`w-3.5 h-3.5 ${isLight ? 'text-neutral-900' : 'text-neutral-200'}`} />
+              <span className={subHeadingClass}>Drawing Guides</span>
+            </div>
+            <span className="text-[10px] opacity-65 font-medium">Snap & Sketch</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+            {onOpenScaffolding && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.trigger('light');
+                  onOpenScaffolding();
+                }}
+                className={`h-11 min-h-[44px] px-2.5 py-1 rounded-lg border flex items-center gap-2 font-medium transition-all active:scale-[0.98] ${
+                  isLight
+                    ? 'bg-white border-black/10 hover:bg-neutral-200/50 text-neutral-900 shadow-xs'
+                    : 'bg-black/30 border-white/10 hover:bg-white/10 text-neutral-100 shadow-xs'
+                }`}
+                title="Open 3D Armatures (Human figure, head cage, car, limb guides)"
+              >
+                <User className="w-4 h-4 shrink-0 text-sky-400" />
+                <div className="flex flex-col text-left leading-tight overflow-hidden">
+                  <span className="text-xs font-semibold truncate">3D Armatures</span>
+                  <span className="text-[9.5px] opacity-65 truncate">Mannequin & Forms</span>
+                </div>
+              </button>
+            )}
+
+            {onOpenBentGuide && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.trigger('light');
+                  onOpenBentGuide();
+                }}
+                className={`h-11 min-h-[44px] px-2.5 py-1 rounded-lg border flex items-center gap-2 font-medium transition-all active:scale-[0.98] ${
+                  isLight
+                    ? 'bg-white border-black/10 hover:bg-neutral-200/50 text-neutral-900 shadow-xs'
+                    : 'bg-black/30 border-white/10 hover:bg-white/10 text-neutral-100 shadow-xs'
+                }`}
+                title="Open Bend Path & Curved Guide"
+              >
+                <Spline className="w-4 h-4 shrink-0 text-teal-400" />
+                <div className="flex flex-col text-left leading-tight overflow-hidden">
+                  <span className="text-xs font-semibold truncate">Bend Path</span>
+                  <span className="text-[9.5px] opacity-65 truncate">Curves & Ribbons</span>
+                </div>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 3. COLOR AND LOOK ARE INDEPENDENT CONTROLS */}
       <div className={cardClass}>
         <div className="flex items-center justify-between">
@@ -381,109 +532,38 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
         </div>
       </div>
 
-      {/* 3. BRUSHES MENU: Category Tabs & 3D Clay Mark Thumbnails */}
+        </>
+      ) : (
+        <>
+      {panelView === 'brush' && <>
+      {/* Everyday brushes stay visible; specialist brushes are optional. */}
       <div className={cardClass}>
-        <div className="flex items-center justify-between border-b pb-1.5 border-black/10 dark:border-white/10">
-          <div className="text-xs font-bold tracking-tight text-current">Brushes</div>
-          <div className="hidden items-center gap-2 text-[10.5px] font-semibold">
-            {(['Favorites', 'Core', 'Textures', 'Surface'] as BrushCategoryTab[]).map((tab) => {
-              const isTabActive = activeTab === tab;
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => {
-                    haptics.trigger('light');
-                    setActiveTab(tab);
-                  }}
-                  className={`relative pb-0.5 transition-colors ${
-                    isTabActive
-                      ? 'text-neutral-950 dark:text-white font-bold'
-                      : isLight
-                      ? 'text-neutral-500 hover:text-neutral-900'
-                      : 'text-white/40 hover:text-white/80'
-                  }`}
-                >
-                  {tab}
-                  {isTabActive && (
-                    <span className="absolute -bottom-1.5 left-0 right-0 h-[2px] bg-neutral-900 dark:bg-white rounded-full shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
-                  )}
-                </button>
-              );
-            })}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs font-bold tracking-tight text-current">Essential brushes</div>
+            <div className={`mt-0.5 text-[10px] ${isLight ? 'text-neutral-500' : 'text-white/45'}`}>Pick a shape, then draw.</div>
           </div>
+          <span className={`rounded-full px-2 py-1 text-[9px] font-semibold ${isLight ? 'bg-black/[0.05] text-neutral-600' : 'bg-white/[0.06] text-white/55'}`}>4 choices</span>
         </div>
 
-        {/* 4-column Grid of 3D Clay Mark Presets */}
-        <div className="grid grid-cols-4 gap-1.5 pt-1">
-          {displayedBrushes.slice(0, 4).map((preset) => {
-            const isSelected = activeBrush.id === preset.id;
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => {
-                  haptics.trigger('medium');
-                  setBrushSettings((prev) => applyCuratedBrush(preset, prev));
-                }}
-                className={`relative rounded-xl p-1.5 flex flex-col items-center justify-between transition-all active:scale-95 aspect-[4/5] border ${
-                  isSelected
-                    ? isLight
-                      ? 'border-neutral-900 bg-black/[0.08] shadow-xs ring-1 ring-neutral-900/60'
-                      : 'border-white bg-white/[0.12] shadow-[0_0_10px_rgba(255,255,255,0.2)] ring-1 ring-white/70'
-                    : isLight
-                    ? 'border-black/10 bg-white hover:border-black/20 text-neutral-800'
-                    : 'border-white/[0.06] bg-[#18191e] hover:border-white/20 hover:bg-[#1f2127] text-white/80'
-                }`}
-                title={preset.description}
-              >
-                {/* Active Star Badge */}
-                {isSelected && (
-                  <Star className="w-2.5 h-2.5 text-neutral-900 fill-neutral-900 dark:text-white dark:fill-white absolute top-1 right-1" />
-                )}
-
-                {/* Brush Icon */}
-                <div className="w-full flex-1 flex items-center justify-center p-0.5 overflow-hidden pointer-events-none">
-                  <BrushShapeGlyph brushId={preset.id} size={0.05} boxSize={38} />
-                </div>
-
-                {/* Label */}
-                <span
-                  className={`text-[9.5px] truncate w-full text-center leading-tight pb-0.5 ${
-                    isSelected
-                      ? isLight ? 'text-neutral-950 font-bold' : 'text-white font-bold'
-                      : 'opacity-80 font-medium'
-                  }`}
-                >
-                  {preset.name}
-                </span>
-              </button>
-            );
-          })}
+        <div className="grid grid-cols-2 gap-2 pt-2">
+          {renderBrushCards(essentialBrushes)}
         </div>
 
-        {/* Detailed falloff information stays behind Advanced. */}
-        <div className="hidden pt-2 border-t border-black/10 dark:border-white/10 items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className={`text-[10px] font-medium ${isLight ? 'text-neutral-500' : 'text-white/60'}`}>Falloff</span>
-            <div className={`w-18 h-6 rounded-lg border px-1.5 py-0.5 flex items-center justify-center ${
-              isLight ? 'border-black/10 bg-neutral-200/50' : 'border-white/10 bg-black/40'
-            }`}>
-              <svg viewBox="0 0 40 18" className={`w-full h-full stroke-current fill-none ${isLight ? 'text-neutral-700' : 'text-white/80'}`}>
-                <path d="M 2 16 C 14 16, 20 2, 32 2 C 36 2, 38 16, 39 16" strokeWidth="1.2" />
-              </svg>
-            </div>
-          </div>
-
+        <div className="pt-2">
           <button
             type="button"
-            className="w-7 h-7 rounded-lg border border-black/15 dark:border-white/20 bg-black/5 dark:bg-white/5 flex items-center justify-center text-neutral-800 dark:text-white active:scale-95 transition-all shadow-xs"
-            title="Stylus pressure tip"
+            onClick={() => {
+              haptics.trigger('light');
+              setShowMoreBrushes((visible) => !visible);
+            }}
+            className={`flex min-h-[42px] w-full items-center justify-between rounded-xl border px-3 text-left text-[11px] font-semibold ${isLight ? 'border-black/10 bg-white text-neutral-800' : 'border-white/10 bg-black/25 text-white/80'}`}
+            aria-expanded={showMoreBrushes}
           >
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 stroke-current fill-none">
-              <path d="M 12 2 L 18 8 L 8 18 L 4 20 L 6 16 Z" strokeWidth="1.5" strokeLinejoin="round" />
-            </svg>
+            <span>More brushes <span className="opacity-50">({moreBrushes.length})</span></span>
+            <ChevronRight className={`h-4 w-4 transition-transform ${showMoreBrushes ? 'rotate-90' : ''}`} />
           </button>
+          {showMoreBrushes && <div className="grid grid-cols-2 gap-2 pt-2">{renderBrushCards(moreBrushes)}</div>}
         </div>
       </div>
 
@@ -492,7 +572,7 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
         <div className="flex items-center justify-between">
           <div className={subHeadingClass}>Brush Size & Intensity</div>
           <div className="flex items-center gap-1.5">
-            <BrushShapeGlyph brushId={activeBrush.id} size={0.04} boxSize={18} />
+            <BrushShapeGlyph brushId={activeBrush.id} profile={activeBrush.profile} patternType={activeBrush.patternType} boxSize={18} />
             <span className="text-[10.5px] font-semibold text-neutral-950 dark:text-white">{activeBrush.name}</span>
             <span className="text-[9px] font-medium opacity-65 font-mono">
               ({isConformal ? 'Conformal' : 'Non-Conf'}, {isFlat ? 'Flat' : 'Not Flat'})
@@ -530,27 +610,37 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
         </div>
       </div>
 
-      {/* 5. ADVANCED BRUSH SETTINGS (Expandable Accordion) */}
-      <div className={cardClass}>
+      <button
+        type="button"
+        onClick={() => {
+          haptics.trigger('light');
+          setPanelView('advanced');
+        }}
+        className={`flex min-h-[44px] w-full items-center justify-between rounded-xl border px-3 text-left ${isLight ? 'border-black/10 bg-white/80' : 'border-white/10 bg-white/[0.03]'}`}
+      >
+        <span>
+          <span className="block text-[11px] font-semibold">Fine-tune brush</span>
+          <span className="block text-[9.5px] opacity-55">Shape, smoothing, pressure, and eraser</span>
+        </span>
+        <ChevronRight className="h-4 w-4 opacity-60" />
+      </button>
+      </>}
+
+      {/* Fine tuning is a separate screen, not another long accordion. */}
+      {panelView === 'advanced' && <div className={cardClass}>
         <button
           type="button"
           onClick={() => {
             haptics.trigger('light');
-            setShowAdvancedSettings((prev) => !prev);
+            setPanelView('brush');
           }}
-          className="w-full flex items-center justify-between min-h-[36px] text-left"
+          className="mb-2 flex min-h-[40px] w-full items-center gap-2 border-b border-black/5 text-left dark:border-white/5"
         >
-          <div className={subHeadingClass}>Advanced Brush Settings</div>
-          <div className="flex items-center gap-1.5 opacity-70">
-            <span className="text-[10px] font-mono">
-              {showAdvancedSettings ? 'Hide' : 'Profile / Smoothing'}
-            </span>
-            {showAdvancedSettings ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          </div>
+          <ChevronLeft className="h-4 w-4" />
+          <span className="text-[11px] font-semibold">Back to brushes</span>
         </button>
 
-        {showAdvancedSettings && (
-          <div className="space-y-3 pt-1 border-t border-black/5 dark:border-white/5">
+          <div className="space-y-3">
             {/* Profile Selection */}
             <div className="space-y-1">
               <label className={`text-[10.5px] font-medium ${isLight ? 'text-neutral-600' : 'text-neutral-400'}`}>
@@ -743,8 +833,9 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
               </div>
             </div>
           </div>
-        )}
-      </div>
+      </div>}
+        </>
+      )}
     </div>
   );
 };

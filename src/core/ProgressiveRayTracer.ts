@@ -22,9 +22,6 @@ export interface ProgressiveRayTracerOptions {
   reflectionStrength?: number;
   bloomEnabled?: boolean;
   bloomIntensity?: number;
-  contactShadowSharpness?: number;
-  denoiserEnabled?: boolean;
-  denoiserStrength?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +53,6 @@ const RayTraceShader = {
     uniform float uAORadius;
     uniform float uShadowSoftness;
     uniform float uReflectionStrength;
-    uniform float uContactShadowSharpness;
     uniform mat4 uProjectionInverse;
     uniform mat4 uProjectionMatrix;
     uniform mat4 uViewMatrix;
@@ -162,21 +158,16 @@ const RayTraceShader = {
         }
       }
 
-      occlusion = clamp(1.0 - (occlusion / float(AO_SAMPLES)) * 1.25, 0.10, 1.0);
+      occlusion = clamp(1.0 - (occlusion / float(AO_SAMPLES)) * 1.25, 0.12, 1.0);
 
       // ---------------------------------------------------------------------
-      // Pass 2: High-Precision SSDO Ribbon Contact Shadows
-      // Adaptive geometric micro-march for razor-sharp contact crevice grounding
+      // Pass 2: Screen Space Directional Occlusion (SSDO) Contact Shadows
+      // Micro-scale directional ray march for ribbon contact shadows on clay
       // ---------------------------------------------------------------------
       float ssdoContactOcclusion = 0.0;
-      const int SSDO_STEPS = 8;
-      float sharpness = max(0.4, uContactShadowSharpness);
-      float searchRange = 0.052 / sharpness;
-
+      const int SSDO_STEPS = 5;
       for (int k = 1; k <= SSDO_STEPS; k++) {
-        float fStep = float(k) / float(SSDO_STEPS);
-        // Geometric progression: starts at 0.002 units for micro-proximity, then gently broadens
-        float microDist = (0.0022 + pow(fStep, 1.75) * searchRange) * (0.88 + 0.24 * noise);
+        float microDist = (float(k) / float(SSDO_STEPS)) * 0.048 * (0.8 + 0.4 * noise);
         vec3 microView = viewPos + viewLightDir * microDist;
         vec2 microUv = viewToUv(microView);
 
@@ -185,19 +176,15 @@ const RayTraceShader = {
           if (mDepth < 0.9999) {
             vec3 blockerPos = getViewPos(microUv);
             float zDiff = blockerPos.z - microView.z;
-            // Immediate proximity check: tightly anchors ribbons to clay
-            float maxZDiff = 0.036 / sharpness;
-            if (zDiff > 0.0006 && zDiff < maxZDiff) {
-              float proximity = 1.0 - smoothstep(0.0006, maxZDiff, zDiff);
-              float occWeight = (1.0 - fStep * 0.65) * proximity;
-              ssdoContactOcclusion += occWeight;
+            // Detect blockers positioned closely in front of the incident light ray
+            if (zDiff > 0.0012 && zDiff < 0.035) {
+              float weight = 1.0 - (float(k) / float(SSDO_STEPS + 1));
+              ssdoContactOcclusion += weight;
             }
           }
         }
       }
-
-      float rawContact = clamp(ssdoContactOcclusion / float(SSDO_STEPS), 0.0, 1.0);
-      float ssdoShadowFactor = clamp(1.0 - pow(rawContact * 2.3, 1.0 / sharpness) * 1.65, 0.06, 1.0);
+      float ssdoShadowFactor = clamp(1.0 - (ssdoContactOcclusion / float(SSDO_STEPS)) * 1.8, 0.18, 1.0);
 
       // ---------------------------------------------------------------------
       // Pass 3: Cone-Jittered Soft Penumbra Directional Shadows (Macro Shadows)
@@ -289,7 +276,7 @@ const RayTraceShader = {
       // Composite Combined Lighting (modulating direct light with SSDO contact shadows)
       // ---------------------------------------------------------------------
       vec3 directLight = uLightColor * nDotL * shadow * ssdoShadowFactor;
-      vec3 ambient = uAmbientColor * (occlusion * (ssdoShadowFactor * 0.85 + 0.15)) + indirectBounce;
+      vec3 ambient = uAmbientColor * (occlusion * (ssdoShadowFactor * 0.75 + 0.25)) + indirectBounce;
       vec3 litColor = albedo.rgb * (directLight + ambient) + sssColor;
 
       gl_FragColor = vec4(litColor, albedo.a);
@@ -298,125 +285,7 @@ const RayTraceShader = {
 };
 
 // ---------------------------------------------------------------------------
-// 2. Cross-Bilateral Edge-Preserving Spatial Denoiser Shader
-// Eliminates Monte Carlo speckles in 1-2 frames while preserving sharp contours
-// ---------------------------------------------------------------------------
-const DenoiseShader = {
-  vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = vec4(position.xy, 0.0, 1.0);
-    }
-  `,
-  fragmentShader: `
-    precision highp float;
-
-    uniform sampler2D tSource;
-    uniform sampler2D tNormal;
-    uniform sampler2D tDepth;
-    uniform vec2 uResolution;
-    uniform float uDenoiserEnabled;
-    uniform float uDenoiserStrength;
-    uniform float uFrameIndex;
-    uniform mat4 uProjectionInverse;
-
-    varying vec2 vUv;
-
-    // Linear view-space depth
-    float getLinearDepth(vec2 coord) {
-      float z = texture2D(tDepth, coord).r;
-      vec4 clip = vec4(coord * 2.0 - 1.0, z * 2.0 - 1.0, 1.0);
-      vec4 view = uProjectionInverse * clip;
-      return -view.z / view.w;
-    }
-
-    void main() {
-      vec4 centerColor = texture2D(tSource, vUv);
-      float centerRawDepth = texture2D(tDepth, vUv).r;
-
-      // Background pass-through or denoiser disabled
-      if (centerRawDepth >= 0.9999 || uDenoiserEnabled < 0.5) {
-        gl_FragColor = centerColor;
-        return;
-      }
-
-      vec3 centerNormal = normalize(texture2D(tNormal, vUv).xyz * 2.0 - 1.0);
-      float centerDepth = getLinearDepth(vUv);
-      vec2 texelSize = 1.0 / uResolution;
-
-      // Dynamic filter radius: wider on initial frames to kill noise immediately,
-      // gently shrinking to preserve micro details as temporal accumulation converges.
-      float baseRadius = mix(2.2, 1.0, clamp(uFrameIndex / 10.0, 0.0, 1.0)) * uDenoiserStrength;
-
-      // 9-tap 3x3 Cross-Bilateral Kernel
-      vec2 offsets[9];
-      offsets[0] = vec2(-1.0, -1.0);
-      offsets[1] = vec2( 0.0, -1.0);
-      offsets[2] = vec2( 1.0, -1.0);
-      offsets[3] = vec2(-1.0,  0.0);
-      offsets[4] = vec2( 0.0,  0.0);
-      offsets[5] = vec2( 1.0,  0.0);
-      offsets[6] = vec2(-1.0,  1.0);
-      offsets[7] = vec2( 0.0,  1.0);
-      offsets[8] = vec2( 1.0,  1.0);
-
-      float spatialWeights[9];
-      spatialWeights[0] = 0.0625;
-      spatialWeights[1] = 0.1250;
-      spatialWeights[2] = 0.0625;
-      spatialWeights[3] = 0.1250;
-      spatialWeights[4] = 0.2500;
-      spatialWeights[5] = 0.1250;
-      spatialWeights[6] = 0.0625;
-      spatialWeights[7] = 0.1250;
-      spatialWeights[8] = 0.0625;
-
-      vec4 colorSum = vec4(0.0);
-      float totalWeight = 0.0;
-
-      for (int i = 0; i < 9; i++) {
-        vec2 sampleUv = clamp(vUv + offsets[i] * texelSize * baseRadius, 0.001, 0.999);
-        float sampleRawDepth = texture2D(tDepth, sampleUv).r;
-
-        if (sampleRawDepth >= 0.9999) {
-          continue;
-        }
-
-        vec3 sampleNormal = normalize(texture2D(tNormal, sampleUv).xyz * 2.0 - 1.0);
-        float sampleDepth = getLinearDepth(sampleUv);
-        vec4 sampleColor = texture2D(tSource, sampleUv);
-
-        // 1. Normal bilateral weight (prevents blurring across ribbon borders or clay creases)
-        float normalDot = max(0.0, dot(centerNormal, sampleNormal));
-        float normalWeight = pow(normalDot, 32.0);
-
-        // 2. Depth bilateral weight (prevents blurring across silhouettes and gaps)
-        float depthDiff = abs(centerDepth - sampleDepth);
-        float depthWeight = exp(-depthDiff * 45.0);
-
-        // 3. Luminance difference penalty (avoids washing out high-contrast highlights)
-        float lumCenter = dot(centerColor.rgb, vec3(0.299, 0.587, 0.114));
-        float lumSample = dot(sampleColor.rgb, vec3(0.299, 0.587, 0.114));
-        float lumDiff = abs(lumCenter - lumSample);
-        float lumWeight = exp(-lumDiff * 3.5);
-
-        float w = spatialWeights[i] * normalWeight * depthWeight * lumWeight;
-        colorSum += sampleColor * w;
-        totalWeight += w;
-      }
-
-      vec4 denoised = totalWeight > 0.001 ? (colorSum / totalWeight) : centerColor;
-
-      // When frames have accumulated significantly (e.g. >16), blend in raw center for maximum sharpness
-      float rawBlend = clamp((uFrameIndex - 16.0) / 24.0, 0.0, 0.5);
-      gl_FragColor = mix(denoised, centerColor, rawBlend);
-    }
-  `,
-};
-
-// ---------------------------------------------------------------------------
-// 3. Ping-Pong Temporal Accumulation Shader
+// 2. Ping-Pong Temporal Accumulation Shader
 // ---------------------------------------------------------------------------
 const AccumulationShader = {
   vertexShader: `
@@ -570,11 +439,6 @@ export class ProgressiveRayTracer {
   private _width: number = 1;
   private _height: number = 1;
 
-  // Contact Shadow & Denoiser Configuration
-  private _contactShadowSharpness: number = 1.5;
-  private _denoiserEnabled: boolean = true;
-  private _denoiserStrength: number = 1.0;
-
   // Bloom Configuration
   private _bloomEnabled: boolean = false;
   private _bloomIntensity: number = 0.45;
@@ -585,7 +449,6 @@ export class ProgressiveRayTracer {
   private _sceneTarget: THREE.WebGLRenderTarget | null = null;
   private _normalTarget: THREE.WebGLRenderTarget | null = null;
   private _sampleTarget: THREE.WebGLRenderTarget | null = null;
-  private _denoiseTarget: THREE.WebGLRenderTarget | null = null;
   private _accumTargetA: THREE.WebGLRenderTarget | null = null;
   private _accumTargetB: THREE.WebGLRenderTarget | null = null;
   private _bloomTarget1: THREE.WebGLRenderTarget | null = null;
@@ -598,7 +461,6 @@ export class ProgressiveRayTracer {
 
   // Shader Materials
   private readonly _raytraceMaterial: THREE.ShaderMaterial;
-  private readonly _denoiseMaterial: THREE.ShaderMaterial;
   private readonly _accumulateMaterial: THREE.ShaderMaterial;
   private readonly _bloomExtractMaterial: THREE.ShaderMaterial;
   private readonly _bloomBlurMaterial: THREE.ShaderMaterial;
@@ -619,9 +481,6 @@ export class ProgressiveRayTracer {
     this._maxAccumulatedFrames = options.maxAccumulatedFrames ?? 64;
     this._bloomEnabled = options.bloomEnabled ?? false;
     this._bloomIntensity = options.bloomIntensity ?? 0.45;
-    this._contactShadowSharpness = options.contactShadowSharpness ?? 1.5;
-    this._denoiserEnabled = options.denoiserEnabled ?? true;
-    this._denoiserStrength = options.denoiserStrength ?? 1.0;
 
     this._postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this._postScene = new THREE.Scene();
@@ -646,28 +505,10 @@ export class ProgressiveRayTracer {
         uAORadius: { value: options.ambientOcclusionRadius ?? 0.5 },
         uShadowSoftness: { value: options.shadowSoftness ?? 0.08 },
         uReflectionStrength: { value: options.reflectionStrength ?? 0.25 },
-        uContactShadowSharpness: { value: this._contactShadowSharpness },
         uProjectionInverse: { value: new THREE.Matrix4() },
         uProjectionMatrix: { value: new THREE.Matrix4() },
         uViewMatrix: { value: new THREE.Matrix4() },
         uCameraMatrixWorld: { value: new THREE.Matrix4() },
-      },
-      depthWrite: false,
-      depthTest: false,
-    });
-
-    this._denoiseMaterial = new THREE.ShaderMaterial({
-      vertexShader: DenoiseShader.vertexShader,
-      fragmentShader: DenoiseShader.fragmentShader,
-      uniforms: {
-        tSource: { value: null },
-        tNormal: { value: null },
-        tDepth: { value: null },
-        uResolution: { value: new THREE.Vector2(1, 1) },
-        uDenoiserEnabled: { value: this._denoiserEnabled ? 1.0 : 0.0 },
-        uDenoiserStrength: { value: this._denoiserStrength },
-        uFrameIndex: { value: 0 },
-        uProjectionInverse: { value: new THREE.Matrix4() },
       },
       depthWrite: false,
       depthTest: false,
@@ -764,38 +605,6 @@ export class ProgressiveRayTracer {
   }
 
   /**
-   * Adjusts the sharpness of micro-directional ribbon contact shadows.
-   */
-  public setContactShadowSharpness(val: number): void {
-    this._contactShadowSharpness = Math.max(0.4, Math.min(3.0, val));
-    this._raytraceMaterial.uniforms.uContactShadowSharpness.value = this._contactShadowSharpness;
-    this.reset();
-  }
-
-  public get contactShadowSharpness(): number {
-    return this._contactShadowSharpness;
-  }
-
-  /**
-   * Toggles the cross-bilateral edge-preserving spatial denoiser.
-   */
-  public setDenoiserEnabled(enabled: boolean): void {
-    this._denoiserEnabled = enabled;
-    this._denoiseMaterial.uniforms.uDenoiserEnabled.value = enabled ? 1.0 : 0.0;
-    this.reset();
-  }
-
-  public get isDenoiserEnabled(): boolean {
-    return this._denoiserEnabled;
-  }
-
-  public setDenoiserStrength(strength: number): void {
-    this._denoiserStrength = Math.max(0.1, Math.min(3.0, strength));
-    this._denoiseMaterial.uniforms.uDenoiserStrength.value = this._denoiserStrength;
-    this.reset();
-  }
-
-  /**
    * Toggles the lightweight bloom post-processing pass.
    */
   public setBloomEnabled(enabled: boolean): void {
@@ -862,7 +671,6 @@ export class ProgressiveRayTracer {
     this._height = h;
 
     this._raytraceMaterial.uniforms.uResolution.value.set(w, h);
-    this._denoiseMaterial.uniforms.uResolution.value.set(w, h);
     this._createRenderTargets(w, h);
     this.reset();
   }
@@ -886,7 +694,6 @@ export class ProgressiveRayTracer {
 
     this._normalTarget = new THREE.WebGLRenderTarget(w, h, targetOptions);
     this._sampleTarget = new THREE.WebGLRenderTarget(w, h, targetOptions);
-    this._denoiseTarget = new THREE.WebGLRenderTarget(w, h, targetOptions);
     this._accumTargetA = new THREE.WebGLRenderTarget(w, h, targetOptions);
     this._accumTargetB = new THREE.WebGLRenderTarget(w, h, targetOptions);
 
@@ -901,7 +708,6 @@ export class ProgressiveRayTracer {
     this._sceneTarget?.dispose();
     this._normalTarget?.dispose();
     this._sampleTarget?.dispose();
-    this._denoiseTarget?.dispose();
     this._accumTargetA?.dispose();
     this._accumTargetB?.dispose();
     this._bloomTarget1?.dispose();
@@ -910,7 +716,6 @@ export class ProgressiveRayTracer {
     this._sceneTarget = null;
     this._normalTarget = null;
     this._sampleTarget = null;
-    this._denoiseTarget = null;
     this._accumTargetA = null;
     this._accumTargetB = null;
     this._bloomTarget1 = null;
@@ -960,18 +765,13 @@ export class ProgressiveRayTracer {
   }
 
   /**
-   * Executes the adaptive progressive rendering pipeline with ribbon contact shadows & denoiser.
+   * Executes the adaptive progressive rendering pipeline with SSDO contact shadows & bloom.
    */
-  public render(
-    renderer: THREE.WebGLRenderer,
-    scene: THREE.Scene,
-    camera: THREE.Camera,
-    outputTarget: THREE.WebGLRenderTarget | null = null
-  ): void {
+  public render(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): void {
     this._initCapabilities(renderer);
 
     if (!this._enabled) {
-      renderer.setRenderTarget(outputTarget);
+      renderer.setRenderTarget(null);
       renderer.render(scene, camera);
       return;
     }
@@ -989,12 +789,11 @@ export class ProgressiveRayTracer {
       this._sceneTarget &&
       this._normalTarget &&
       this._sampleTarget &&
-      this._denoiseTarget &&
       this._accumTargetA &&
       this._accumTargetB;
 
     if (!targetsValid) {
-      renderer.setRenderTarget(outputTarget);
+      renderer.setRenderTarget(null);
       renderer.render(scene, camera);
       return;
     }
@@ -1010,7 +809,7 @@ export class ProgressiveRayTracer {
         this._renderBloom(renderer, this._sceneTarget.texture);
       }
 
-      renderer.setRenderTarget(outputTarget);
+      renderer.setRenderTarget(null);
       this._quadMesh.material = this._blitMaterial;
       this._blitMaterial.uniforms.tAccum.value = this._sceneTarget.texture;
       this._blitMaterial.uniforms.tBloom.value = this._bloomTarget1?.texture ?? null;
@@ -1025,7 +824,7 @@ export class ProgressiveRayTracer {
     // and directly blit the cached accumulation buffer to keep GPU cool.
     if (this._accumulatedFrames >= this._maxAccumulatedFrames) {
       this._isSleeping = true;
-      renderer.setRenderTarget(outputTarget);
+      renderer.setRenderTarget(null);
       this._quadMesh.material = this._blitMaterial;
       this._blitMaterial.uniforms.tAccum.value = this._accumTargetA.texture;
       this._blitMaterial.uniforms.tBloom.value = this._bloomTarget1?.texture ?? null;
@@ -1057,7 +856,7 @@ export class ProgressiveRayTracer {
     renderer.render(scene, camera);
     scene.overrideMaterial = originalOverrideMaterial;
 
-    // 3. Ray Tracing Pass (with SSDO Directional Ribbon Contact Shadows)
+    // 3. Ray Tracing Pass (with SSDO Directional Contact Shadows)
     const perspCamera = camera as THREE.PerspectiveCamera;
     const near = perspCamera.near ?? 0.1;
     const far = perspCamera.far ?? 1000.0;
@@ -1069,7 +868,6 @@ export class ProgressiveRayTracer {
     this._raytraceMaterial.uniforms.uTime.value = performance.now() * 0.001;
     this._raytraceMaterial.uniforms.uNear.value = near;
     this._raytraceMaterial.uniforms.uFar.value = far;
-    this._raytraceMaterial.uniforms.uContactShadowSharpness.value = this._contactShadowSharpness;
     this._raytraceMaterial.uniforms.uProjectionInverse.value.copy(camera.projectionMatrixInverse);
     this._raytraceMaterial.uniforms.uProjectionMatrix.value.copy(camera.projectionMatrix);
     this._raytraceMaterial.uniforms.uViewMatrix.value.copy(camera.matrixWorldInverse);
@@ -1079,23 +877,9 @@ export class ProgressiveRayTracer {
     this._quadMesh.material = this._raytraceMaterial;
     renderer.render(this._postScene, this._postCamera);
 
-    // 4. Cross-Bilateral Edge-Preserving Spatial Denoiser Pass
-    // Eliminates Monte Carlo speckles in 1-2 frames while preserving sharp contours
-    this._denoiseMaterial.uniforms.tSource.value = this._sampleTarget.texture;
-    this._denoiseMaterial.uniforms.tNormal.value = this._normalTarget.texture;
-    this._denoiseMaterial.uniforms.tDepth.value = this._sceneTarget.depthTexture;
-    this._denoiseMaterial.uniforms.uDenoiserEnabled.value = this._denoiserEnabled ? 1.0 : 0.0;
-    this._denoiseMaterial.uniforms.uDenoiserStrength.value = this._denoiserStrength;
-    this._denoiseMaterial.uniforms.uFrameIndex.value = this._accumulatedFrames;
-    this._denoiseMaterial.uniforms.uProjectionInverse.value.copy(camera.projectionMatrixInverse);
-
-    renderer.setRenderTarget(this._denoiseTarget);
-    this._quadMesh.material = this._denoiseMaterial;
-    renderer.render(this._postScene, this._postCamera);
-
-    // 5. Accumulation Pass: Ping-pong blend denoiseTarget into accumTargetB
+    // 4. Accumulation Pass: Ping-pong blend sampleTarget into accumTargetB
     this._accumulateMaterial.uniforms.tAccumPrev.value = this._accumTargetA.texture;
-    this._accumulateMaterial.uniforms.tSample.value = this._denoiseTarget.texture;
+    this._accumulateMaterial.uniforms.tSample.value = this._sampleTarget.texture;
     this._accumulateMaterial.uniforms.uAccumCount.value = this._accumulatedFrames;
 
     renderer.setRenderTarget(this._accumTargetB);
@@ -1109,13 +893,13 @@ export class ProgressiveRayTracer {
 
     this._accumulatedFrames++;
 
-    // 6. Optional Bloom Pass on accumulated buffer
+    // 5. Optional Bloom Pass on accumulated buffer
     if (this._bloomEnabled && this._bloomTarget1 && this._bloomTarget2) {
       this._renderBloom(renderer, this._accumTargetA.texture);
     }
 
-    // 7. Output Blit Pass: ACES Filmic tonemapping directly to screen canvas or outputTarget
-    renderer.setRenderTarget(outputTarget);
+    // 6. Output Blit Pass: ACES Filmic tonemapping directly to screen canvas
+    renderer.setRenderTarget(null);
     this._quadMesh.material = this._blitMaterial;
     this._blitMaterial.uniforms.tAccum.value = this._accumTargetA.texture;
     this._blitMaterial.uniforms.tBloom.value = this._bloomTarget1?.texture ?? null;
@@ -1130,7 +914,6 @@ export class ProgressiveRayTracer {
   public dispose(): void {
     this._disposeRenderTargets();
     this._raytraceMaterial.dispose();
-    this._denoiseMaterial.dispose();
     this._accumulateMaterial.dispose();
     this._bloomExtractMaterial.dispose();
     this._bloomBlurMaterial.dispose();

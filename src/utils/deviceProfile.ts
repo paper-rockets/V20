@@ -228,6 +228,12 @@ function gatherSignals(): DetectionSignals {
 function classify(signals: DetectionSignals): { tier: PerformanceTier; isS6Lite: boolean; reason: string } {
   const { renderer, cores, memoryGB, isTouch, isMobileUA, ua, screenPixels } = signals;
 
+  const isMobileDevice =
+    isMobileUA ||
+    /Android|iPad|iPhone|iPod/i.test(ua) ||
+    (isTouch && /Mobi|Tablet|ARM/i.test(ua));
+  const isDesktop = !isMobileDevice;
+
   // 1. Check specifically for Galaxy Tab S6 Lite (SM-P610/P613/P615/P619 or Mali-G72)
   const isS6Lite = S6_LITE_PATTERNS.some((re) => re.test(ua) || re.test(renderer));
   if (isS6Lite) {
@@ -238,7 +244,18 @@ function classify(signals: DetectionSignals): { tier: PerformanceTier; isS6Lite:
     };
   }
 
-  // 2. Check for known Flagship mobile/desktop GPUs (e.g. S25 Ultra Adreno 830, S24 Adreno 750, Apple Silicon)
+  // 2. Desktop PC hardware (non-mobile) -> high performance tier
+  // Desktops run on wall power with modern GPUs and high-refresh monitors (120Hz+).
+  // Note: Chromium privacy specs clamp navigator.deviceMemory to 4 or 8 GB, which must never degrade a PC.
+  if (isDesktop && !/swiftshader|llvmpipe|software|basic render/i.test(renderer)) {
+    return {
+      tier: 'high',
+      isS6Lite: false,
+      reason: `Desktop PC hardware detected (${renderer || 'Desktop Browser'})`,
+    };
+  }
+
+  // 3. Check for known Flagship mobile GPUs (e.g. S25 Ultra Adreno 830, S24 Adreno 750, Apple Silicon)
   const isFlagshipGPU = FLAGSHIP_GPU_PATTERNS.some((re) => re.test(renderer));
   const isFlagshipModel = /SM-S9[0-9]{2}/i.test(ua); // Samsung Galaxy S22/S23/S24/S25 series flagships
   if (isFlagshipGPU || isFlagshipModel) {
@@ -249,23 +266,23 @@ function classify(signals: DetectionSignals): { tier: PerformanceTier; isS6Lite:
     };
   }
 
-  // 3. Known budget / constrained mobile GPUs
+  // 4. Known budget / constrained mobile GPUs
   if (LOW_POWER_GPU_PATTERNS.some((re) => re.test(renderer))) {
     return { tier: 'low', isS6Lite: false, reason: `Low-power GPU detected (${renderer})` };
   }
 
-  // 4. Explicit memory signal: devices with <= 4GB RAM on mobile are entry tier
-  if (memoryGB > 0 && memoryGB <= 4 && (isMobileUA || isTouch)) {
+  // 5. Explicit memory signal: mobile devices with <= 4GB RAM are entry tier
+  if (memoryGB > 0 && memoryGB <= 4 && isMobileDevice) {
     return { tier: 'low', isS6Lite: false, reason: `Constrained device memory (${memoryGB} GB)` };
   }
 
-  // 5. Very low core count mobile CPUs (<= 4 cores)
-  if (isMobileUA && cores <= 4) {
+  // 6. Very low core count mobile CPUs (<= 4 cores)
+  if (isMobileDevice && cores <= 4) {
     return { tier: 'low', isS6Lite: false, reason: `Mobile CPU with ${cores} cores` };
   }
 
-  // 6. High-end devices with >= 6GB RAM or >= 8 cores on modern mobile
-  if ((memoryGB >= 6 || cores >= 8) && (isMobileUA || isTouch)) {
+  // 7. High-end devices with >= 6GB RAM or >= 8 cores on modern mobile
+  if (isMobileDevice && (memoryGB >= 6 || cores >= 8)) {
     return {
       tier: 'high',
       isS6Lite: false,
@@ -273,9 +290,9 @@ function classify(signals: DetectionSignals): { tier: PerformanceTier; isS6Lite:
     };
   }
 
-  // 7. Modest desktop or tablet hardware
-  if (cores <= 4 || (memoryGB > 0 && memoryGB <= 4)) {
-    return { tier: 'medium', isS6Lite: false, reason: `Modest hardware (${cores} cores)` };
+  // 8. Modest mobile / tablet hardware
+  if (isMobileDevice) {
+    return { tier: 'medium', isS6Lite: false, reason: `Mobile / tablet hardware (${cores} cores)` };
   }
 
   return { tier: 'high', isS6Lite: false, reason: `Standard high-performance hardware (${cores} cores)` };

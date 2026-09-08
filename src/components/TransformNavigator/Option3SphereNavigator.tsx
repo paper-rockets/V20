@@ -20,6 +20,8 @@ export interface Option3SphereNavigatorProps {
   models?: any[];
   activeModelId?: string | null;
   onSelectModel?: (id: string) => void;
+  navigatorLayout?: 'sphere' | 'disc' | 'petal' | 'collar';
+  onNavigatorLayoutChange?: (layout: 'sphere' | 'disc' | 'petal' | 'collar') => void;
 }
 
 interface TargetItem {
@@ -70,6 +72,8 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
   models = [],
   activeModelId,
   onSelectModel,
+  navigatorLayout = 'sphere',
+  onNavigatorLayoutChange,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [isListOpen, setIsListOpen] = useState<boolean>(false);
@@ -1641,6 +1645,33 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       </div>
 
       <div className="nv-menu" id="nv-menu" ref={menuRef}>
+        {onNavigatorLayoutChange && (
+          <>
+            <div className="nv-sec" style={{ marginTop: '1px' }}>Navigation layout</div>
+            <div className="nv-layouts" role="group" aria-label="Navigation layout">
+              {[
+                { id: 'sphere', label: 'Sphere' },
+                { id: 'disc', label: 'Disc' },
+                { id: 'petal', label: 'Petal' },
+                { id: 'collar', label: 'Collar' },
+              ].map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className="nv-layout"
+                  aria-pressed={navigatorLayout === option.id}
+                  onClick={() => {
+                    haptics.trigger('light');
+                    onNavigatorLayoutChange(option.id as 'sphere' | 'disc' | 'petal' | 'collar');
+                    setMenu(false);
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <div className="nv-sec" style={{ marginTop: '1px' }}>Target item</div>
         <button
           className="nv-pick"

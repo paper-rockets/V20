@@ -441,17 +441,6 @@ export class StrokePipeline {
       }
     });
 
-    // Ensure target 3D meshes have computed normals
-    this.ctx.getTargetMeshes().forEach((mesh) => {
-      if (mesh.geometry) {
-        mesh.geometry.computeVertexNormals();
-        if (mesh.geometry.attributes.normal) {
-          mesh.geometry.attributes.normal.needsUpdate = true;
-        }
-      }
-    });
-
-    this.ctx.onAutoSaveTrigger?.('normals_recalculated');
     return count;
   }
 

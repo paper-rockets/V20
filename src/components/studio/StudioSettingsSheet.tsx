@@ -23,11 +23,18 @@ import {
   ChevronRight,
   ChevronDown,
   FolderArchive,
+  PanelLeft,
+  EyeOff,
 } from 'lucide-react';
 import { StudioSheet } from './StudioSheet';
 import { closeSheet } from './panelStore';
 import { haptics } from '../../utils/haptics';
 import { StorageEstimateInfo, AutoSaveMetaInfo } from '../../utils/storagePermission';
+import {
+  readStudioDockPreferences,
+  StudioDockPosition,
+  writeStudioDockPreferences,
+} from './studioDockPreferences';
 
 export interface StudioSettingsSheetProps {
   theme: 'light' | 'dark';
@@ -72,8 +79,8 @@ export interface StudioSettingsSheetProps {
   autoSaveMeta?: AutoSaveMetaInfo;
   onRestoreAutoSave?: () => void;
   // Navigator Style & Toggle
-  navigatorStyle?: 'opt3' | 'opt1' | 'classic';
-  onNavigatorStyleChange?: (style: 'opt3' | 'opt1' | 'classic') => void;
+  navigatorStyle?: 'sphere' | 'disc' | 'petal' | 'collar';
+  onNavigatorStyleChange?: (style: 'sphere' | 'disc' | 'petal' | 'collar') => void;
   // Navigator & Stats
   showNavigator?: boolean;
   onToggleNavigator?: (show: boolean) => void;
@@ -171,7 +178,7 @@ export const StudioSettingsSheet: React.FC<StudioSettingsSheetProps> = ({
   storageEstimate,
   autoSaveMeta,
   onRestoreAutoSave,
-  navigatorStyle = 'opt3',
+  navigatorStyle = 'sphere',
   onNavigatorStyleChange,
   showNavigator = true,
   onToggleNavigator,
@@ -181,6 +188,7 @@ export const StudioSettingsSheet: React.FC<StudioSettingsSheetProps> = ({
   const isLight = theme === 'light';
   const [internalSound, setInternalSound] = useState<boolean>(() => haptics.getAudioFeedbackEnabled());
   const [showMore, setShowMore] = useState(false);
+  const [dockPreferences, setDockPreferences] = useState(readStudioDockPreferences);
 
   const effectiveSound = soundEnabled !== undefined ? soundEnabled : internalSound;
 
@@ -191,6 +199,12 @@ export const StudioSettingsSheet: React.FC<StudioSettingsSheetProps> = ({
       const next = haptics.toggleAudioFeedback();
       setInternalSound(next);
     }
+  };
+
+  const updateDockPreferences = (next: Partial<typeof dockPreferences>) => {
+    const updated = { ...dockPreferences, ...next };
+    setDockPreferences(updated);
+    writeStudioDockPreferences(updated);
   };
 
   const pill = (active: boolean) =>
@@ -284,15 +298,15 @@ export const StudioSettingsSheet: React.FC<StudioSettingsSheetProps> = ({
 
       {onNavigatorStyleChange && (
         <Row icon={Compass} label="Navigator Tool" hint="Active 3D navigation interface" isLight={isLight}>
-          <div className="flex gap-1 w-44">
+          <div className="grid grid-cols-2 gap-1 w-44">
             <button
               type="button"
               onClick={() => {
                 haptics.trigger('light');
-                onNavigatorStyleChange('opt3');
+                onNavigatorStyleChange('sphere');
               }}
-              className={pill(navigatorStyle === 'opt3')}
-              title="Opt 3: Sphere Gimbal Navigator"
+              className={pill(navigatorStyle === 'sphere')}
+              title="Sphere: axis gimbal navigator"
             >
               Sphere
             </button>
@@ -300,12 +314,33 @@ export const StudioSettingsSheet: React.FC<StudioSettingsSheetProps> = ({
               type="button"
               onClick={() => {
                 haptics.trigger('light');
-                onNavigatorStyleChange('opt1');
+                onNavigatorStyleChange('disc');
               }}
-              className={pill(navigatorStyle === 'opt1')}
-              title="Opt 1: Tabbed Deck Navigator"
+              className={pill(navigatorStyle === 'disc')}
             >
-              Tabbed
+              Disc
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.trigger('light');
+                onNavigatorStyleChange('petal');
+              }}
+              className={pill(navigatorStyle === 'petal')}
+              title="Petal: direct view navigator"
+            >
+              Petal
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.trigger('light');
+                onNavigatorStyleChange('collar');
+              }}
+              className={pill(navigatorStyle === 'collar')}
+              title="Collar: orbit ring navigator"
+            >
+              Collar
             </button>
           </div>
         </Row>
@@ -383,6 +418,38 @@ export const StudioSettingsSheet: React.FC<StudioSettingsSheetProps> = ({
 
       <Row icon={Hand} label="Touch Input Drawing" hint="Enable touch drawing when stylus is unavailable" isLight={isLight}>
         <Toggle on={fingerDraw} onChange={onToggleFingerDraw} label="Touch Input Drawing" isLight={isLight} />
+      </Row>
+
+      <Row icon={PanelLeft} label="Tool Dock" hint="Responsive placement, or pin it to an edge" isLight={isLight}>
+        <div className="grid w-40 grid-cols-3 gap-1">
+          {(['auto', 'left', 'right'] as StudioDockPosition[]).map((position) => (
+            <button
+              key={position}
+              type="button"
+              onClick={() => {
+                haptics.trigger('light');
+                updateDockPreferences({ position });
+              }}
+              className={`min-h-[40px] rounded-lg px-1 text-[10px] font-bold capitalize transition-colors ${
+                dockPreferences.position === position
+                  ? isLight ? 'bg-neutral-900 text-white' : 'bg-white text-zinc-950'
+                  : isLight ? 'bg-neutral-100 text-neutral-600' : 'bg-neutral-800 text-neutral-300'
+              }`}
+              aria-pressed={dockPreferences.position === position}
+            >
+              {position}
+            </button>
+          ))}
+        </div>
+      </Row>
+
+      <Row icon={EyeOff} label="Auto-hide Tool Dock" hint="Reveal it from the small edge handle" isLight={isLight}>
+        <Toggle
+          on={dockPreferences.autoHide}
+          onChange={(autoHide) => updateDockPreferences({ autoHide })}
+          label="Auto-hide Tool Dock"
+          isLight={isLight}
+        />
       </Row>
 
       {onToggleDisableContextMenu && (

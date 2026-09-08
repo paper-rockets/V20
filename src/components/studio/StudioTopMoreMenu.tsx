@@ -1,13 +1,15 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  IcSettings as Settings,
-  IcFullscreen as Maximize,
-  IcExitFullscreen as Minimize,
-  IcSun as Sun,
-  IcSave as Save,
-  IcSessions as FolderArchive,
-} from '../pro/StudioIcons';
-import { Square, X } from 'lucide-react';
+  FolderOpen,
+  Maximize2,
+  Minimize2,
+  Save,
+  Settings,
+  Square,
+  Sun,
+  User,
+  X,
+} from 'lucide-react';
 
 interface StudioTopMoreMenuProps {
   open: boolean;
@@ -19,6 +21,7 @@ interface StudioTopMoreMenuProps {
   onOpenIllumination?: () => void;
   onOpenShapes: () => void;
   onOpenSettings: () => void;
+  onOpenScaffolding?: () => void;
   onToggleFullscreen: () => void;
 }
 
@@ -34,7 +37,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, description, o
   <button
     type="button"
     onClick={onSelect}
-    className={`min-h-[56px] w-full rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 active:scale-[0.99] ${
+    className={`min-h-[62px] w-full rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 active:scale-[0.99] ${
       isLight ? 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200' : 'bg-white/[0.07] text-white hover:bg-white/[0.12]'
     }`}
   >
@@ -42,7 +45,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, description, o
       <span className="grid h-9 w-9 shrink-0 place-items-center" aria-hidden="true">{icon}</span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold leading-5">{label}</span>
-        <span className={`block truncate text-xs leading-4 ${isLight ? 'text-neutral-600' : 'text-white/60'}`}>
+        <span className={`block text-xs leading-4 ${isLight ? 'text-neutral-600' : 'text-white/60'}`}>
           {description}
         </span>
       </span>
@@ -60,6 +63,7 @@ export const StudioTopMoreMenu: React.FC<StudioTopMoreMenuProps> = ({
   onOpenIllumination,
   onOpenShapes,
   onOpenSettings,
+  onOpenScaffolding,
   onToggleFullscreen,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -143,20 +147,23 @@ export const StudioTopMoreMenu: React.FC<StudioTopMoreMenuProps> = ({
 
         <div className="grid grid-cols-2 gap-2" aria-label="Studio actions">
           {onQuickSave && (
-            <ActionButton icon={<Save className="h-5 w-5" />} label="Save" description="Quick save" onSelect={select(onQuickSave)} isLight={isLight} />
+            <ActionButton icon={<Save className="h-5 w-5" strokeWidth={1.7} />} label="Save" description="Quick save" onSelect={select(onQuickSave)} isLight={isLight} />
           )}
           {onOpenSessions && (
-            <ActionButton icon={<FolderArchive className="h-5 w-5" />} label="Sessions" description="Versions and files" onSelect={select(onOpenSessions)} isLight={isLight} />
+            <ActionButton icon={<FolderOpen className="h-5 w-5" strokeWidth={1.7} />} label="Sessions" description="Versions and files" onSelect={select(onOpenSessions)} isLight={isLight} />
           )}
           {onOpenIllumination && (
-            <ActionButton icon={<Sun className="h-5 w-5 text-amber-400" />} label="Lighting" description="Scene illumination" onSelect={select(onOpenIllumination)} isLight={isLight} />
+            <ActionButton icon={<Sun className="h-5 w-5 text-amber-400" strokeWidth={1.7} />} label="Lighting" description="Scene illumination" onSelect={select(onOpenIllumination)} isLight={isLight} />
           )}
-          <ActionButton icon={<Square className="h-5 w-5" />} label="Shapes" description="Shape snapping" onSelect={select(onOpenShapes)} isLight={isLight} />
-          <ActionButton icon={<Settings className="h-5 w-5" />} label="Settings" description="Studio preferences" onSelect={select(onOpenSettings)} isLight={isLight} />
+          <ActionButton icon={<Square className="h-5 w-5" strokeWidth={1.7} />} label="Shapes" description="Shape snapping" onSelect={select(onOpenShapes)} isLight={isLight} />
+          {onOpenScaffolding && (
+            <ActionButton icon={<User className="h-5 w-5 text-sky-400" strokeWidth={1.7} />} label="Guides" description="3D Armatures & Forms" onSelect={select(onOpenScaffolding)} isLight={isLight} />
+          )}
+          <ActionButton icon={<Settings className="h-5 w-5" strokeWidth={1.7} />} label="Settings" description="Studio preferences" onSelect={select(onOpenSettings)} isLight={isLight} />
           <ActionButton
-            icon={isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+            icon={isFullscreen ? <Minimize2 className="h-5 w-5" strokeWidth={1.7} /> : <Maximize2 className="h-5 w-5" strokeWidth={1.7} />}
             label={isFullscreen ? 'Exit full screen' : 'Full screen'}
-            description="Adjust workspace view"
+            description={isFullscreen ? 'Return to browser' : 'Use the whole screen'}
             onSelect={select(onToggleFullscreen)}
             isLight={isLight}
           />

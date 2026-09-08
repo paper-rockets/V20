@@ -206,6 +206,8 @@ export const ProPanel: React.FC<ProPanelProps> = ({
             brushSettings={brushSettings}
             setBrushSettings={setBrushSettings}
             onOpenColorStudio={onOpenColorStudio}
+            onOpenScaffolding={onOpenScaffolding}
+            onOpenBentGuide={onOpenBentGuide}
             theme={theme}
           />
         )}
@@ -217,6 +219,8 @@ export const ProPanel: React.FC<ProPanelProps> = ({
             onSetModelDisplayMode={onSetModelDisplayMode}
             onOpenModelLibrary={onOpenModelLibrary}
             onOpenImporter={onOpenImporter}
+            onOpenScaffolding={onOpenScaffolding}
+            onOpenBentGuide={onOpenBentGuide}
             theme={theme}
           />
         )}

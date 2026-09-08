@@ -37,7 +37,7 @@ interface ScaffoldingModalProps {
   isOpen: boolean;
   onClose: () => void;
   engine: StudioEngine | null;
-  onOpenNumpad: (target: NumpadTarget) => void;
+  onOpenNumpad?: (target: NumpadTarget) => void;
   theme?: 'light' | 'dark';
 }
 

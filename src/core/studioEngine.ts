@@ -31,13 +31,14 @@ import {
   EraserMode,
   LoadedModelInfo,
   ProjectSaveData,
+  ActiveGuideReference,
 } from '../types';
 import { ShapeSnappingEngine, ShapeSnapResult } from './shapeSnapping';
 import { ConformalBeadGenerator } from './conformalBeadGenerator';
 import { MaterialCache, normalizeHexColor } from './materialCache';
 import { UVPaintingEngine } from './uvPaintingEngine';
 import { PostProcessingEngine } from './postProcessingEngine';
-import { StudioPathTracer } from './StudioPathTracer';
+import { ProgressiveRayTracer } from './ProgressiveRayTracer';
 import { PathTracingProgressInfo } from '../types';
 import { SampleModelFactory } from './sampleModels';
 import { StrokeSmoother } from './strokeSmoother';
@@ -205,7 +206,7 @@ export class StudioEngine {
   public uvEngine: UVPaintingEngine;
   public postEngine: PostProcessingEngine;
   public postProcessing?: PostProcessingEngine;
-  public pathTracer?: StudioPathTracer;
+  public progressiveRayTracer?: ProgressiveRayTracer;
   public onPathTracingProgress?: (info: PathTracingProgressInfo) => void;
   public skyEngine: ProceduralSkyEngine;
   public liquifyEngine: VolumetricLiquifyEngine;
@@ -392,6 +393,8 @@ export class StudioEngine {
   public get currentTransformTotalMatrix(): THREE.Matrix4 { return this.transformController.currentTransformTotalMatrix; }
   public get transformUndoStack() { return this.transformController.transformUndoStack; }
   public get transformRedoStack() { return this.transformController.transformRedoStack; }
+  public activeGuide: ActiveGuideReference | null = null;
+  private onActiveGuideChangeCallbacks: Set<(guide: ActiveGuideReference | null) => void> = new Set();
   private lastPerfectViewInfo: PerfectViewInfo = {
     isPerfect: false,
     view: null,
@@ -589,6 +592,9 @@ export class StudioEngine {
       notifyHistory: () => this.notifyHistory(),
       pushHistoryUndo: (entry) => this.historyUndoStack.push(entry),
       clearHistoryRedo: () => { this.historyRedoStack = []; },
+      getActiveGuideMesh: () => this.getActiveGuideMesh(),
+      getGuideRoot: () => this.loftEngine.getGuideRoot(),
+      getScaffoldRoot: () => this.scaffoldingEngine.getScaffoldRoot(),
     });
 
     // 8. Stroke Pipeline
@@ -879,13 +885,13 @@ export class StudioEngine {
       return;
     }
 
-    // Detach drawing plane only if explicitly clearing the scene
-    if (loadMode === 'clear') {
+    // Detach drawing plane if clearing scene OR if it was just the empty starting canvas
+    if (loadMode === 'clear' || (this.drawingPlaneMesh && this.strokes.size === 0)) {
       const existingPlane = this.modelRoot.getObjectByName('DrawingPlaneCanvas');
       if (existingPlane) {
         this.modelRoot.remove(existingPlane);
-        this.drawingPlaneMesh = null;
       }
+      this.drawingPlaneMesh = null;
     }
 
     this.modelRoot.add(obj);
@@ -1031,22 +1037,21 @@ export class StudioEngine {
             (targetMat as any).emissiveMap.needsUpdate = true;
           }
 
-          // Ensure proper alpha test and depth write for transparent textures & cards (stars, decals, etc.)
-          if (
-            isAlphaTransparent ||
-            targetMat.transparent ||
-            (targetMat.opacity !== undefined && targetMat.opacity < 0.999) ||
-            ('map' in targetMat && (targetMat as any).map) ||
-            (targetMat as any).alphaTest > 0
-          ) {
+          // Solid 3D model meshes MUST remain opaque (transparent: false) so they render
+          // in the opaque pass and write to the depth buffer before strokes render on top.
+          // Only genuinely semi-transparent materials (blended transparency or opacity < 0.999)
+          // should use transparency.
+          if (isAlphaTransparent || (targetMat.opacity !== undefined && targetMat.opacity < 0.999)) {
+            targetMat.transparent = true;
             targetMat.depthWrite = true;
             targetMat.depthTest = true;
             if ((targetMat as any).alphaTest === 0 || (targetMat as any).alphaTest === undefined) {
               (targetMat as any).alphaTest = 0.2;
             }
-            if (isAlphaTransparent || (targetMat as any).alphaTest > 0) {
-              targetMat.transparent = true;
-            }
+          } else {
+            targetMat.transparent = false;
+            targetMat.depthWrite = true;
+            targetMat.depthTest = true;
           }
 
           MaterialCache.configureModelMaterial(targetMat);
@@ -1083,7 +1088,12 @@ export class StudioEngine {
     if (loadMode === 'add') {
       const existingBox = new THREE.Box3();
       this.modelRoot.children.forEach((child) => {
-        if (child !== this.strokeRoot && child !== obj) {
+        if (
+          child !== this.strokeRoot &&
+          child !== obj &&
+          child.name !== 'DrawingPlaneCanvas' &&
+          !child.userData?.isDrawingPlane
+        ) {
           existingBox.expandByObject(child);
         }
       });
@@ -1112,6 +1122,8 @@ export class StudioEngine {
           child instanceof THREE.Mesh &&
           child.geometry &&
           child.name !== 'UV_Overlay' &&
+          child.name !== 'DrawingPlaneCanvas' &&
+          !child.userData?.isDrawingPlane &&
           child.name !== 'ModelGroundContactShadow' &&
           !child.userData?.isHelper
         ) {
@@ -1143,6 +1155,7 @@ export class StudioEngine {
       this.targetSpherical.phi = 1.05; // ~60° pleasant perspective elevation
       this.targetSpherical.theta = 0.65; // ~37° smooth diagonal azimuth
       this.targetPosition.set(0, 0, 0);
+      this.cameraSpherical.copy(this.targetSpherical);
       this.updateCameraPosition();
     }
 
@@ -1199,6 +1212,7 @@ export class StudioEngine {
         })
       );
     }
+    this.setModelDisplayMode(this.modelDisplayMode);
     this.notifyModelsChanged();
     this.onAutoSaveTrigger?.('model_loaded');
   }
@@ -1559,13 +1573,32 @@ export class StudioEngine {
     if (!this.targetMeshes || this.targetMeshes.length === 0) {
       this.targetMeshes = [];
       this.modelRoot.traverse((child) => {
-        if (child instanceof THREE.Mesh && child.geometry && child.visible) {
+        if (
+          child instanceof THREE.Mesh &&
+          child.geometry &&
+          child.visible &&
+          child.name !== 'UV_Overlay' &&
+          child.name !== 'ModelGroundContactShadow' &&
+          !child.userData?.isHelper
+        ) {
           this.targetMeshes.push(child);
         }
       });
     }
 
-    for (let i = 0; i < this.targetMeshes.length; i++) targets.push(this.targetMeshes[i]);
+    const hasRealModel = this.targetMeshes.some(
+      (m) => m.name !== 'DrawingPlaneCanvas' && m !== this.drawingPlaneMesh && !m.userData?.isDrawingPlane
+    );
+
+    for (let i = 0; i < this.targetMeshes.length; i++) {
+      const mesh = this.targetMeshes[i];
+      if (!mesh || !mesh.visible || !mesh.geometry) continue;
+      // When an actual 3D model is active, do not let DrawingPlaneCanvas occlude or steal hits
+      if (hasRealModel && (mesh.name === 'DrawingPlaneCanvas' || mesh === this.drawingPlaneMesh || mesh.userData?.isDrawingPlane)) {
+        continue;
+      }
+      targets.push(mesh);
+    }
 
     // Include active loft guides, scaffolding collision meshes, and guide collider meshes
     if (this.loftEngine) {
@@ -1908,9 +1941,9 @@ export class StudioEngine {
     // canvas / spatial plane, we evaluate exactly 1 raycast per point: this prevents straight-line
     // chord pinning and lets the 3D Catmull-Rom spline construct smooth, jitter-free curves.
     const sampleDensity = settings.raycastSampleDensity || 'high';
-    const requestedMaxSteps = sampleDensity === 'ultra' ? 8 : sampleDensity === 'standard' ? 4 : 6;
+    const requestedMaxSteps = sampleDensity === 'ultra' ? 6 : sampleDensity === 'standard' ? 2 : 4;
     const densityMaxSteps = Math.min(requestedMaxSteps, this.profile.maxStrokeSubSteps);
-    const maxStepDist = sampleDensity === 'ultra' ? 0.003 : 0.005;
+    const maxStepDist = sampleDensity === 'ultra' ? 0.005 : 0.008;
     const steps = (isCoalescedPoint || isDrawingPlane) ? 1 : Math.min(densityMaxSteps, Math.max(1, Math.ceil(screenDist / maxStepDist)));
 
     let missStreak = 0;
@@ -2004,7 +2037,7 @@ export class StudioEngine {
         }
       } else {
         const distFromLast = this.lastCapturePoint!.position.distanceTo(newPoint.position);
-        if (distFromLast > 0.0003) {
+        if (distFromLast > 0.002) {
           this.activePoints.push(newPoint);
           this.lastCapturePoint = newPoint;
         }
@@ -3318,6 +3351,9 @@ export class StudioEngine {
     this.modelDisplayMode = mode;
     const isLight = this.currentStudioTheme === 'light';
     this.targetMeshes.forEach((mesh) => {
+      if (mesh.name === 'DrawingPlaneCanvas' || mesh === this.drawingPlaneMesh || mesh.userData?.isDrawingPlane) {
+        return;
+      }
       if (mode === 'clay') {
         if (!mesh.userData.originalMaterial) {
           mesh.userData.originalMaterial = mesh.material;
@@ -3335,7 +3371,13 @@ export class StudioEngine {
           mesh.material = mesh.userData.originalMaterial;
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
           mats.forEach((m) => {
-            if (m) MaterialCache.configureModelMaterial(m);
+            if (m) {
+              const isTrulyAlpha = m.opacity !== undefined && m.opacity < 0.999;
+              m.transparent = isTrulyAlpha;
+              m.depthWrite = true;
+              m.depthTest = true;
+              MaterialCache.configureModelMaterial(m);
+            }
           });
         }
       }
@@ -3670,38 +3712,38 @@ export class StudioEngine {
     if (this.postEngine) {
       this.postEngine.setSize(width, height);
     }
+    if (this.progressiveRayTracer) {
+      this.progressiveRayTracer.setSize(width, height);
+    }
     this.refreshRect();
     this.markDirty();
   }
 
-  private ensurePathTracer(): StudioPathTracer {
-    if (!this.pathTracer) {
+  private ensureRayTracer(): ProgressiveRayTracer {
+    if (!this.progressiveRayTracer) {
       const postSettings = this.postEngine?.getSettings();
-      this.pathTracer = new StudioPathTracer(this.renderer, {
-        bounces: postSettings?.rayTracingBounces ?? 3,
-        maxSamples: postSettings?.rayTracingSamples ?? 48,
-        onProgress: (info) => {
-          this.onPathTracingProgress?.(info);
-        },
+      this.progressiveRayTracer = new ProgressiveRayTracer({
+        maxAccumulatedFrames: postSettings?.rayTracingSamples ?? 48,
+        samplesPerFrame: 1,
       });
+      if (this.container) {
+        this.progressiveRayTracer.setSize(this.container.clientWidth || 1, this.container.clientHeight || 1);
+      }
     }
-    return this.pathTracer;
+    return this.progressiveRayTracer;
   }
 
   public setPostProcessSettings(settings: Partial<PostProcessSettings>): void {
     if (this.postEngine) {
       this.postEngine.updateSettings(settings);
     }
-    if (settings.rayTracing !== undefined || this.pathTracer) {
-      const tracer = this.ensurePathTracer();
+    if (settings.rayTracing !== undefined || this.progressiveRayTracer) {
+      const tracer = this.ensureRayTracer();
       if (settings.rayTracing !== undefined) {
         tracer.enable(settings.rayTracing);
       }
       if (settings.rayTracingSamples !== undefined) {
-        tracer.setMaxSamples(settings.rayTracingSamples);
-      }
-      if (settings.rayTracingBounces !== undefined) {
-        tracer.setBounces(settings.rayTracingBounces);
+        tracer.setQuality(1, settings.rayTracingSamples);
       }
       tracer.reset();
     }
@@ -3778,7 +3820,7 @@ export class StudioEngine {
       const isIdle =
         !this.hasAnimatedContent && this.idleFrameIntervalMs > 0 && time - this.lastActivityTime > this.profile.idleAfterMs;
       const interval = isIdle ? this.idleFrameIntervalMs : this.minFrameIntervalMs;
-      if (!this.isDrawing && interval > 0 && time - this.lastRenderTime < interval - 0.5) {
+      if (!this.isDrawing && interval > 0 && time - this.lastRenderTime < interval * 0.75) {
         return;
       }
       this.lastRenderTime = time;
@@ -3837,15 +3879,21 @@ export class StudioEngine {
       const useRayTracing = postSettings?.renderMode === 'render' && postSettings?.rayTracing;
 
       if (useRayTracing) {
-        const tracer = this.ensurePathTracer();
-        const isInteracting = this.isDrawing || this.isCameraSettling();
-        const handledByPathTracer = tracer.step(this.renderer, this.scene, this.camera, isInteracting);
-        if (!handledByPathTracer) {
-          if (this.postEngine) {
-            this.postEngine.render(time * 0.001);
-          } else {
-            this.renderer.render(this.scene, this.camera);
-          }
+        const tracer = this.ensureRayTracer();
+        const cameraSettling = this.isCameraSettling();
+        if (this.isDrawing || cameraSettling) {
+          tracer.reset();
+        }
+        tracer.render(this.renderer, this.scene, this.camera);
+        if (this.onPathTracingProgress) {
+          const frames = tracer.accumulatedFrames;
+          const maxF = tracer.maxAccumulatedFrames;
+          this.onPathTracingProgress({
+            samples: frames,
+            maxSamples: maxF,
+            converged: frames >= maxF,
+            isStationary: !this.isDrawing && !cameraSettling,
+          });
         }
       } else if (this.postEngine) {
         this.postEngine.render(time * 0.001);
@@ -3876,7 +3924,7 @@ export class StudioEngine {
 
   public markDirty(): void {
     this.isDirty = true;
-    this.pathTracer?.markSceneDirty();
+    this.progressiveRayTracer?.reset();
   }
 
   /** The active adaptive quality profile. */
@@ -4116,7 +4164,11 @@ export class StudioEngine {
     width: number = 0.35,
     opacity: number = 0.5
   ): BentGuideConfig {
-    return this.loftEngine.createPresetGuide(preset, width, opacity);
+    const guide = this.loftEngine.createPresetGuide(preset, width, opacity);
+    if (guide) {
+      this.setActiveGuide({ type: 'bent', id: guide.id, name: guide.name });
+    }
+    return guide;
   }
 
   /**
@@ -4138,16 +4190,24 @@ export class StudioEngine {
 
     if (!latestStroke || latestStroke.points.length < 2) return null;
     const curvePoints = latestStroke.points.map((p) => p.position);
-    return this.loftEngine.createBentGuideFromPoints(
+    const guide = this.loftEngine.createBentGuideFromPoints(
       curvePoints,
       `Scaffold from ${latestStroke.id}`,
       width,
       opacity
     );
+    if (guide) {
+      this.setActiveGuide({ type: 'bent', id: guide.id, name: guide.name });
+    }
+    return guide;
   }
 
   public removeBentGuide(id: string): void {
+    if (this.activeGuide?.id === id) {
+      this.setActiveGuide(null);
+    }
     this.loftEngine.removeBentGuide(id);
+    this.markDirty();
   }
 
   public updateBentGuideParameters(id: string, params: Partial<BentGuideConfig>): BentGuideConfig | null {
@@ -4163,6 +4223,48 @@ export class StudioEngine {
   }
 
   // ==========================================
+  // ACTIVE GUIDE & MANIFOLD HUD ENGINE
+  // ==========================================
+
+  public getActiveGuide(): ActiveGuideReference | null {
+    return this.activeGuide;
+  }
+
+  public setActiveGuide(guide: ActiveGuideReference | null): void {
+    this.activeGuide = guide;
+    this.onActiveGuideChangeCallbacks.forEach((cb) => {
+      try { cb(guide); } catch {}
+    });
+    this.markDirty();
+  }
+
+  public subscribeActiveGuideChange(cb: (guide: ActiveGuideReference | null) => void): () => void {
+    this.onActiveGuideChangeCallbacks.add(cb);
+    return () => this.onActiveGuideChangeCallbacks.delete(cb);
+  }
+
+  public getActiveGuideMesh(): THREE.Object3D | null {
+    if (!this.activeGuide) return null;
+    if (this.activeGuide.type === 'bent') {
+      const bent = this.loftEngine.getGuides().find((g) => g.id === this.activeGuide!.id);
+      return bent?.manifoldMesh || null;
+    } else if (this.activeGuide.type === 'scaffold') {
+      const scaffold = this.scaffoldingEngine.getScaffolds().find((s) => s.id === this.activeGuide!.id);
+      return scaffold?.mesh || null;
+    }
+    return null;
+  }
+
+  public removeActiveGuide(): void {
+    if (!this.activeGuide) return;
+    if (this.activeGuide.type === 'bent') {
+      this.removeBentGuide(this.activeGuide.id);
+    } else {
+      this.removeScaffold(this.activeGuide.id);
+    }
+  }
+
+  // ==========================================
   // SCAFFOLDING & COLLISION MESH ENGINE
   // ==========================================
 
@@ -4171,15 +4273,27 @@ export class StudioEngine {
   }
 
   public createProxyScaffold(type: ScaffoldProxyType, name?: string): CollisionGuideMeshConfig {
-    return this.scaffoldingEngine.createProxyScaffold(type, name);
+    const scaffold = this.scaffoldingEngine.createProxyScaffold(type, name);
+    if (scaffold) {
+      this.setActiveGuide({ type: 'scaffold', id: scaffold.id, name: scaffold.name });
+    }
+    return scaffold;
   }
 
   public loadCollisionMeshFromObject(object: THREE.Object3D, name: string = 'Collision Guide'): CollisionGuideMeshConfig {
-    return this.scaffoldingEngine.loadCollisionMeshFromObject(object, name);
+    const scaffold = this.scaffoldingEngine.loadCollisionMeshFromObject(object, name);
+    if (scaffold) {
+      this.setActiveGuide({ type: 'scaffold', id: scaffold.id, name: scaffold.name });
+    }
+    return scaffold;
   }
 
   public removeScaffold(id: string): void {
+    if (this.activeGuide?.id === id) {
+      this.setActiveGuide(null);
+    }
     this.scaffoldingEngine.removeScaffold(id);
+    this.markDirty();
   }
 
   public updateScaffold(id: string, updates: Partial<CollisionGuideMeshConfig>): CollisionGuideMeshConfig | null {
@@ -4364,7 +4478,7 @@ export class StudioEngine {
 
     // 3. Sub-engines
     try { this.postEngine?.dispose(); } catch (_) {}
-    try { this.pathTracer?.dispose(); } catch (_) {}
+    try { this.progressiveRayTracer?.dispose(); } catch (_) {}
     try { this.uvEngine.dispose(); } catch (_) {}
     try { (this.skyEngine as any)?.dispose?.(); } catch (_) {}
     try { (this.loftEngine as any)?.dispose?.(); } catch (_) {}

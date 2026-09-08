@@ -12,12 +12,37 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-    <title>Remix 3D Model Painting Studio</title>
-    <meta name="description" content="3D model painting studio and Draco compression suite with universal file conversion (GLB, GLTF, OBJ, FBX, 3DS, STL, PLY, DAE), orientation adjustment, geometry baking, and in-app local storage." />
-    <meta property="og:title" content="Remix 3D Model Painting Studio" />
-    <meta property="og:description" content="3D model painting studio and Draco compression suite with universal file conversion (GLB, GLTF, OBJ, FBX, 3DS, STL, PLY, DAE), orientation adjustment, geometry baking, and in-app local storage." />
+    <title>Remix 3D — Draw and Paint in 3D</title>
+    <meta name="description" content="Draw in 3D space or paint directly on models. Remix 3D is a touch-first studio for stylus, tablet, desktop, local projects, and export." />
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+    <link rel="canonical" href="https://paper-rockets.github.io/V20/" />
+    <meta property="og:title" content="Remix 3D — Draw and Paint in 3D" />
+    <meta property="og:description" content="A touch-first 3D drawing and surface-painting studio for stylus, tablet, and desktop." />
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:url" content="https://paper-rockets.github.io/V20/" />
+    <meta property="og:site_name" content="Remix 3D" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Remix 3D — Draw and Paint in 3D" />
+    <meta name="twitter:description" content="A touch-first 3D drawing and surface-painting studio for stylus, tablet, and desktop." />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Remix 3D",
+        "applicationCategory": "GraphicsApplication",
+        "operatingSystem": "Web",
+        "url": "https://paper-rockets.github.io/V20/",
+        "description": "A touch-first studio for drawing in 3D space and painting directly on 3D models.",
+        "featureList": [
+          "3D spatial drawing",
+          "Surface painting on imported 3D models",
+          "Stylus and touch input",
+          "Local project storage",
+          "GLB and image export"
+        ]
+      }
+    </script>
     <!-- Self-hosted Fonts & Draco Runtime -->
     <link rel="stylesheet" href="/fonts/fonts.css" />
     <script src="/draco/draco_encoder.js"></script>
@@ -25,7 +50,13 @@
   </head>
   <body class="bg-[#0c0e14] text-neutral-200 overflow-hidden select-none">
     <div id="root" class="w-full h-full"></div>
+    <noscript>
+      <main>
+        <h1>Remix 3D</h1>
+        <p>Draw in 3D space or paint directly on 3D models with a touch-first creative studio for stylus, tablet, and desktop.</p>
+        <p>Enable JavaScript to launch the studio.</p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

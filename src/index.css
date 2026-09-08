@@ -102,11 +102,10 @@ canvas {
 }
 
 .paperrocket-model-item {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex !important;
   align-items: center;
-  min-height: 48px;
-  padding: 8px 4px !important;
+  min-height: 76px;
+  padding: 8px !important;
   background: transparent !important;
   border: 0 !important;
   border-bottom: 1px solid rgb(255 255 255 / 0.1) !important;
@@ -114,15 +113,17 @@ canvas {
   box-shadow: none !important;
 }
 
-.paperrocket-model-item p,
-.paperrocket-model-item > :last-child > :first-child {
-  display: none;
-}
-
 .paperrocket-model-item > :last-child {
   margin: 0 !important;
-  padding: 0 4px 0 10px !important;
+  padding: 0 4px 0 2px !important;
   border: 0 !important;
+}
+
+.paperrocket-model-item h3 {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: normal;
 }
 
 .paperrocket-model-upload {

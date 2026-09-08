@@ -728,12 +728,12 @@ export class ModelLoaderService {
             (mat as any).metalnessMap.colorSpace = THREE.NoColorSpace;
           }
 
-          if (mat.transparent || (mat.opacity !== undefined && mat.opacity < 1.0) || ('map' in mat && (mat as any).map)) {
-            mat.depthWrite = true;
-            mat.depthTest = true;
-            if ((mat as any).alphaTest === 0 && mat.transparent) {
-              (mat as any).alphaTest = 0.5;
-            }
+          const isTrulyAlpha = mat.transparent && (mat.opacity !== undefined && mat.opacity < 0.999);
+          mat.transparent = isTrulyAlpha;
+          mat.depthWrite = true;
+          mat.depthTest = true;
+          if ((mat as any).alphaTest === 0 && isTrulyAlpha) {
+            (mat as any).alphaTest = 0.5;
           }
 
           // Configure Stencil Writing & Depth Bias

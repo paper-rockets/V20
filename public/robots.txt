@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://paper-rockets.github.io/V20/sitemap.xml

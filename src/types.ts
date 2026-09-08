@@ -390,7 +390,13 @@ export interface ViewportState {
 
 export type TransformJoystickMode = '2d' | '3d';
 
-export type TransformTargetScope = 'all' | 'strokes' | 'active_layer' | 'model';
+export type TransformTargetScope = 'all' | 'strokes' | 'active_layer' | 'model' | 'guide';
+
+export interface ActiveGuideReference {
+  type: 'bent' | 'scaffold';
+  id: string;
+  name: string;
+}
 
 export type PerfectViewType = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right' | 'isometric' | null;
 

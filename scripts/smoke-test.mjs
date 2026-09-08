@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 let spawnedServer = null;
 
@@ -148,6 +148,9 @@ async function runSmokeTests() {
 
       // Test Opening Models Modal
       await page.evaluate(() => window.__testApp.openModal('models'));
+      // Adding is the safe default. Explicitly choose Replace before testing
+      // the work-loss guard.
+      await page.getByRole('button', { name: 'Replace current' }).click();
       const firstModelCard = page.locator('#model-library-modal .paperrocket-model-item').first();
       await firstModelCard.waitFor({ state: 'visible', timeout: 5000 });
       await firstModelCard.click();

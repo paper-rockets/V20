@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  IcScene as Box,
-  IcUndo as Undo2,
-  IcRedo as Redo2,
-  IcSettings as Settings,
-  IcFullscreen as Maximize,
-  IcExitFullscreen as Minimize,
-  IcSun as Sun,
-  IcSave as Save,
-  IcSessions as FolderArchive,
-} from '../pro/StudioIcons';
-import { MoreHorizontal, Square } from 'lucide-react';
+  Box,
+  FolderOpen,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
+  Redo2,
+  Save,
+  Settings,
+  Square,
+  Sun,
+  Undo2,
+  User,
+} from 'lucide-react';
 import { toggleSheet } from './panelStore';
 import { StudioTopMoreMenu } from './StudioTopMoreMenu';
 
@@ -23,6 +25,7 @@ interface StudioTopStripProps {
   canRedo: boolean;
   theme?: 'light' | 'dark';
   onOpenIllumination?: () => void;
+  onOpenScaffolding?: () => void;
   onQuickSave?: () => void;
   onOpenSessions?: () => void;
 }
@@ -36,6 +39,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
   canRedo,
   theme = 'dark',
   onOpenIllumination,
+  onOpenScaffolding,
   onQuickSave,
   onOpenSessions,
 }) => {
@@ -139,7 +143,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
         className={`pointer-events-auto studio-top-strip-left shrink inline-flex items-center gap-1.5 sm:gap-2 h-11 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`}
         aria-label="Open model library"
       >
-        <Box className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" strokeWidth={1.35} />
+        <Box className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" strokeWidth={1.7} />
         <span className="text-[11px] sm:text-[13px] font-medium tracking-[0.01em] whitespace-nowrap truncate max-w-[64px] sm:max-w-[160px]">
           {projectName || 'Model'}
         </span>
@@ -152,7 +156,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
           className={`${button} disabled:opacity-25`}
           aria-label="Undo"
         >
-          <Undo2 className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.35} />
+          <Undo2 className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.7} />
         </button>
         <button
           type="button"
@@ -161,7 +165,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
           className={`${button} disabled:opacity-25`}
           aria-label="Redo"
         >
-          <Redo2 className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.35} />
+          <Redo2 className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.7} />
         </button>
         {onQuickSave && (
           <button
@@ -171,7 +175,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
             aria-label="Quick Save Session (Ctrl+S)"
             title="Quick Save Session (Ctrl+S)"
           >
-            <Save className="w-[18px] h-[18px] sm:w-[20px] sm:h-[20px]" strokeWidth={1.35} />
+            <Save className="w-[18px] h-[18px] sm:w-[20px] sm:h-[20px]" strokeWidth={1.7} />
           </button>
         )}
         {onOpenSessions && (
@@ -182,7 +186,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
             aria-label="Project Sessions"
             title="Project Sessions"
           >
-            <FolderArchive className="w-[18px] h-[18px] sm:w-[20px] sm:h-[20px]" strokeWidth={1.35} />
+            <FolderOpen className="w-[18px] h-[18px] sm:w-[20px] sm:h-[20px]" strokeWidth={1.7} />
           </button>
         )}
         {onOpenIllumination && (
@@ -193,7 +197,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
             aria-label="Studio Illumination"
             title="Studio Illumination"
           >
-            <Sun className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.35} />
+            <Sun className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.7} />
           </button>
         )}
         <button
@@ -203,8 +207,19 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
           aria-label="Shape Snapping"
           title="Shape Snapping (Auto-Shapes)"
         >
-          <Square className="w-[17px] h-[17px] sm:w-[19px] sm:h-[19px]" strokeWidth={1.35} />
+          <Square className="w-[17px] h-[17px] sm:w-[19px] sm:h-[19px]" strokeWidth={1.7} />
         </button>
+        {onOpenScaffolding && (
+          <button
+            type="button"
+            onClick={onOpenScaffolding}
+            className={`${button} hidden md:grid`}
+            aria-label="3D Armatures & Guides"
+            title="3D Armatures & Guides (Mannequins, Head Cage, Car, Limbs)"
+          >
+            <User className="w-[17px] h-[17px] sm:w-[19px] sm:h-[19px] text-sky-400" strokeWidth={1.7} />
+          </button>
+        )}
         <button
           type="button"
           onClick={openSettings}
@@ -212,7 +227,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
           aria-label="Settings"
           title="Settings"
         >
-          <Settings className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.35} />
+          <Settings className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.7} />
         </button>
         <button
           type="button"
@@ -222,9 +237,9 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
           title={isFsActive ? 'Exit Full Screen' : 'Full Screen'}
         >
           {isFsActive ? (
-            <Minimize className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.35} />
+            <Minimize2 className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.7} />
           ) : (
-            <Maximize className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.35} />
+            <Maximize2 className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.7} />
           )}
         </button>
         <button
@@ -249,6 +264,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
         onOpenIllumination={onOpenIllumination}
         onOpenShapes={openShapes}
         onOpenSettings={openSettings}
+        onOpenScaffolding={onOpenScaffolding}
         onToggleFullscreen={handleToggleFullscreen}
       />
     </header>

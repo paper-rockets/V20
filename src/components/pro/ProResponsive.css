@@ -1,295 +1,225 @@
-/* Responsive Studio shell. The protected 3D navigator is intentionally not addressed here. */
+/* Mobile-first Studio shell. The protected 3D axis gizmo is intentionally untouched. */
+
+#mody-autosave-indicator { display: none !important; }
+
+/* Retired duplicate navigation pod. The axis gizmo and native gestures remain. */
+#viewport-camera-control-pod,
+#viewport-nav-pod-wakeup { display: none !important; }
 
 .paperrocket-studio-rail {
-  left: 0;
-  right: 88px;
-  bottom: 0;
-  padding: 0 6px max(6px, env(safe-area-inset-bottom));
+  position: fixed;
+  inset: 0;
+  width: auto;
+  padding: 0;
+  transform: none;
+  pointer-events: none;
 }
 
-.paperrocket-studio-rail-inner {
-  width: 100%;
-  min-height: 64px;
-  justify-content: space-around;
-  gap: 2px;
-  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, #111318 94%, transparent);
-  box-shadow: 0 -10px 30px rgb(0 0 0 / 28%);
+.paperrocket-studio-rail-inner { display: contents; }
+
+/* Scene tools: Select, Create, Deform, Layers. */
+.paperrocket-studio-mode-group {
+  position: fixed;
+  top: 50%;
+  right: 8px;
+  z-index: 50;
+  display: flex;
+  width: 54px;
+  padding: 5px;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 17px;
+  background: rgb(17 19 24 / 94%);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 28%);
+  transform: translateY(-50%);
+  transition: transform 180ms ease-out, opacity 180ms ease-out;
+  pointer-events: auto;
 }
 
-[data-theme='light'] .paperrocket-studio-rail-inner,
-.light .paperrocket-studio-rail-inner {
-  background: color-mix(in srgb, #f7f4ee 96%, transparent);
+.paperrocket-studio-rail[data-theme='light'] .paperrocket-studio-mode-group {
+  border-color: rgb(35 28 20 / 12%);
+  background: rgb(247 244 238 / 96%);
+  box-shadow: 0 12px 28px rgb(35 28 20 / 13%);
 }
 
 .paperrocket-studio-mode {
-  width: 19%;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  gap: 0;
+}
+
+.paperrocket-studio-mode-label { display: none; }
+
+/* Drawing tools stay centered at the bottom. */
+.paperrocket-studio-quick-group {
+  position: fixed;
+  left: 50%;
+  bottom: max(7px, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  width: min(calc(100% - 16px), 468px);
+  min-height: 62px;
+  padding: 4px;
+  gap: 2px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 19px;
+  background: rgb(17 19 24 / 95%);
+  box-shadow: 0 -10px 30px rgb(0 0 0 / 28%);
+  transform: translateX(-50%);
+  transition: transform 180ms ease-out, opacity 180ms ease-out;
+  pointer-events: auto;
+}
+
+.paperrocket-studio-rail[data-theme='light'] .paperrocket-studio-quick-group {
+  border-color: rgb(35 28 20 / 12%);
+  background: rgb(247 244 238 / 97%);
+  box-shadow: 0 -10px 28px rgb(35 28 20 / 13%);
+}
+
+.paperrocket-studio-quick {
+  display: flex;
+  width: 100%;
   min-width: 0;
-  min-height: 56px;
-  padding: 6px 2px 5px;
+  min-height: 52px;
+  padding: 5px 2px 4px;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 3px;
 }
 
-.paperrocket-studio-mode-label {
+.paperrocket-studio-quick-label {
   display: block;
-  font-size: 10px;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 9.5px;
   line-height: 1;
-  letter-spacing: 0.01em;
+  letter-spacing: .01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.paperrocket-studio-mode-group {
-  display: contents;
+.paperrocket-studio-quick--color > span:first-child { width: 22px; height: 22px; }
+
+.paperrocket-studio-mode[data-active='true'],
+.paperrocket-studio-quick[data-active='true'] {
+  background: rgb(255 255 255 / 12%) !important;
+  color: white;
 }
 
-.paperrocket-studio-quick-group {
-  display: none;
+.paperrocket-studio-rail[data-theme='light'] .paperrocket-studio-mode[data-active='true'],
+.paperrocket-studio-rail[data-theme='light'] .paperrocket-studio-quick[data-active='true'] {
+  background: rgb(35 28 20 / 9%) !important;
+  color: rgb(23 23 23);
 }
 
-.paperrocket-studio-quick,
-.paperrocket-studio-expand {
-  display: none;
+.paperrocket-studio-expand { display: none; }
+
+.paperrocket-studio-rail[data-dock-position='left'] .paperrocket-studio-mode-group { left: 8px; right: auto; }
+.paperrocket-studio-rail[data-dock-position='right'] .paperrocket-studio-mode-group { left: auto; right: 8px; }
+
+.paperrocket-studio-rail[data-hidden='true'] .paperrocket-studio-quick-group {
+  opacity: 0;
+  transform: translate(-50%, calc(100% + 20px));
+  pointer-events: none;
 }
+
+.paperrocket-studio-rail[data-hidden='true'] .paperrocket-studio-mode-group,
+.paperrocket-studio-rail[data-dock-position='right'][data-hidden='true'] .paperrocket-studio-mode-group {
+  opacity: 0;
+  transform: translate(calc(100% + 20px), -50%);
+  pointer-events: none;
+}
+
+.paperrocket-studio-rail[data-dock-position='left'][data-hidden='true'] .paperrocket-studio-mode-group {
+  transform: translate(calc(-100% - 20px), -50%);
+}
+
+.paperrocket-studio-dock-reveal {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  width: 22px;
+  height: 48px;
+  border-radius: 12px 0 0 12px;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.paperrocket-studio-dock-reveal[data-dock-position='left'] {
+  left: 0;
+  right: auto;
+  border-radius: 0 12px 12px 0;
+}
+
+.paperrocket-studio-shelf {
+  position: fixed !important;
+  left: 50% !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: calc(78px + env(safe-area-inset-bottom)) !important;
+  width: min(calc(100% - 16px), 360px) !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  transform: translateX(-50%) !important;
+}
+
+.paperrocket-studio-shelf--compact { width: min(calc(100% - 16px), 220px) !important; }
+.paperrocket-studio-shelf--brush { width: min(calc(100% - 16px), 360px) !important; }
 
 .paperrocket-context-panel {
-  left: 0;
-  right: 0;
-  bottom: calc(72px + env(safe-area-inset-bottom));
-  width: 100%;
+  left: 8px;
+  right: auto;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  width: calc(100vw - 76px);
+  max-width: 360px;
   max-height: min(68dvh, calc(100dvh - 132px));
-  border-radius: 20px 20px 0 0;
+  border-radius: 20px;
   animation-name: enter;
 }
 
-@media (max-width: 699px) {
-  .paperrocket-studio-shelf {
-    position: fixed !important;
-    left: 8px !important;
-    right: 8px !important;
-    top: auto !important;
-    bottom: calc(74px + env(safe-area-inset-bottom)) !important;
-    width: auto !important;
-    max-width: none !important;
-    margin-left: 0 !important;
-    transform: none !important;
-  }
-}
-
-/* Tablet: compact left rail with a contextual inspector on the right. */
 @media (min-width: 700px) {
-  .paperrocket-studio-rail {
-    left: 8px;
+  .paperrocket-studio-rail[data-dock-position='auto'] .paperrocket-studio-mode-group {
+    left: 10px;
     right: auto;
-    top: 50%;
-    bottom: auto;
-    padding: 0;
-    transform: translateY(-50%);
   }
 
-  .paperrocket-studio-rail-inner {
-    width: 52px;
-    min-height: 0;
-    padding: 4px 0;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 4px;
-    border: 0;
-    border-radius: 16px;
-    background: transparent;
-    box-shadow: none;
-    backdrop-filter: none;
+  .paperrocket-studio-rail[data-dock-position='auto'][data-hidden='true'] .paperrocket-studio-mode-group {
+    transform: translate(calc(-100% - 20px), -50%);
   }
 
-  .paperrocket-studio-mode-group,
-  .paperrocket-studio-quick-group {
-    display: flex;
-    width: 100%;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .paperrocket-studio-quick-group {
-    padding-top: 4px;
-    border-top: 1px solid rgb(255 255 255 / 10%);
-  }
-
-  .paperrocket-studio-rail[data-theme='light'] .paperrocket-studio-quick-group {
-    border-top-color: rgb(35 28 20 / 10%);
-  }
-
-  .paperrocket-studio-mode,
-  .paperrocket-studio-quick {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    min-height: 44px;
-    padding: 0;
-    flex-direction: row;
-  }
-
-  .paperrocket-studio-mode-label {
-    display: none;
+  .paperrocket-studio-dock-reveal[data-dock-position='auto'] {
+    left: 0;
+    right: auto;
+    border-radius: 0 12px 12px 0;
   }
 
   .paperrocket-context-panel {
     left: auto;
-    right: 104px;
-    top: 72px;
-    bottom: 12px;
-    width: min(320px, calc(100vw - 96px));
-    max-height: none;
+    right: 16px;
+    bottom: 84px;
+    width: min(344px, calc(100vw - 96px));
+    max-height: min(64dvh, 680px);
     border-radius: 18px;
   }
 
-  .paperrocket-studio-shelf {
-    position: absolute !important;
-    left: 100% !important;
-    right: auto !important;
-    bottom: auto;
-    margin-left: 12px !important;
-  }
-
-  .paperrocket-context-backdrop {
-    display: none;
-  }
+  .paperrocket-context-backdrop { display: none; }
 }
 
-/* Desktop: expandable labeled rail and a docked right inspector. */
-@media (min-width: 1180px) {
-  .paperrocket-studio-rail-inner {
-    width: 56px;
-    align-items: stretch;
-    gap: 5px;
-    padding: 6px;
-    border: 1px solid rgb(255 255 255 / 10%);
-    border-radius: 16px;
-    background: rgb(18 20 24 / 94%);
-    box-shadow: 0 12px 34px rgb(0 0 0 / 28%);
-  }
-
-  .paperrocket-studio-rail[data-expanded='true'] .paperrocket-studio-rail-inner {
-    width: 144px;
-  }
-
-  .paperrocket-studio-rail[data-theme='light'] .paperrocket-studio-rail-inner {
-    border-color: rgb(35 28 20 / 12%);
-    background: rgb(247 244 238 / 96%);
-    box-shadow: 0 12px 30px rgb(35 28 20 / 13%);
-  }
-
-  .paperrocket-studio-mode-group {
-    gap: 2px;
-    align-items: stretch;
-  }
-
-  .paperrocket-studio-mode,
-  .paperrocket-studio-quick {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .paperrocket-studio-mode {
-    height: 40px;
-    min-height: 40px;
-  }
-
-  .paperrocket-studio-mode[data-active='true'],
-  .paperrocket-studio-quick[data-active='true'] {
-    background: rgb(255 255 255 / 12%) !important;
-    box-shadow: inset 3px 0 0 currentColor;
-  }
-
-  .paperrocket-studio-rail[data-theme='light'] .paperrocket-studio-mode[data-active='true'],
-  .paperrocket-studio-rail[data-theme='light'] .paperrocket-studio-quick[data-active='true'] {
-    background: rgb(35 28 20 / 8%) !important;
-  }
-
-  .paperrocket-studio-rail[data-expanded='true'] .paperrocket-studio-mode {
-    justify-content: flex-start;
-    padding: 0 12px;
-    gap: 10px;
-  }
-
-  .paperrocket-studio-rail[data-expanded='true'] .paperrocket-studio-mode-label {
-    display: block;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .paperrocket-studio-quick-group {
-    width: 100%;
-    padding-top: 5px;
-    border-top: 1px solid rgb(255 255 255 / 10%);
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
-  }
-
-  .paperrocket-studio-rail[data-expanded='true'] .paperrocket-studio-quick-group {
-    flex-direction: row;
-    justify-content: center;
-    gap: 2px;
-  }
-
-  .paperrocket-studio-rail[data-theme='light'] .paperrocket-studio-quick-group {
-    border-top-color: rgb(35 28 20 / 10%);
-  }
-
-  .paperrocket-studio-quick-group .paperrocket-studio-quick {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    min-width: 40px;
-    height: 38px;
-    min-height: 38px;
-  }
-
-  .paperrocket-studio-expand {
-    display: flex;
-    width: 44px;
-    height: 30px;
-    align-self: flex-end;
-  }
-
-  .paperrocket-studio-rail[data-expanded='false'] .paperrocket-studio-expand {
-    align-self: center;
-  }
-
-  .paperrocket-studio-rail[data-expanded='false'] .paperrocket-studio-expand-icon {
-    transform: rotate(180deg);
-  }
-
-  .paperrocket-context-panel {
-    right: 104px;
-    top: 72px;
-    bottom: 16px;
-    width: 336px;
-    border-radius: 18px;
-  }
-}
-
-.paperrocket-brush-card {
-  isolation: isolate;
-}
+.paperrocket-brush-card { isolation: isolate; }
 
 .paperrocket-brush-card:focus-visible,
-.paperrocket-brush-tab:focus-visible,
 .paperrocket-studio-mode:focus-visible,
-.paperrocket-studio-quick:focus-visible,
-.paperrocket-studio-expand:focus-visible {
+.paperrocket-studio-quick:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .paperrocket-studio-rail-inner,
-  .paperrocket-studio-expand-icon {
-    transition: none;
-  }
+  .paperrocket-studio-mode-group,
+  .paperrocket-studio-quick-group { transition: none; }
 }

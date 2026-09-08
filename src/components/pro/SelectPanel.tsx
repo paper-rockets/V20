@@ -198,6 +198,7 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
             { id: 'active_layer' as const, label: 'Active Layer' },
             { id: 'model' as const, label: 'Model' },
             { id: 'strokes' as const, label: 'All Curves' },
+            { id: 'guide' as const, label: '3D Guide' },
             { id: 'all' as const, label: 'All Objects' },
           ].map((scope) => (
             <button
@@ -208,6 +209,8 @@ export const SelectPanel: React.FC<SelectPanelProps> = ({
                 onSelectTargetScope(scope.id);
               }}
               className={`h-8 min-h-[32px] px-2 py-1 rounded-lg border text-center font-medium transition-all text-xs ${
+                scope.id === 'all' ? 'col-span-2' : ''
+              } ${
                 targetScope === scope.id
                   ? isLight
                     ? 'bg-neutral-900 border-neutral-900 text-white font-bold shadow-xs'

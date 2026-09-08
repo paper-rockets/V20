@@ -6,7 +6,7 @@ The interface is a quiet creative instrument around a large, uninterrupted 3D ca
 
 ## Responsive workspace
 
-- Phone: five Studio modes in the lower thumb zone; one full-width contextual bottom sheet at a time.
+- Phone: a compact, persistent left Studio rail; one full-width contextual bottom sheet at a time. The same rail and camera controls remain in place when the installed app enters fullscreen.
 - Tablet: compact left mode rail and a right-side contextual inspector.
 - Desktop: persistent left rail and docked right inspector with room for shortcuts and labels.
 - Preserve the existing `Option3SphereNavigator` appearance, behavior, motion, menus, and positioning logic.

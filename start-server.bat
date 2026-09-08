@@ -5,7 +5,7 @@ echo ========================================================
 echo        REMIX 3D STUDIO - LOCAL DEV SERVER
 echo ========================================================
 echo.
-echo Launching local development server on http://localhost:3000 ...
+echo Launching local development server on http://localhost:5000 ...
 echo.
 
 node scripts/server-local.mjs

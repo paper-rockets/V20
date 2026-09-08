@@ -3,7 +3,7 @@ import { createServer } from 'vite';
 
 const args = process.argv.slice(2);
 const portArgIndex = args.indexOf('--port');
-const requestedPort = portArgIndex !== -1 && args[portArgIndex + 1] ? parseInt(args[portArgIndex + 1], 10) : 3000;
+const requestedPort = portArgIndex !== -1 && args[portArgIndex + 1] ? parseInt(args[portArgIndex + 1], 10) : 5000;
 
 function getLocalIpAddresses() {
   const interfaces = os.networkInterfaces();

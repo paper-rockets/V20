@@ -383,6 +383,7 @@ export const Viewport: React.FC<ViewportProps> = ({
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isRadialMenuOpen) return;
     e.preventDefault();
     if ((window as any).__NAVIGATOR_ACTIVE__) return;
     refreshRect();
@@ -1314,6 +1315,7 @@ export const Viewport: React.FC<ViewportProps> = ({
 
       {/* Invisible Hover-Wakeup Zone near bottom-right corner */}
       <div
+        id="viewport-nav-pod-wakeup"
         onPointerEnter={() => showNavPod(3500)}
         className="absolute bottom-0 right-0 w-28 h-72 z-10 pointer-events-auto"
         aria-hidden="true"

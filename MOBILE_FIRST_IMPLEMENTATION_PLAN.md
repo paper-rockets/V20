@@ -32,6 +32,19 @@ Target: `E:\X\AiStudio Workflow\V20`
 5. Establish Android performance, offline, and storage reliability budgets.
 6. Add automated protection before packaging the APK.
 
+## Current UI implementation status (September 8, 2026)
+
+- Implemented one mobile-first Studio shell with two distinct control areas: a centered bottom Drawing dock and a compact side Studio dock.
+- Drawing dock: Draw, Erase, quick Color, Size, Brush, and Symmetry.
+- Studio dock: Select, Create, Deform, and Layers. Its side can be set to Auto, Left, or Right, with optional auto-hide.
+- Removed the duplicate floating zoom/reset/pan strip from every device. The existing 3D axis gizmo remains unchanged.
+- Reduced the first brush picker to four plain-language essentials: Flat Ribbon, Surface Decal, 3D Tube, and Chisel Marker. Textures and effects are behind More Brushes.
+- Moved fine brush controls to a separate Fine Tune screen instead of expanding an endless accordion.
+- Standardized Studio and radial-menu icons; the radial center brush-size readout now opens the editable size control.
+- Added a permanent quick-color entry point and removed the legacy green autosave indicator while retaining autosave behavior.
+- Changed the model library to legible single-column cards at compact widths, with real model names and Add to Scene as the default UI choice.
+- Remaining interface work: compact mobile lighting editor, light-theme scene texture, final phone/tablet rotation pass, and accessibility/touch QA.
+
 ## Work for Antigravity Gemini 3.8
 
 These are bounded, mechanical tasks. Complete one phase at a time in the real V20 folder. After every phase run `npm run lint`, `npm run build`, and the relevant Playwright smoke test. Do not redesign screens or invent engine methods.
@@ -90,9 +103,9 @@ Use one information architecture with three responsive presentations:
 
 | Device | Primary navigation | Context controls |
 |---|---|---|
-| Phone | Bottom five-mode bar: Select, Draw, Create, Deform, Layers | Full-width bottom sheet with sticky title and primary action |
-| Tablet | Compact left mode rail | Right-side panel, sized to preserve a large drawing viewport |
-| Desktop | Labeled or expandable left rail | Docked right inspector with optional keyboard shortcuts |
+| Phone | Bottom Drawing dock plus compact right Studio dock | Full-width bottom sheet with sticky title and primary action |
+| Tablet | Bottom Drawing dock plus compact left Studio dock | Right-side panel, sized to preserve a large drawing viewport |
+| Desktop | Same two-dock model with mouse and keyboard affordances | Docked right inspector with optional keyboard shortcuts |
 
 Rules:
 

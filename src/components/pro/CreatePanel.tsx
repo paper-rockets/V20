@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Square } from 'lucide-react';
+import { ChevronDown, ChevronRight, Square, User, Spline } from 'lucide-react';
 import {
   IcCube as Box,
   IcSphere as Circle,
@@ -27,6 +27,8 @@ interface CreatePanelProps {
   onSetModelDisplayMode: (mode: ModelDisplayMode) => void;
   onOpenModelLibrary: () => void;
   onOpenImporter: () => void;
+  onOpenScaffolding?: () => void;
+  onOpenBentGuide?: () => void;
   theme?: 'light' | 'dark';
 }
 
@@ -51,6 +53,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   onSetModelDisplayMode,
   onOpenModelLibrary,
   onOpenImporter,
+  onOpenScaffolding,
+  onOpenBentGuide,
   theme = 'dark',
 }) => {
   const isLight = theme === 'light';
@@ -123,7 +127,63 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         </div>
       </div>
 
-      {/* 2. MODEL LIBRARY & IMPORT */}
+      {/* 2. DRAWING GUIDES & ARMATURES */}
+      {(onOpenScaffolding || onOpenBentGuide) && (
+        <div className={cardClass}>
+          <div className="flex items-center justify-between">
+            <div className={subHeadingClass}>Drawing Guides & Armatures</div>
+            <span className="text-[10px] opacity-65 font-medium">Snap & Sketch</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+            {onOpenScaffolding && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.trigger('light');
+                  onOpenScaffolding();
+                }}
+                className={`h-11 min-h-[44px] px-2.5 py-1 rounded-lg border flex items-center gap-2 font-medium transition-all active:scale-[0.98] ${
+                  isLight
+                    ? 'bg-white border-black/10 hover:bg-neutral-200/50 text-neutral-900 shadow-xs'
+                    : 'bg-black/30 border-white/10 hover:bg-white/10 text-neutral-100 shadow-xs'
+                }`}
+                title="Open 3D Armatures (Human figure, head cage, car, limb guides)"
+              >
+                <User className="w-4 h-4 shrink-0 text-sky-400" />
+                <div className="flex flex-col text-left leading-tight overflow-hidden">
+                  <span className="text-xs font-semibold truncate">3D Armatures</span>
+                  <span className="text-[9.5px] opacity-65 truncate">Mannequin & Forms</span>
+                </div>
+              </button>
+            )}
+
+            {onOpenBentGuide && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.trigger('light');
+                  onOpenBentGuide();
+                }}
+                className={`h-11 min-h-[44px] px-2.5 py-1 rounded-lg border flex items-center gap-2 font-medium transition-all active:scale-[0.98] ${
+                  isLight
+                    ? 'bg-white border-black/10 hover:bg-neutral-200/50 text-neutral-900 shadow-xs'
+                    : 'bg-black/30 border-white/10 hover:bg-white/10 text-neutral-100 shadow-xs'
+                }`}
+                title="Open Bend Path & Curved Guide"
+              >
+                <Spline className="w-4 h-4 shrink-0 text-teal-400" />
+                <div className="flex flex-col text-left leading-tight overflow-hidden">
+                  <span className="text-xs font-semibold truncate">Bend Path</span>
+                  <span className="text-[9.5px] opacity-65 truncate">Curves & Ribbons</span>
+                </div>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. MODEL LIBRARY & IMPORT */}
       <div className={cardClass}>
         <div className={subHeadingClass}>3D Models</div>
 
