@@ -10,8 +10,9 @@ import {
   IcSave as Save,
   IcSessions as FolderArchive,
 } from '../pro/StudioIcons';
-import { Square } from 'lucide-react';
+import { MoreHorizontal, Square } from 'lucide-react';
 import { toggleSheet } from './panelStore';
+import { StudioTopMoreMenu } from './StudioTopMoreMenu';
 
 interface StudioTopStripProps {
   projectName: string;
@@ -54,6 +55,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
 
   const [isFullscreen, setIsFullscreen] = useState(isCurrentlyFullscreen);
   const [simulatedFs, setSimulatedFs] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const isFsActive = isFullscreen || simulatedFs;
 
   useEffect(() => {
@@ -125,8 +127,12 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
     }
   }, [simulatedFs]);
 
+  const openShapes = useCallback(() => toggleSheet('shapes'), []);
+  const openSettings = useCallback(() => toggleSheet('settings'), []);
+  const closeMore = useCallback(() => setMoreOpen(false), []);
+
   return (
-    <header className="studio-top-strip fixed inset-x-0 top-0 z-30 flex h-14 sm:h-16 items-center justify-between px-1.5 sm:px-4 pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pointer-events-none select-none">
+    <header className={`studio-top-strip fixed inset-x-0 top-0 ${moreOpen ? 'z-50' : 'z-30'} flex h-[calc(3.5rem+env(safe-area-inset-top))] items-end justify-between px-1.5 pb-0 pt-[env(safe-area-inset-top)] sm:h-[calc(4rem+env(safe-area-inset-top))] sm:px-4 pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pointer-events-none select-none`}>
       <button
         type="button"
         onClick={onOpenModelLibrary}
@@ -138,7 +144,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
           {projectName || 'Model'}
         </span>
       </button>
-      <nav className="flex items-center gap-0.5 sm:gap-1.5 pointer-events-auto shrink-0 py-0.5 overflow-x-auto no-scrollbar" aria-label="History and settings">
+      <nav className="flex items-center gap-0.5 sm:gap-1.5 pointer-events-auto shrink-0 py-0.5 overflow-x-auto no-scrollbar" aria-label="History and studio actions">
         <button
           type="button"
           onClick={onUndo}
@@ -161,7 +167,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
           <button
             type="button"
             onClick={onQuickSave}
-            className={button}
+            className={`${button} hidden md:grid`}
             aria-label="Quick Save Session (Ctrl+S)"
             title="Quick Save Session (Ctrl+S)"
           >
@@ -172,7 +178,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
           <button
             type="button"
             onClick={onOpenSessions}
-            className={button}
+            className={`${button} hidden md:grid`}
             aria-label="Project Sessions"
             title="Project Sessions"
           >
@@ -183,7 +189,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
           <button
             type="button"
             onClick={onOpenIllumination}
-            className={`${button} text-amber-400 hover:text-amber-300`}
+            className={`${button} hidden text-amber-400 hover:text-amber-300 md:grid`}
             aria-label="Studio Illumination"
             title="Studio Illumination"
           >
@@ -192,8 +198,8 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
         )}
         <button
           type="button"
-          onClick={() => toggleSheet('shapes')}
-          className={button}
+          onClick={openShapes}
+          className={`${button} hidden md:grid`}
           aria-label="Shape Snapping"
           title="Shape Snapping (Auto-Shapes)"
         >
@@ -201,8 +207,8 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => toggleSheet('settings')}
-          className={button}
+          onClick={openSettings}
+          className={`${button} hidden md:grid`}
           aria-label="Settings"
           title="Settings"
         >
@@ -211,7 +217,7 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
         <button
           type="button"
           onClick={handleToggleFullscreen}
-          className={`${button} shrink-0`}
+          className={`${button} hidden shrink-0 md:grid`}
           aria-label={isFsActive ? 'Exit Full Screen' : 'Full Screen'}
           title={isFsActive ? 'Exit Full Screen' : 'Full Screen'}
         >
@@ -221,7 +227,30 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
             <Maximize className="w-[18px] h-[18px] sm:w-[21px] sm:h-[21px]" strokeWidth={1.35} />
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          className={`${button} md:hidden`}
+          aria-label="More actions"
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
+          aria-controls="studio-top-more-menu"
+        >
+          <MoreHorizontal className="h-5 w-5" strokeWidth={1.6} />
+        </button>
       </nav>
+      <StudioTopMoreMenu
+        open={moreOpen}
+        theme={theme}
+        isFullscreen={isFsActive}
+        onClose={closeMore}
+        onQuickSave={onQuickSave}
+        onOpenSessions={onOpenSessions}
+        onOpenIllumination={onOpenIllumination}
+        onOpenShapes={openShapes}
+        onOpenSettings={openSettings}
+        onToggleFullscreen={handleToggleFullscreen}
+      />
     </header>
   );
 };

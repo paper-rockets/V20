@@ -11,9 +11,11 @@ import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import * as WebGLTextureUtils from 'three/examples/jsm/utils/WebGLTextureUtils.js';
 import JSZip from 'jszip';
+import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
 import {
   ConversionResult,
   DracoCompressionConfig,
+  MeshSimplificationConfig,
   ModelInspectionData,
   ModelTransformConfig,
   Saved3DModel,
@@ -44,6 +46,13 @@ export const DEFAULT_DRACO_CONFIG: DracoCompressionConfig = {
   normalQuantization: 10,
   uvQuantization: 10,
   colorQuantization: 8,
+};
+
+export const DEFAULT_SIMPLIFICATION_CONFIG: MeshSimplificationConfig = {
+  enabled: false,
+  targetRatio: 0.5,
+  maxError: 0.02,
+  lockBorder: true,
 };
 
 export class ModelConverterEngine {
@@ -578,6 +587,132 @@ export class ModelConverterEngine {
   }
 
   /**
+   * Simplifies a BufferGeometry using MeshoptSimplifier, decimating triangles
+   * while remapping vertex attributes and stripping unused points.
+   */
+  public static simplifyGeometry(
+    geometry: THREE.BufferGeometry,
+    config: MeshSimplificationConfig
+  ): THREE.BufferGeometry {
+    const posAttr = geometry.attributes.position;
+    if (!posAttr || posAttr.count < 4) return geometry;
+
+    const positions = posAttr.array as Float32Array;
+    let initialIndices: Uint32Array;
+
+    if (geometry.index) {
+      initialIndices = new Uint32Array(geometry.index.array);
+    } else {
+      initialIndices = new Uint32Array(posAttr.count);
+      for (let i = 0; i < posAttr.count; i++) {
+        initialIndices[i] = i;
+      }
+    }
+
+    if (initialIndices.length < 12) return geometry;
+
+    const targetRatio = Math.max(0.05, Math.min(1.0, config.targetRatio));
+    const targetIndexCount = Math.floor((initialIndices.length * targetRatio) / 3) * 3;
+    if (targetIndexCount >= initialIndices.length) return geometry;
+
+    const flags = config.lockBorder ? (['LockBorder'] as any) : [];
+
+    const [simplifiedIndices] = MeshoptSimplifier.simplify(
+      initialIndices,
+      positions,
+      3,
+      targetIndexCount,
+      config.maxError ?? 0.02,
+      flags
+    );
+
+    if (!simplifiedIndices || simplifiedIndices.length === 0 || simplifiedIndices.length >= initialIndices.length) {
+      return geometry;
+    }
+
+    // Compact vertices: remap referenced vertices and discard unreferenced ones to shrink memory & file size
+    const remap = new Int32Array(posAttr.count).fill(-1);
+    let newVertexCount = 0;
+    for (let i = 0; i < simplifiedIndices.length; i++) {
+      const oldIdx = simplifiedIndices[i];
+      if (remap[oldIdx] === -1) {
+        remap[oldIdx] = newVertexCount++;
+      }
+    }
+
+    const compactIndices = new Uint32Array(simplifiedIndices.length);
+    for (let i = 0; i < simplifiedIndices.length; i++) {
+      compactIndices[i] = remap[simplifiedIndices[i]];
+    }
+
+    const newGeom = new THREE.BufferGeometry();
+    newGeom.setIndex(new THREE.BufferAttribute(compactIndices, 1));
+
+    // Remap all vertex attributes (position, normal, uv, uv2, color, etc.)
+    for (const name in geometry.attributes) {
+      const attr = geometry.attributes[name];
+      const itemSize = attr.itemSize;
+      const oldArr = attr.array;
+      const newArr = new (oldArr.constructor as any)(newVertexCount * itemSize);
+
+      for (let oldIdx = 0; oldIdx < posAttr.count; oldIdx++) {
+        const newIdx = remap[oldIdx];
+        if (newIdx !== -1) {
+          for (let c = 0; c < itemSize; c++) {
+            newArr[newIdx * itemSize + c] = oldArr[oldIdx * itemSize + c];
+          }
+        }
+      }
+
+      newGeom.setAttribute(name, new THREE.BufferAttribute(newArr, itemSize, attr.normalized));
+    }
+
+    newGeom.computeVertexNormals();
+    return newGeom;
+  }
+
+  /**
+   * Recursively simplifies all meshes inside a 3D Object or Scene
+   */
+  public static async simplifyObject(
+    object: THREE.Object3D,
+    config: MeshSimplificationConfig
+  ): Promise<{ beforeTriangles: number; afterTriangles: number }> {
+    if (!config.enabled) {
+      return { beforeTriangles: 0, afterTriangles: 0 };
+    }
+
+    if (MeshoptSimplifier.ready) {
+      await MeshoptSimplifier.ready;
+    }
+
+    let beforeTriangles = 0;
+    let afterTriangles = 0;
+
+    object.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        const geom = mesh.geometry;
+        if (!geom) return;
+
+        const count = geom.index ? geom.index.count / 3 : (geom.attributes.position?.count || 0) / 3;
+        beforeTriangles += Math.floor(count);
+
+        const simplified = this.simplifyGeometry(geom, config);
+        if (simplified !== geom) {
+          geom.dispose();
+          mesh.geometry = simplified;
+        }
+
+        const newCount = mesh.geometry.index ? mesh.geometry.index.count / 3 : (mesh.geometry.attributes.position?.count || 0) / 3;
+        afterTriangles += Math.floor(newCount);
+      }
+    });
+
+    return { beforeTriangles, afterTriangles };
+  }
+
+  /**
    * Fit Model to Target Height/Dimension in Meters (Default: 2.0m)
    */
   public static fitToTarget(object: THREE.Object3D, targetMeters = 2.0): number {
@@ -791,7 +926,8 @@ export class ModelConverterEngine {
     files: FileList | File[],
     customName?: string,
     transformConfig?: Partial<ModelTransformConfig>,
-    dracoConfig?: Partial<DracoCompressionConfig>
+    dracoConfig?: Partial<DracoCompressionConfig>,
+    simplificationConfig?: Partial<MeshSimplificationConfig>
   ): Promise<ConversionResult> {
     const startTime = performance.now();
 
@@ -822,7 +958,16 @@ export class ModelConverterEngine {
     // 4. Apply Transformations & Final Baking
     const transformed = this.applyTransforms(scene, fullTransform, true);
 
-    // 5. Inspect Model
+    // 5. Mesh Decimation / Slimming
+    const fullSimp: MeshSimplificationConfig = {
+      ...DEFAULT_SIMPLIFICATION_CONFIG,
+      ...simplificationConfig,
+    };
+    if (fullSimp.enabled) {
+      await this.simplifyObject(transformed, fullSimp);
+    }
+
+    // 6. Inspect Model
     const inspection = this.inspect(transformed, finalName, format, originalBytes);
 
     // 6. Compress & Export to lightweight GLB

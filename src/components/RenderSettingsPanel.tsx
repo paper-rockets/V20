@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PostProcessSettings, RenderMode, GPUInfo } from '../types';
+import { PostProcessSettings, RenderMode, GPUInfo, PathTracingProgressInfo } from '../types';
 import {
   Sparkles,
   Sun,
@@ -24,6 +24,7 @@ interface RenderSettingsPanelProps {
   onRecalculateNormals?: () => number | void;
   gpuInfo?: GPUInfo;
   theme?: 'light' | 'dark';
+  pathTracingProgress?: PathTracingProgressInfo | null;
 }
 
 export const RenderSettingsPanelComponent: React.FC<RenderSettingsPanelProps> = ({
@@ -33,6 +34,7 @@ export const RenderSettingsPanelComponent: React.FC<RenderSettingsPanelProps> = 
   onRecalculateNormals,
   gpuInfo,
   theme = 'dark',
+  pathTracingProgress,
 }) => {
   const isLight = theme === 'light';
   const [recalcFeedback, setRecalcFeedback] = useState<string | null>(null);
@@ -40,7 +42,13 @@ export const RenderSettingsPanelComponent: React.FC<RenderSettingsPanelProps> = 
   const isWebGPU = gpuInfo?.backend === 'webgpu';
 
   const update = <K extends keyof PostProcessSettings>(key: K, val: PostProcessSettings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: val }));
+    setSettings((prev) => {
+      const next = { ...prev, [key]: val };
+      if (key === 'rayTracing' && val === true && prev.renderMode === 'draft') {
+        next.renderMode = 'render';
+      }
+      return next;
+    });
   };
 
   const handleManualRecalculate = () => {
@@ -160,6 +168,95 @@ export const RenderSettingsPanelComponent: React.FC<RenderSettingsPanelProps> = 
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Studio Path Tracing & Global Illumination */}
+        <div className={`p-3 rounded-xl border space-y-3 ${
+          isLight ? 'bg-[#f4f0e9]/80 border-black/10' : 'bg-neutral-950/60 border-neutral-800/80'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 font-semibold text-neutral-700 dark:text-zinc-300">
+              <Zap className="w-3.5 h-3.5" />
+              <span>Studio Path Tracing</span>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.rayTracing}
+              onChange={(e) => update('rayTracing', e.target.checked)}
+              className="accent-neutral-900 dark:accent-neutral-100 w-4 h-4 rounded cursor-pointer"
+            />
+          </div>
+
+          {/* Status badge when active */}
+          {settings.rayTracing && (
+            <div className={`flex items-center justify-between text-[11px] font-mono px-2.5 py-1.5 rounded-lg border ${
+              isLight ? 'bg-white/80 border-black/10' : 'bg-neutral-900/80 border-neutral-800'
+            }`}>
+              <span className={isLight ? 'text-neutral-600' : 'text-neutral-400'}>State:</span>
+              <span className={
+                pathTracingProgress?.converged
+                  ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                  : pathTracingProgress?.isStationary && (pathTracingProgress?.samples ?? 0) > 0
+                  ? 'text-amber-600 dark:text-amber-400 font-semibold'
+                  : 'text-neutral-600 dark:text-neutral-300'
+              }>
+                {pathTracingProgress?.converged
+                  ? `Converged (${pathTracingProgress.maxSamples}s)`
+                  : pathTracingProgress?.isStationary && (pathTracingProgress?.samples ?? 0) > 0
+                  ? `Sampling (${pathTracingProgress.samples}/${pathTracingProgress.maxSamples})`
+                  : 'Interactive (60 FPS)'}
+              </span>
+            </div>
+          )}
+
+          {settings.rayTracing && (
+            <div className="space-y-2.5 pt-1">
+              {/* Quality Preset / Max Samples */}
+              <div className="space-y-1">
+                <div className={`flex justify-between ${isLight ? 'text-neutral-700' : 'text-neutral-300'}`}>
+                  <span>Target Samples</span>
+                  <span className={`font-mono ${isLight ? 'text-neutral-500' : 'text-neutral-400'}`}>{settings.rayTracingSamples ?? 48} samples</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1 pt-0.5">
+                  {[24, 48, 64].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => update('rayTracingSamples', s)}
+                      className={`py-1 rounded text-[11px] font-mono transition-all border ${
+                        (settings.rayTracingSamples ?? 48) === s
+                          ? isLight
+                            ? 'bg-neutral-900 text-white border-neutral-900 shadow-sm'
+                            : 'bg-neutral-100 text-neutral-900 border-neutral-100 shadow-sm'
+                          : isLight
+                          ? 'bg-white border-black/10 text-neutral-600 hover:bg-neutral-50'
+                          : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:bg-neutral-800'
+                      }`}
+                    >
+                      {s === 24 ? 'Mobile 24' : s === 48 ? 'Studio 48' : 'Photo 64'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Light Bounces */}
+              <div className="space-y-1">
+                <div className={`flex justify-between ${isLight ? 'text-neutral-700' : 'text-neutral-300'}`}>
+                  <span>Light Bounces</span>
+                  <span className={`font-mono ${isLight ? 'text-neutral-500' : 'text-neutral-400'}`}>{settings.rayTracingBounces ?? 3} bounces</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="4"
+                  step="1"
+                  value={settings.rayTracingBounces ?? 3}
+                  onChange={(e) => update('rayTracingBounces', parseInt(e.target.value, 10))}
+                  className={`w-full accent-neutral-900 dark:accent-neutral-100 h-1.5 rounded cursor-pointer ${isLight ? 'bg-neutral-200' : 'bg-neutral-800'}`}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 1. Bloom & Neon Glow Halo */}

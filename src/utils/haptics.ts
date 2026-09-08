@@ -123,7 +123,56 @@ class HapticsEngine {
     }
     this.lastTriggerTime = now;
 
-    // 1. Physical Device Vibration API
+    // 1. Native Android APK Mechanical Motor Bridge (LRA Linear Resonant Actuator)
+    if (typeof window !== 'undefined') {
+      const win = window as any;
+      const androidBridge = win.AndroidBridge || win.AndroidInterface || win.Android || win.AndroidHaptics;
+
+      if (androidBridge) {
+        try {
+          if (typeof androidBridge.performHapticFeedback === 'function') {
+            // Android HapticFeedbackConstants: 4 = CLOCK_TICK, 16 = CONFIRM, 3 = KEYBOARD_TAP
+            const constant = (type === 'light' || type === 'detent') ? 4 : (type === 'snap' || type === 'success') ? 16 : 3;
+            androidBridge.performHapticFeedback(constant);
+            return;
+          } else if (typeof androidBridge.vibrateEffect === 'function') {
+            // Android VibrationEffect: 2 = EFFECT_TICK, 5 = EFFECT_HEAVY_CLICK, 0 = EFFECT_CLICK
+            const effect = (type === 'light' || type === 'detent') ? 2 : (type === 'snap' || type === 'heavy') ? 5 : 0;
+            androidBridge.vibrateEffect(effect);
+            return;
+          } else if (typeof androidBridge.click === 'function') {
+            androidBridge.click();
+            return;
+          }
+        } catch (_) {
+          // Fall through to standard web vibration API on bridge error
+        }
+      }
+
+      // Capacitor Haptics Plugin (if packaged with Capacitor)
+      if (win.Capacitor?.Plugins?.Haptics) {
+        try {
+          const capHaptics = win.Capacitor.Plugins.Haptics;
+          if (type === 'light' || type === 'detent') {
+            capHaptics.impact?.({ style: 'LIGHT' });
+            return;
+          } else if (type === 'heavy' || type === 'snap') {
+            capHaptics.impact?.({ style: 'HEAVY' });
+            return;
+          } else if (type === 'success') {
+            capHaptics.notification?.({ type: 'SUCCESS' });
+            return;
+          } else {
+            capHaptics.impact?.({ style: 'MEDIUM' });
+            return;
+          }
+        } catch (_) {
+          // Fall through
+        }
+      }
+    }
+
+    // 2. Physical Device Vibration API (Web Browsers)
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
         switch (type) {

@@ -20,6 +20,7 @@ import {
   SAH,
   MeshBVH,
 } from 'three-mesh-bvh';
+import { GenerateMeshBVHWorker } from 'three-mesh-bvh/src/workers/index.js';
 
 // Inject three-mesh-bvh methods into Three.js prototypes if not yet attached
 type BufferGeometryWithBVH = THREE.BufferGeometry & {
@@ -211,12 +212,53 @@ export class FastSurfaceRaycaster {
     }
   }
 
+  private static _bvhWorker: GenerateMeshBVHWorker | null = null;
+
   /**
-   * Asynchronously generates the BVH tree in a background microtask/yielding loop
-   * to prevent frame drops on large high-polygon models during tablet painting.
+   * Reusable background worker singleton for parallel BVH tree generation
+   */
+  public static getBVHWorker(): GenerateMeshBVHWorker | null {
+    if (!FastSurfaceRaycaster._bvhWorker && typeof Worker !== 'undefined') {
+      try {
+        FastSurfaceRaycaster._bvhWorker = new GenerateMeshBVHWorker();
+      } catch (e) {
+        console.warn('Could not initialize GenerateMeshBVHWorker, using main thread fallback:', e);
+      }
+    }
+    return FastSurfaceRaycaster._bvhWorker;
+  }
+
+  /**
+   * Asynchronously generates the BVH tree in a background worker thread
+   * to eliminate frame drops and UI freezes on large high-polygon models.
    * @param mesh Target mesh to update.
    */
   public async updateMeshBVHAsync(mesh: THREE.Mesh): Promise<void> {
+    const geometry = mesh.geometry as BufferGeometryWithBVH;
+    if (!geometry || !geometry.attributes.position) return;
+
+    if (!geometry.boundingBox) {
+      geometry.computeBoundingBox();
+    }
+    if (!geometry.attributes.normal) {
+      geometry.computeVertexNormals();
+    }
+
+    const worker = FastSurfaceRaycaster.getBVHWorker();
+    if (worker && !worker.running) {
+      try {
+        const bvh = await worker.generate(geometry, {
+          strategy: SAH,
+          targetLeafSize: 5,
+          indirect: true,
+        });
+        geometry.boundsTree = bvh;
+        return;
+      } catch (workerErr) {
+        console.warn('Worker BVH generation busy or failed, falling back to local computation:', workerErr);
+      }
+    }
+
     return new Promise<void>((resolve, reject) => {
       try {
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {

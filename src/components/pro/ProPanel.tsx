@@ -9,6 +9,7 @@ import { CreatePanel } from './CreatePanel';
 import { DeformPanel } from './DeformPanel';
 import { LayerPanel } from '../LayerPanel';
 import { StudioEngine } from '../../core/studioEngine';
+import './ProResponsive.css';
 import {
   ToolType,
   BrushSettings,
@@ -59,6 +60,7 @@ export interface ProPanelProps {
   setActiveLayerId?: (id: string) => void;
   onClearLayerStrokes?: (layerId: string) => void;
   onMergeLayerDown?: (layerId: string) => void;
+  onBeforeDestructiveAction?: (title: string, description: string, actionLabel: string, action: () => Promise<void> | void) => void;
   theme?: 'light' | 'dark';
 }
 
@@ -108,6 +110,7 @@ export const ProPanel: React.FC<ProPanelProps> = ({
   setActiveLayerId,
   onClearLayerStrokes,
   onMergeLayerDown,
+  onBeforeDestructiveAction,
   theme = 'dark',
 }) => {
   const openSheet = useOpenSheet();
@@ -138,7 +141,7 @@ export const ProPanel: React.FC<ProPanelProps> = ({
     <>
       {/* Outside click/tap dismiss backdrop */}
       <div
-        className="fixed inset-0 z-30 bg-black/20 sm:bg-black/10 animate-in fade-in duration-150 pointer-events-auto"
+        className="paperrocket-context-backdrop fixed inset-0 z-30 bg-black/20 sm:bg-black/10 animate-in fade-in duration-150 pointer-events-auto"
         onClick={() => {
           haptics.trigger('light');
           closeSheet();
@@ -150,11 +153,7 @@ export const ProPanel: React.FC<ProPanelProps> = ({
         role="region"
         aria-label={`${title} Panel`}
       data-theme={theme}
-      className={`paperrocket-pro-panel fixed z-40 select-none flex flex-col border shadow-2xl animate-in fade-in duration-150 overflow-hidden
-        /* Mobile: Bottom sheet anchored at bottom with comfortable thumb reach */
-        inset-x-2 bottom-2 max-h-[74dvh] rounded-2xl slide-in-from-bottom-3
-        /* Desktop/Tablet: Floating side drawer docked next to rail */
-        sm:inset-x-auto sm:bottom-auto sm:left-[84px] sm:top-1/2 sm:-translate-y-1/2 sm:w-[310px] sm:max-w-[calc(100vw-6rem)] sm:max-h-[min(80vh,calc(100dvh-84px))] sm:slide-in-from-left-3 ${
+      className={`paperrocket-pro-panel paperrocket-context-panel fixed z-40 select-none flex flex-col border shadow-2xl animate-in fade-in duration-150 overflow-hidden ${
         light
           ? 'bg-[#f7f4ee]/98 border-black/15 text-neutral-800 shadow-[0_20px_50px_rgba(35,28,20,0.14)]'
           : 'bg-[#14161a]/98 border-white/15 text-neutral-200 shadow-[0_24px_70px_rgba(0,0,0,0.6)]'
@@ -250,6 +249,7 @@ export const ProPanel: React.FC<ProPanelProps> = ({
             setActiveLayerId={setActiveLayerId}
             onClearLayerStrokes={onClearLayerStrokes || (() => {})}
             onMergeLayerDown={onMergeLayerDown}
+            onBeforeDestructiveAction={onBeforeDestructiveAction}
             inline={true}
             theme={theme}
           />

@@ -24,6 +24,7 @@ interface ModelLibraryModalProps {
   activeModelName: string;
   onOpenConverter?: () => void;
   theme?: 'light' | 'dark';
+  onBeforeReplace?: (modelName: string, action: () => Promise<void>) => void;
 }
 
 export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
@@ -32,6 +33,7 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
   activeModelName,
   onOpenConverter,
   theme = 'dark',
+  onBeforeReplace,
 }) => {
   const isLight = theme === 'light';
   const presets = useMemo(() => SampleModelFactory.getPresets(), []);
@@ -79,11 +81,6 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
     });
   }, [savedModels, searchQuery]);
 
-  const [pendingPrompt, setPendingPrompt] = useState<{
-    modelName: string;
-    onConfirm: (loadMode: 'add' | 'clear') => Promise<void>;
-  } | null>(null);
-
   const [loadChoice, setLoadChoice] = useState<'ask' | 'add' | 'clear'>(() => {
     try {
       return (localStorage.getItem('remix3d.modelLoadChoice') as any) || 'ask';
@@ -105,19 +102,14 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
       return;
     }
     if (loadChoice === 'clear') {
-      void doLoad('clear');
+      if (onBeforeReplace) onBeforeReplace(modelName, () => doLoad('clear'));
+      else void doLoad('clear');
       return;
     }
-    // If the scene currently has drawings, ask the user so their work is never lost
-    if (engine && engine.hasActiveDrawings()) {
-      setPendingPrompt({
-        modelName,
-        onConfirm: doLoad,
-      });
-      return;
-    }
-    // If empty, proceed directly
-    void doLoad('clear');
+    // Replacement is always deliberate. This also protects model-only and UV-only
+    // scenes, which are not detected by the stroke-only hasActiveDrawings check.
+    if (onBeforeReplace) onBeforeReplace(modelName, () => doLoad('clear'));
+    else void doLoad('clear');
   };
 
   const handleSelectPreset = (preset: PresetModelDefinition) => {
@@ -692,54 +684,6 @@ export const ModelLibraryModal: React.FC<ModelLibraryModalProps> = ({
           </div>
         </div>
 
-        {/* Ask: Keep Drawing or Start Fresh confirmation prompt */}
-        {pendingPrompt && (
-          <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className={`w-full max-w-sm p-5 rounded-2xl shadow-2xl border animate-in fade-in zoom-in-95 duration-150 ${
-              isLight ? 'bg-white text-neutral-900 border-neutral-200' : 'bg-[#18191d] text-white border-white/10'
-            }`}>
-              <h3 className="text-base font-bold mb-1.5">Keep existing drawings?</h3>
-              <p className={`text-xs mb-4 leading-relaxed ${isLight ? 'text-neutral-600' : 'text-neutral-300'}`}>
-                You have an active drawing in your scene. Loading <strong>{pendingPrompt.modelName}</strong> can either keep your drawing and add the model alongside, or clear everything and start fresh.
-              </p>
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const prompt = pendingPrompt;
-                    setPendingPrompt(null);
-                    await prompt.onConfirm('add');
-                  }}
-                  className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-neutral-900 dark:bg-white text-white dark:text-neutral-950 hover:opacity-90 shadow-sm transition-all cursor-pointer"
-                >
-                  Add to Scene (Keep Drawing)
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const prompt = pendingPrompt;
-                    setPendingPrompt(null);
-                    await prompt.onConfirm('clear');
-                  }}
-                  className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                    isLight
-                      ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300'
-                      : 'bg-white/10 hover:bg-white/15 text-white border-white/10'
-                  }`}
-                >
-                  Clear & Start Fresh
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingPrompt(null)}
-                  className="w-full py-2 px-4 rounded-xl text-xs font-medium text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer mt-1"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

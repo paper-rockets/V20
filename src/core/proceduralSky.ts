@@ -320,6 +320,10 @@ export class ProceduralSkyEngine {
   private currentPreset: EnvironmentPreset;
   private time: number = 0;
   private customOffBackground: THREE.Texture | THREE.Color | null = null;
+  private activeRenderer: THREE.WebGLRenderer | null = null;
+  private pmremGenerator: THREE.PMREMGenerator | null = null;
+  private skyEnvTexture: THREE.Texture | null = null;
+  private pendingEnvUpdateTimeout: any = null;
 
   // Synced Three.js Lighting References
   public sunLight: THREE.DirectionalLight | null = null;
@@ -331,6 +335,11 @@ export class ProceduralSkyEngine {
     this.scene = scene;
     this.currentPreset = DEFAULT_PRESETS[0];
     this.init();
+  }
+
+  public setRenderer(renderer: THREE.WebGLRenderer): void {
+    this.activeRenderer = renderer;
+    this.updateSkyReflection();
   }
 
   public setCustomOffBackground(bg: THREE.Texture | THREE.Color | null): void {
@@ -572,6 +581,9 @@ export class ProceduralSkyEngine {
     } else {
       this.scene.fog = null;
     }
+
+    // Bake reflection cubemap for shiny & metallic 3D models
+    this.updateSkyReflection();
   }
 
   public setTimeOfDay(hour: number): void {
@@ -713,6 +725,73 @@ export class ProceduralSkyEngine {
     }
     if (this.skyMesh) {
       this.skyMesh.position.copy(camera.position);
+    }
+  }
+
+  /**
+   * Bakes the procedural sky gradient and atmosphere into a PMREM radiance cubemap
+   * so metallic, chrome, and glass 3D models reflect the real outdoor sky.
+   * Debounced to protect mobile battery and prevent frame drops during slider adjustments.
+   */
+  public updateSkyReflection(renderer?: THREE.WebGLRenderer): void {
+    const r = renderer || this.activeRenderer;
+    if (!r) return;
+    if (!this.skyMesh || !this.skyMesh.visible || this.currentPreset.id === 'off') {
+      if (this.skyEnvTexture) {
+        this.skyEnvTexture.dispose();
+        this.skyEnvTexture = null;
+      }
+      return;
+    }
+
+    if (this.pendingEnvUpdateTimeout) {
+      clearTimeout(this.pendingEnvUpdateTimeout);
+    }
+
+    this.pendingEnvUpdateTimeout = setTimeout(() => {
+      try {
+        if (!this.pmremGenerator) {
+          this.pmremGenerator = new THREE.PMREMGenerator(r);
+          this.pmremGenerator.compileCubemapShader();
+        }
+
+        const bakeScene = new THREE.Scene();
+        const tempDome = new THREE.Mesh(this.skyMesh!.geometry, this.skyMaterial!);
+        bakeScene.add(tempDome);
+
+        const renderTarget = this.pmremGenerator.fromScene(bakeScene, 0.04);
+
+        if (this.skyEnvTexture) {
+          this.skyEnvTexture.dispose();
+        }
+        this.skyEnvTexture = renderTarget.texture;
+        this.scene.environment = this.skyEnvTexture;
+
+        bakeScene.remove(tempDome);
+        tempDome.geometry = null as any;
+        tempDome.material = null as any;
+      } catch (err) {
+        console.warn('Failed to bake procedural sky environment map:', err);
+      }
+    }, 150);
+  }
+
+  public dispose(): void {
+    if (this.pendingEnvUpdateTimeout) {
+      clearTimeout(this.pendingEnvUpdateTimeout);
+    }
+    if (this.skyEnvTexture) {
+      this.skyEnvTexture.dispose();
+      this.skyEnvTexture = null;
+    }
+    if (this.pmremGenerator) {
+      this.pmremGenerator.dispose();
+      this.pmremGenerator = null;
+    }
+    if (this.skyMesh) {
+      this.scene.remove(this.skyMesh);
+      this.skyMesh.geometry.dispose();
+      this.skyMaterial?.dispose();
     }
   }
 }

@@ -33,6 +33,7 @@ import {
 import {
   ModelTransformConfig,
   DracoCompressionConfig,
+  MeshSimplificationConfig,
   ModelInspectionData,
   Saved3DModel,
   SupportedModelFormat,
@@ -43,6 +44,7 @@ import {
   ModelConverterEngine,
   DEFAULT_TRANSFORM_CONFIG,
   DEFAULT_DRACO_CONFIG,
+  DEFAULT_SIMPLIFICATION_CONFIG,
 } from '../core/modelConverter';
 import { ModelStorage } from '../core/modelStorage';
 import { StudioEngine } from '../core/studioEngine';
@@ -88,6 +90,7 @@ export const ModelConverterModal: React.FC<ModelConverterModalProps> = ({
   // Transform & Draco Configurations
   const [transformConfig, setTransformConfig] = useState<ModelTransformConfig>(DEFAULT_TRANSFORM_CONFIG);
   const [dracoConfig, setDracoConfig] = useState<DracoCompressionConfig>(DEFAULT_DRACO_CONFIG);
+  const [simplificationConfig, setSimplificationConfig] = useState<MeshSimplificationConfig>(DEFAULT_SIMPLIFICATION_CONFIG);
 
   // Inspection Data
   const [inspection, setInspection] = useState<ModelInspectionData | null>(null);
@@ -453,10 +456,17 @@ export const ModelConverterModal: React.FC<ModelConverterModalProps> = ({
       // 1. Transform & Bake
       const transformed = ModelConverterEngine.applyTransforms(rawScene, transformConfig);
 
+      // 1b. Mesh Decimation / Slimming
+      if (simplificationConfig.enabled) {
+        setLoadingStatus('Slimming model triangles with Meshopt...');
+        await ModelConverterEngine.simplifyObject(transformed, simplificationConfig);
+      }
+
       // 2. Inspect
       const insp = ModelConverterEngine.inspect(transformed, modelName, modelFormat, originalBytes);
 
       // 3. Export GLB with Draco
+      setLoadingStatus('Compressing geometry with Draco & exporting GLB...');
       const { blob, arrayBuffer } = await ModelConverterEngine.exportToGLB(transformed, dracoConfig);
 
       // 4. Generate thumbnail
@@ -524,6 +534,11 @@ export const ModelConverterModal: React.FC<ModelConverterModalProps> = ({
     setLoadingStatus('Generating downloadable .GLB package...');
     try {
       const transformed = ModelConverterEngine.applyTransforms(rawScene, transformConfig);
+      if (simplificationConfig.enabled) {
+        setLoadingStatus('Slimming model triangles with Meshopt...');
+        await ModelConverterEngine.simplifyObject(transformed, simplificationConfig);
+      }
+      setLoadingStatus('Generating downloadable .GLB package...');
       const { blob } = await ModelConverterEngine.exportToGLB(transformed, dracoConfig);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1141,9 +1156,102 @@ export const ModelConverterModal: React.FC<ModelConverterModalProps> = ({
               </div>
             )}
 
-            {/* TAB 2: DRACO COMPRESSION & EXPORT */}
+            {/* TAB 2: MESH SLIMMER & DRACO COMPRESSION */}
             {activeTab === 'compression_export' && (
               <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                {/* Meshopt Triangle Decimation / Mesh Slimmer Card */}
+                <div className="p-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-sm text-zinc-200">
+                      <Minimize2 className="w-4 h-4 text-emerald-400" />
+                      Automatic 3D Mesh Slimmer (Meshopt)
+                    </div>
+                    <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      Mobile Memory Saver
+                    </span>
+                  </div>
+
+                  {/* Enable Mesh Slimmer Switch */}
+                  <label className="flex items-center justify-between p-3.5 rounded-xl border border-zinc-700 bg-zinc-800/50 cursor-pointer">
+                    <div>
+                      <div className="text-xs font-bold text-zinc-200">Enable Triangle Reduction</div>
+                      <div className="text-[11px] text-zinc-400">
+                        Decimates heavy 3D scans and models to run buttery smooth on phones and tablets
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={simplificationConfig.enabled}
+                      onChange={(e) =>
+                        setSimplificationConfig((prev) => ({ ...prev, enabled: e.target.checked }))
+                      }
+                      className="accent-white w-5 h-5 rounded"
+                    />
+                  </label>
+
+                  {simplificationConfig.enabled && (
+                    <div className="space-y-4 pt-1">
+                      {/* Target Reduction Slider */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-zinc-300">Target Detail Ratio:</span>
+                          <span className="font-mono text-emerald-400 font-bold">
+                            {Math.round(simplificationConfig.targetRatio * 100)}% of original triangles
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="0.9"
+                          step="0.05"
+                          value={simplificationConfig.targetRatio}
+                          onChange={(e) =>
+                            setSimplificationConfig((prev) => ({
+                              ...prev,
+                              targetRatio: parseFloat(e.target.value),
+                            }))
+                          }
+                          className="w-full accent-emerald-400 h-1.5 bg-zinc-800 rounded-lg"
+                        />
+                        <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
+                          <span>10% (Ultra Slim)</span>
+                          <span>50% (Recommended)</span>
+                          <span>90% (Subtle)</span>
+                        </div>
+                      </div>
+
+                      {/* Lock Borders */}
+                      <label className="flex items-center justify-between p-2.5 rounded-lg border border-zinc-800 bg-zinc-850 cursor-pointer">
+                        <span className="text-xs text-zinc-300">Lock Boundary Edges (Prevents seam cracks)</span>
+                        <input
+                          type="checkbox"
+                          checked={simplificationConfig.lockBorder}
+                          onChange={(e) =>
+                            setSimplificationConfig((prev) => ({ ...prev, lockBorder: e.target.checked }))
+                          }
+                          className="accent-white w-4 h-4 rounded"
+                        />
+                      </label>
+
+                      {/* Live Triangle Counter comparison */}
+                      {inspection && (
+                        <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/40 flex items-center justify-between text-xs">
+                          <span className="text-zinc-400">Triangles after slimming:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="line-through text-zinc-500 font-mono">
+                              {inspection.triangleCount.toLocaleString()}
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="font-mono font-bold text-emerald-300">
+                              {~~ (inspection.triangleCount * simplificationConfig.targetRatio).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div
                   className="p-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 space-y-5"
                 >

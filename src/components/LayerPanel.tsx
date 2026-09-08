@@ -40,6 +40,7 @@ export interface LayerPanelProps {
   onClose?: () => void;
   onClearLayerStrokes: (layerId: string) => void;
   onMergeLayerDown?: (layerId: string) => void;
+  onBeforeDestructiveAction?: (title: string, description: string, actionLabel: string, action: () => Promise<void> | void) => void;
   inline?: boolean;
   theme?: 'light' | 'dark';
 }
@@ -81,6 +82,7 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
   onClose,
   onClearLayerStrokes,
   onMergeLayerDown,
+  onBeforeDestructiveAction,
   inline = false,
   theme = 'dark',
 }) => {
@@ -233,15 +235,29 @@ export const LayerPanelComponent: React.FC<LayerPanelProps> = ({
       });
     }
 
-    toDelete.forEach((delId) => onClearLayerStrokes(delId));
-    setLayers((prev) => prev.filter((l) => !toDelete.has(l.id)));
+    const performDelete = () => {
+      toDelete.forEach((delId) => onClearLayerStrokes(delId));
+      setLayers((prev) => prev.filter((l) => !toDelete.has(l.id)));
 
-    if (toDelete.has(activeLayerId)) {
-      const remaining = layers.filter((l) => !toDelete.has(l.id));
-      if (remaining.length > 0) {
-        setActiveLayerId(remaining[0].id);
+      if (toDelete.has(activeLayerId)) {
+        const remaining = layers.filter((l) => !toDelete.has(l.id));
+        if (remaining.length > 0) setActiveLayerId(remaining[0].id);
       }
+    };
+
+    const selected = layers.find((layer) => layer.id === id);
+    if (onBeforeDestructiveAction) {
+      onBeforeDestructiveAction(
+        `Delete “${selected?.name || 'layer'}”?`,
+        toDelete.size > 1
+          ? `This removes the group, ${toDelete.size - 1} nested item${toDelete.size === 2 ? '' : 's'}, and all of their strokes.`
+          : 'This removes the layer and every stroke on it.',
+        'Delete Layer',
+        performDelete,
+      );
+      return;
     }
+    performDelete();
   };
 
   const handleToggleVisibility = (id: string, e: React.MouseEvent) => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   IcDraw as PenLine,
@@ -69,6 +69,36 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
 
   const updateSetting = <K extends keyof BrushSettings>(key: K, value: BrushSettings[K]) => {
     setBrushSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Older saved projects may omit drawingMode. Normalize once so the shipped
+  // default is explicit and imported models immediately become the draw surface.
+  useEffect(() => {
+    if (brushSettings.drawingMode) return;
+    setBrushSettings((prev) => ({
+      ...prev,
+      drawingMode: 'surface',
+      profile: prev.profile || 'ribbon',
+      materialType: prev.materialType || 'shadeless',
+      patternType: prev.patternType || 'none',
+      solidColor: prev.solidColor || prev.color,
+      activeLookName: prev.activeLookName || 'Flat Paint',
+    }));
+  }, [brushSettings.drawingMode, setBrushSettings]);
+
+  const selectSolidLook = (materialType: 'shadeless' | 'shaded' | 'glow') => {
+    const color = brushSettings.solidColor || brushSettings.color || '#000000';
+    setBrushSettings((prev) => ({
+      ...prev,
+      color,
+      solidColor: color,
+      materialType,
+      shaderEffect: undefined,
+      customShader: undefined,
+      matcapUrl: undefined,
+      matcapTexture: undefined,
+      activeLookName: materialType === 'shadeless' ? 'Flat Paint' : materialType === 'shaded' ? 'Lit' : 'Glow',
+    }));
   };
 
   const cardClass = isLight
@@ -171,10 +201,10 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
         </div>
       </div>
 
-      {/* 2. CURRENT PALETTE TYPE CONFIRMATION */}
+      {/* 2. WHERE AND HOW THE MARK IS DRAWN */}
       <div className={cardClass}>
         <div className="flex items-center justify-between">
-          <div className={subHeadingClass}>Current Palette Type</div>
+          <div className={subHeadingClass}>Stroke</div>
           <div className="flex items-center gap-1.5">
             <span
               className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
@@ -187,7 +217,7 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
                   : 'bg-amber-500/20 text-amber-300 border-amber-400/40'
               }`}
             >
-              {isConformal ? 'Conformal' : 'Non-Conformal'}
+              {isConformal ? 'Surface' : 'Space'}
             </span>
             <span
               className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
@@ -200,7 +230,7 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
                   : 'bg-purple-500/20 text-purple-300 border-purple-400/40'
               }`}
             >
-              {isFlat ? 'Flat' : 'Not Flat'}
+              {isFlat ? 'Flat' : 'Round'}
             </span>
           </div>
         </div>
@@ -225,10 +255,10 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
             title={isConformal ? 'Conformal (Hugs 3D surface). Click to switch to Non-Conformal (Mid-Air).' : 'Non-Conformal (Mid-Air). Click to switch to Conformal (Surface).'}
           >
             <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">
-              Surface Attachment
+              Draw On
             </div>
             <div className="text-xs font-bold mt-0.5">
-              {isConformal ? 'Conformal' : 'Non-Conformal'}
+              {isConformal ? 'Surface' : 'In Space'}
             </div>
             <div className="text-[10px] opacity-75 mt-0.5">
               {isConformal ? 'Hugs 3D Surface' : '3D Mid-Air'}
@@ -254,10 +284,10 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
             title={isFlat ? 'Flat (Ribbon band). Click to switch to Not Flat (Round 3D Tube).' : 'Not Flat (Round 3D Tube). Click to switch to Flat (Ribbon band).'}
           >
             <div className="text-[10px] font-bold uppercase tracking-wider opacity-75">
-              Geometry Shape
+              Shape
             </div>
             <div className="text-xs font-bold mt-0.5">
-              {isFlat ? 'Flat' : 'Not Flat'}
+              {isFlat ? 'Flat' : 'Round'}
             </div>
             <div className="text-[10px] opacity-75 mt-0.5">
               {isFlat ? 'Flat Ribbon Band' : 'Round 3D Tube'}
@@ -266,26 +296,31 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
         </div>
       </div>
 
-      {/* 3. COLOR & MATERIAL: Quick palette swatches + native picker + Color Studio */}
+      {/* 3. COLOR AND LOOK ARE INDEPENDENT CONTROLS */}
       <div className={cardClass}>
         <div className="flex items-center justify-between">
-          <div className={subHeadingClass}>Color & Material</div>
-          <span className="font-mono text-[11px] font-bold opacity-80">
-            {(brushSettings.color || '#38bdf8').toUpperCase()}
-          </span>
+          <div className={subHeadingClass}>Color</div>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-full border border-black/10 dark:border-white/15 px-2 py-0.5 text-[9px] font-bold">
+              {brushSettings.activeLookName || (brushSettings.materialType === 'animated_fx' ? 'Animated FX' : brushSettings.materialType === 'shadeless' ? 'Flat Paint' : brushSettings.materialType)}
+            </span>
+            <span className="font-mono text-[11px] font-bold opacity-80">
+              {(brushSettings.solidColor || brushSettings.color || '#38bdf8').toUpperCase()}
+            </span>
+          </div>
         </div>
 
         {/* Quick Color Swatches */}
         <div className="grid grid-cols-8 gap-1 pt-0.5">
-          {['#2563eb', '#38bdf8', '#ef4444', '#f59e0b', '#10b981', '#a855f7', '#18191d', '#ffffff'].map((hex) => {
-            const isSelected = (brushSettings.color || '#38bdf8').toLowerCase() === hex.toLowerCase();
+          {['#2563eb', '#38bdf8', '#ef4444', '#f59e0b', '#10b981', '#a855f7', '#000000', '#ffffff'].map((hex) => {
+            const isSelected = (brushSettings.solidColor || brushSettings.color || '#000000').toLowerCase() === hex.toLowerCase();
             return (
               <button
                 key={hex}
                 type="button"
                 onClick={() => {
                   haptics.trigger('light');
-                  updateSetting('color', hex);
+                  setBrushSettings((prev) => ({ ...prev, color: hex, solidColor: hex, materialType: 'shadeless', shaderEffect: undefined, customShader: undefined, matcapUrl: undefined, matcapTexture: undefined, activeLookName: 'Flat Paint' }));
                 }}
                 className={`!min-w-0 h-6 sm:h-7 rounded-md sm:rounded-lg border transition-transform active:scale-90 ${
                   isSelected
@@ -321,22 +356,36 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
           <div className="flex items-center gap-2.5">
             <span
               className="w-6 h-6 rounded-lg border border-black/15 dark:border-white/20 shadow-xs shrink-0"
-              style={{ backgroundColor: brushSettings.color || '#38bdf8' }}
+              style={{ backgroundColor: brushSettings.solidColor || brushSettings.color || '#38bdf8' }}
             />
             <div className="text-left">
-              <div className="font-semibold text-xs leading-none">Color Studio & Shaders</div>
-              <div className="text-[10px] opacity-60 mt-0.5">Palettes, gradients, & materials</div>
+              <div className="font-semibold text-xs leading-none">Color Studio</div>
+              <div className="text-[10px] opacity-60 mt-0.5">Color, palettes, and effects</div>
             </div>
           </div>
           <Palette className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity" />
         </button>
+
+        <div className="space-y-1 pt-1">
+          <div className={subHeadingClass}>Look</div>
+          <div className="grid grid-cols-4 gap-1">
+            {([
+              ['shadeless', 'Flat'],
+              ['shaded', 'Lit'],
+              ['glow', 'Glow'],
+            ] as const).map(([id, label]) => (
+              <button key={id} type="button" onClick={() => selectSolidLook(id)} className={`min-h-[40px] rounded-lg border text-[10px] font-semibold ${brushSettings.materialType === id ? (isLight ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-950 border-white') : (isLight ? 'bg-white border-black/10' : 'bg-black/30 border-white/10')}`}>{label}</button>
+            ))}
+            <button type="button" onClick={onOpenColorStudio} className={`min-h-[40px] rounded-lg border text-[10px] font-semibold ${brushSettings.materialType === 'animated_fx' ? (isLight ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-950 border-white') : (isLight ? 'bg-white border-black/10' : 'bg-black/30 border-white/10')}`}>FX</button>
+          </div>
+        </div>
       </div>
 
       {/* 3. BRUSHES MENU: Category Tabs & 3D Clay Mark Thumbnails */}
       <div className={cardClass}>
         <div className="flex items-center justify-between border-b pb-1.5 border-black/10 dark:border-white/10">
           <div className="text-xs font-bold tracking-tight text-current">Brushes</div>
-          <div className="flex items-center gap-2 text-[10.5px] font-semibold">
+          <div className="hidden items-center gap-2 text-[10.5px] font-semibold">
             {(['Favorites', 'Core', 'Textures', 'Surface'] as BrushCategoryTab[]).map((tab) => {
               const isTabActive = activeTab === tab;
               return (
@@ -367,7 +416,7 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
 
         {/* 4-column Grid of 3D Clay Mark Presets */}
         <div className="grid grid-cols-4 gap-1.5 pt-1">
-          {displayedBrushes.map((preset) => {
+          {displayedBrushes.slice(0, 4).map((preset) => {
             const isSelected = activeBrush.id === preset.id;
             return (
               <button
@@ -413,8 +462,8 @@ export const DrawPanel: React.FC<DrawPanelProps> = ({
           })}
         </div>
 
-        {/* Bottom Falloff Curve preview & Stylus Tip */}
-        <div className="pt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-3">
+        {/* Detailed falloff information stays behind Advanced. */}
+        <div className="hidden pt-2 border-t border-black/10 dark:border-white/10 items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className={`text-[10px] font-medium ${isLight ? 'text-neutral-500' : 'text-white/60'}`}>Falloff</span>
             <div className={`w-18 h-6 rounded-lg border px-1.5 py-0.5 flex items-center justify-center ${

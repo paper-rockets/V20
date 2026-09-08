@@ -30,6 +30,7 @@ interface StudioImporterProps {
   onSaved: (name: string) => void;
   onOpenFineTuning?: () => void;
   theme?: 'light' | 'dark';
+  onBeforeReplace?: (modelName: string, action: () => Promise<void>) => void;
 }
 
 type Stage = 'choose' | 'adjusting' | 'saving';
@@ -41,6 +42,7 @@ export const StudioImporter: React.FC<StudioImporterProps> = ({
   onSaved,
   onOpenFineTuning,
   theme = 'dark',
+  onBeforeReplace,
 }) => {
   const isLight = theme === 'light';
   const fileRef = useRef<HTMLInputElement>(null);
@@ -171,7 +173,7 @@ export const StudioImporter: React.FC<StudioImporterProps> = ({
     setTextured((prev) => !prev);
   };
 
-  const keepAndLoad = async () => {
+  const performLoad = async () => {
     if (!engine) return;
     setStage('saving');
     setError(null);
@@ -229,6 +231,16 @@ export const StudioImporter: React.FC<StudioImporterProps> = ({
       setError(err?.message || 'Could not load model onto canvas.');
       setStage('adjusting');
     }
+  };
+
+  const keepAndLoad = () => {
+    if (!engine) return;
+    const modelName = name.trim() || activePreset?.name || 'the imported model';
+    if (onBeforeReplace) {
+      onBeforeReplace(modelName, performLoad);
+      return;
+    }
+    void performLoad();
   };
 
   if (!isOpen) return null;

@@ -148,7 +148,18 @@ async function runSmokeTests() {
 
       // Test Opening Models Modal
       await page.evaluate(() => window.__testApp.openModal('models'));
-      await page.waitForTimeout(300);
+      const firstModelCard = page.locator('#model-library-modal .paperrocket-model-item').first();
+      await firstModelCard.waitFor({ state: 'visible', timeout: 5000 });
+      await firstModelCard.click();
+      const workLossDialog = page.getByRole('alertdialog');
+      await workLossDialog.waitFor({ state: 'visible', timeout: 5000 });
+      const focusedLabel = await page.evaluate(() => document.activeElement?.textContent?.trim() || '');
+      if (!focusedLabel.startsWith('Cancel')) {
+        throw new Error(`Work-loss dialog did not focus Cancel by default (focused: "${focusedLabel}").`);
+      }
+      await page.keyboard.press('Escape');
+      await workLossDialog.waitFor({ state: 'detached', timeout: 5000 });
+      console.log('  ✓ Replacement requires the shared decision sheet; Cancel has default focus and Escape keeps work.');
       await page.evaluate(() => window.__testApp.closeAllModals());
       console.log('  ✓ Models modal toggled cleanly.');
 

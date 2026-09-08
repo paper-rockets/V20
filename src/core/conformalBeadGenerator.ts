@@ -133,7 +133,9 @@ export class ConformalBeadGenerator {
       cumulativeDistances.push(totalLength);
     }
 
-    const baseOffset = settings.surfaceOffset ?? 0.003;
+    const strokeSeq = settings.strokeSequenceIndex ?? 0;
+    const strokeLift = (strokeSeq % 500) * 0.0003;
+    const baseOffset = (settings.surfaceOffset ?? 0.003) + strokeLift;
     const taperLength = Math.max(0.01, settings.taperLength ?? 0.05);
 
     // Compute continuous Bishop Rotation Minimizing Frames (RMF) using Double Reflection Method
@@ -312,18 +314,15 @@ export class ConformalBeadGenerator {
     const normals: THREE.Vector3[] = [];
     const binormals: THREE.Vector3[] = [];
 
-    // Continuous surface-aligned frame construction
     for (let i = 0; i < n; i++) {
       const t = tangents[i];
-      const targetNorm = initialNormals[i] || _scratchV1.set(0, 1, 0);
+      const targetNorm = initialNormals[i] || _scratchV1.set(0, 0, 1);
 
-      // Project surface normal orthogonal to curve tangent
+      // Project surface normal orthogonal to tangent vector
       const norm = _vecPool.get().copy(targetNorm);
       norm.sub(_scratchV1.copy(t).multiplyScalar(t.dot(norm)));
 
       if (norm.lengthSq() < 1e-4) {
-        // Degenerate: tangent is parallel to surface normal.
-        // Fallback to previous frame normal projected onto tangent plane
         if (i > 0 && normals[i - 1]) {
           norm.copy(normals[i - 1]).sub(_scratchV1.copy(t).multiplyScalar(t.dot(normals[i - 1])));
         }
@@ -336,13 +335,16 @@ export class ConformalBeadGenerator {
       }
       norm.normalize();
 
-      // Ensure normal always points outward, aligned with surface normal (never into the mesh or canvas)
-      if (norm.dot(targetNorm) < 0) {
+      if (i > 0 && normals[i - 1] && norm.dot(normals[i - 1]) < 0) {
         norm.negate();
       }
 
-      // Compute binormal as tangent cross surface normal (lateral axis across stroke width)
       const binorm = _vecPool.get().crossVectors(t, norm).normalize();
+
+      if (i > 0 && binormals[i - 1] && binorm.dot(binormals[i - 1]) < 0) {
+        binorm.negate();
+        norm.crossVectors(binorm, t).normalize();
+      }
 
       normals.push(norm);
       binormals.push(binorm);
@@ -403,7 +405,8 @@ export class ConformalBeadGenerator {
         if (jitterAxis === 'binormal' || jitterAxis === 'omnidirectional') _scratchJitter.addScaledVector(binormal, noiseBinorm);
       }
 
-      _scratchCenter.copy(pos).addScaledVector(normal, baseOffset + radius).add(_scratchJitter);
+      const loopElevation = t * 0.0004;
+      _scratchCenter.copy(pos).addScaledVector(normal, baseOffset + radius + loopElevation).add(_scratchJitter);
 
       for (let j = 0; j < radialSegments; j++) {
         const theta = (j / radialSegments) * Math.PI * 2;
@@ -428,8 +431,8 @@ export class ConformalBeadGenerator {
         const c = (i + 1) * radialSegments + nextJ;
         const d = i * radialSegments + nextJ;
 
-        _workIndices.push(a, b, d);
-        _workIndices.push(b, c, d);
+        _workIndices.push(a, d, b);
+        _workIndices.push(b, d, c);
       }
     }
 
@@ -490,7 +493,9 @@ export class ConformalBeadGenerator {
         if (jitterAxis === 'binormal' || jitterAxis === 'omnidirectional') _scratchJitter.addScaledVector(binormal, noiseBinorm);
       }
 
-      _scratchCenter.copy(pos).addScaledVector(normal, baseOffset).add(_scratchJitter);
+      const loopElevation = t * 0.0004;
+      _scratchCenter.copy(pos).addScaledVector(normal, baseOffset + loopElevation).add(_scratchJitter);
+
       const left = _scratchV1.copy(_scratchCenter).addScaledVector(binormal, -width);
       const right = _scratchV2.copy(_scratchCenter).addScaledVector(binormal, width);
 
@@ -509,8 +514,8 @@ export class ConformalBeadGenerator {
       const c = (i + 1) * 2 + 1;
       const d = i * 2 + 1;
 
-      _workIndices.push(a, b, d);
-      _workIndices.push(b, c, d);
+      _workIndices.push(a, d, b);
+      _workIndices.push(b, d, c);
     }
 
     // Add smooth rounded start and end caps for clean brush tip appearance (zero arrowhead artifacts)
@@ -582,7 +587,8 @@ export class ConformalBeadGenerator {
         if (jitterAxis === 'binormal' || jitterAxis === 'omnidirectional') _scratchJitter.addScaledVector(binormal, noiseBinorm);
       }
 
-      _scratchCenter.copy(pos).addScaledVector(normal, baseOffset + height).add(_scratchJitter);
+      const loopElevation = t * 0.0004;
+      _scratchCenter.copy(pos).addScaledVector(normal, baseOffset + height + loopElevation).add(_scratchJitter);
 
       // 4 corners of rectangular chisel profile
       const pTL = _scratchV1.copy(_scratchCenter).addScaledVector(_scratchChiselDir, -width).addScaledVector(normal, height);
@@ -606,8 +612,8 @@ export class ConformalBeadGenerator {
         const c = (i + 1) * 4 + nextK;
         const d = i * 4 + nextK;
 
-        _workIndices.push(a, b, d);
-        _workIndices.push(b, c, d);
+        _workIndices.push(a, d, b);
+        _workIndices.push(b, d, c);
       }
     }
   }
@@ -635,7 +641,7 @@ export class ConformalBeadGenerator {
       uValues.push(-1.0 + (2.0 * j) / (segmentsAcross - 1));
     }
 
-    const domeFactor = settings.domeFactor || 0.22;
+    const domeFactor = settings.domeFactor ?? 0.0;
     const jitterStrength = settings.jitterStrength ?? (settings.spatialJitterEnabled ? 0.25 : 0.0);
     const jitterFreq = settings.jitterFrequency ?? 8.0;
     const jitterAxis = settings.jitterAxis || 'binormal';
@@ -669,9 +675,11 @@ export class ConformalBeadGenerator {
         if (jitterAxis === 'binormal' || jitterAxis === 'omnidirectional') _scratchJitter.addScaledVector(binormal, noiseBinorm);
       }
 
+      const loopElevation = t * 0.0004;
+
       for (let j = 0; j < segmentsAcross; j++) {
         const u = uValues[j];
-        const domeHeight = baseOffset + ringRadius * domeFactor * Math.sqrt(Math.max(0, 1.0 - u * u));
+        const domeHeight = baseOffset + loopElevation + ringRadius * domeFactor * Math.sqrt(Math.max(0, 1.0 - u * u));
         const lateralOffset = u * ringRadius;
 
         _scratchPos.copy(pos)
@@ -679,7 +687,10 @@ export class ConformalBeadGenerator {
           .addScaledVector(normal, domeHeight)
           .add(_scratchJitter);
 
-        _scratchArchNorm.copy(normal).addScaledVector(binormal, u * 0.4).normalize();
+        _scratchArchNorm.copy(normal);
+        if (domeFactor > 0.01) {
+          _scratchArchNorm.addScaledVector(binormal, u * domeFactor * 0.5).normalize();
+        }
 
         _workVertices.push(_scratchPos.x, _scratchPos.y, _scratchPos.z);
         _workNormals.push(_scratchArchNorm.x, _scratchArchNorm.y, _scratchArchNorm.z);
@@ -694,8 +705,8 @@ export class ConformalBeadGenerator {
         const c = (i + 1) * segmentsAcross + (j + 1);
         const d = i * segmentsAcross + (j + 1);
 
-        _workIndices.push(a, b, d);
-        _workIndices.push(b, c, d);
+        _workIndices.push(a, d, b);
+        _workIndices.push(b, d, c);
       }
     }
 

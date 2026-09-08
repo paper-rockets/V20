@@ -12,7 +12,7 @@ import { getQualityProfile } from '../utils/deviceProfile';
 /**
  * Normalizes any hex or color string to valid lowercase 6-digit #rrggbb
  */
-export function normalizeHexColor(hex: string | undefined | null, fallback: string = '#38bdf8'): string {
+export function normalizeHexColor(hex: string | undefined | null, fallback: string = '#000000'): string {
   if (!hex || typeof hex !== 'string') return fallback;
   let clean = hex.trim().toLowerCase();
   if (!clean.startsWith('#')) {
@@ -63,7 +63,7 @@ export class MaterialCache {
     const patContr = settings.patternContrast ?? 1.0;
     const effect: AnimatedShaderEffect = settings.shaderEffect || 'fire';
 
-    const validColor = normalizeHexColor(settings.color, '#38bdf8');
+    const validColor = normalizeHexColor(settings.color, '#000000');
     const shaderKey = settings.customShader?.id || settings.customShader?.name || effect;
     const matcapKey = settings.matcapUrl ? settings.matcapUrl.slice(0, 32) : (settings.matcapTexture ? 'has_tex' : 'no_matcap');
 
@@ -78,6 +78,8 @@ export class MaterialCache {
     const isOpaque = effectiveOpacity >= 0.99 && layerBlendMode === 'normal';
 
     let material: THREE.Material;
+
+    const strokeSide = THREE.DoubleSide;
 
     if (matType === 'cutout') {
       // 1. Cutout: Spatial negative-space material punching through overlapping 3D curves & depth
@@ -99,9 +101,9 @@ export class MaterialCache {
         color: glowColor,
         transparent: !isOpaque,
         opacity: effectiveOpacity,
-        side: THREE.DoubleSide,
+        side: strokeSide,
         depthTest: true,
-        depthWrite: isOpaque,
+        depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -3.0,
         polygonOffsetUnits: -3.0,
@@ -121,9 +123,9 @@ export class MaterialCache {
         matcap: matcapTex || null,
         transparent: !isOpaque,
         opacity: effectiveOpacity,
-        side: THREE.DoubleSide,
+        side: strokeSide,
         depthTest: true,
-        depthWrite: isOpaque,
+        depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -3.0,
         polygonOffsetUnits: -3.0,
@@ -190,9 +192,9 @@ export class MaterialCache {
           vertexShader: settings.customShader.vertexShader || STANDARD_VERTEX_SHADER,
           fragmentShader: settings.customShader.fragmentShader,
           transparent: !isOpaque || effectiveOpacity < 1.0,
-          depthWrite: isOpaque,
+          depthWrite: false,
           depthTest: true,
-          side: THREE.DoubleSide,
+          side: strokeSide,
           polygonOffset: true,
           polygonOffsetFactor: -3.0,
           polygonOffsetUnits: -3.0,
@@ -219,9 +221,9 @@ export class MaterialCache {
             [`EFFECT_${effect}`]: '',
           },
           transparent: !isOpaque || effectiveOpacity < 1.0,
-          depthWrite: isOpaque,
+          depthWrite: false,
           depthTest: true,
-          side: THREE.DoubleSide,
+          side: strokeSide,
           polygonOffset: true,
           polygonOffsetFactor: -3.0,
           polygonOffsetUnits: -3.0,
@@ -244,9 +246,9 @@ export class MaterialCache {
           color: color,
           transparent: !isOpaque,
           opacity: effectiveOpacity,
-          side: THREE.DoubleSide,
+          side: strokeSide,
           depthTest: true,
-          depthWrite: isOpaque,
+          depthWrite: false,
           polygonOffset: true,
           polygonOffsetFactor: -3.0,
           polygonOffsetUnits: -3.0,
@@ -258,9 +260,9 @@ export class MaterialCache {
           metalness: Math.max(0.0, Math.min(1.0, settings.metalness ?? 0.15)),
           transparent: !isOpaque,
           opacity: effectiveOpacity,
-          side: THREE.DoubleSide,
+          side: strokeSide,
           depthTest: true,
-          depthWrite: isOpaque,
+          depthWrite: false,
           polygonOffset: true,
           polygonOffsetFactor: -3.0,
           polygonOffsetUnits: -3.0,
@@ -273,9 +275,9 @@ export class MaterialCache {
         color: color,
         transparent: !isOpaque,
         opacity: effectiveOpacity,
-        side: THREE.DoubleSide,
+        side: strokeSide,
         depthTest: true,
-        depthWrite: isOpaque,
+        depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -3.0,
         polygonOffsetUnits: -3.0,

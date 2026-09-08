@@ -238,6 +238,8 @@ export interface BrushSettings {
   size: number; // in world or screen relative units (0.01 to 0.5)
   opacity: number; // 0.05 to 1.0
   color: string; // hex
+  solidColor?: string; // authored solid paint hex
+  activeLookName?: string; // display name for active paint/look preset
   roughness: number;
   metalness: number;
   emissiveIntensity: number;
@@ -245,6 +247,7 @@ export interface BrushSettings {
   archSegments: number; // default 5 (conformal arched cross-section)
   domeFactor: number; // dome height multiplier (e.g. 0.2)
   surfaceOffset: number; // base offset to prevent coplanar z-fighting (e.g. 0.002)
+  strokeSequenceIndex?: number; // Progressive sequence index to eliminate coplanar stroke z-fighting
   taperLength: number; // fraction 0.05
   silhouetteClamping: boolean;
   stencilMasking: boolean;
@@ -320,6 +323,19 @@ export interface PostProcessSettings {
   grainIntensity: number; // 0.02 to 0.4
   pixelation: boolean;
   pixelSize: number; // 2 to 16
+  rayTracing: boolean;
+  contactShadowSharpness: number; // 0.5 to 2.5
+  denoiser: boolean;
+  rayTracingBounces?: number; // 1 to 4 bounces (default 3)
+  rayTracingSamples?: number; // 24 to 96 samples (default 48)
+  antiAliasing?: boolean; // Edge smoothing anti-aliasing (MSAA / FXAA)
+}
+
+export interface PathTracingProgressInfo {
+  samples: number;
+  maxSamples: number;
+  converged: boolean;
+  isStationary: boolean;
 }
 
 export interface StrokeDescriptor {
@@ -448,6 +464,13 @@ export interface DracoCompressionConfig {
   normalQuantization: number; // 6 - 12
   uvQuantization: number; // 6 - 12
   colorQuantization: number; // 6 - 10
+}
+
+export interface MeshSimplificationConfig {
+  enabled: boolean;
+  targetRatio: number; // 0.1 to 1.0 (e.g. 0.5 = 50% triangles)
+  maxError: number; // allowable geometric error (e.g. 0.01 to 0.05)
+  lockBorder: boolean; // keep boundary edges locked to prevent seam cracks
 }
 
 export interface SubmeshInfo {

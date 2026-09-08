@@ -185,11 +185,16 @@ export function applyPaintPresetToSettings(
   return {
     ...current,
     color: preset.color,
+    solidColor: preset.materialType === 'animated_fx' ? (current.solidColor || current.color) : preset.color,
     materialType: preset.materialType,
     roughness: preset.roughness,
     metalness: preset.metalness,
     emissiveIntensity: preset.emissiveIntensity,
     opacity: preset.opacity,
-    shaderEffect: preset.shaderEffect ?? current.shaderEffect,
+    shaderEffect: preset.shaderEffect,
+    customShader: undefined,
+    matcapUrl: undefined,
+    matcapTexture: undefined,
+    activeLookName: preset.name,
   };
 }

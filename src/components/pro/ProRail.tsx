@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { IcPointer, IcDraw, IcCreate, IcDeform, IcLayers } from './StudioIcons';
-import { ProMode, toggleSheet, useOpenSheet, closeSheet, openSheetId } from '../studio/panelStore';
+import { ProMode, useOpenSheet, closeSheet, openSheetId } from '../studio/panelStore';
 import { haptics } from '../../utils/haptics';
 import { ToolType, BrushSettings } from '../../types';
 import { RealBrushSizeControl } from '../common/RealBrushSizeControl';
@@ -10,9 +10,10 @@ import {
   getBrushesForTab,
   BrushCategoryTab,
 } from '../../presets/curatedBrushes';
-import { ChevronRight, Star, Check, Palette } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Palette } from 'lucide-react';
 import { useDismissibleSurface } from '../../hooks/useDismissibleSurface';
 import { MenuShelf } from '../ui/MenuPrimitives';
+import './ProResponsive.css';
 
 export interface ProRailProps {
   theme?: 'light' | 'dark';
@@ -39,7 +40,45 @@ const MODES: ModeButton[] = [
   { id: 'layers', label: 'Layers', icon: IcLayers },
 ];
 
-const COLORS = ['#2563eb', '#38bdf8', '#ef4444', '#f59e0b', '#10b981', '#a855f7', '#18191d', '#ffffff'];
+const COLORS = ['#2563eb', '#ef4444', '#f59e0b', '#10b981', '#000000', '#ffffff'];
+
+const BrushProfileGlyph: React.FC<{
+  profile: BrushSettings['profile'];
+  patternType?: string;
+}> = ({ profile, patternType }) => (
+  <svg viewBox="0 0 40 40" className="h-9 w-9 fill-none stroke-current" aria-hidden="true">
+    {profile === 'tube' && (
+      <>
+        <path d="M6 25C13 9 25 31 34 14" strokeWidth="4.5" strokeLinecap="round" opacity="0.22" />
+        <path d="M6 25C13 9 25 31 34 14" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="34" cy="14" r="2.25" strokeWidth="1.5" />
+      </>
+    )}
+    {profile === 'ribbon' && (
+      <path d="M5 26C12 8 23 31 35 12L35 18C24 35 13 14 5 30Z" strokeWidth="1.5" strokeLinejoin="round" fill="currentColor" fillOpacity="0.12" />
+    )}
+    {profile === 'marker' && (
+      <>
+        <path d="M7 29L25 11L34 15L16 33Z" strokeWidth="1.5" strokeLinejoin="round" fill="currentColor" fillOpacity="0.12" />
+        <path d="M25 11L29 7L38 11L34 15" strokeWidth="1.5" strokeLinejoin="round" />
+      </>
+    )}
+    {profile === 'conformal' && (
+      <>
+        <path d="M5 27C13 15 27 15 35 27" strokeWidth="5" strokeLinecap="round" opacity="0.18" />
+        <path d="M5 27C13 15 27 15 35 27" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M4 31H36" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 3" opacity="0.55" />
+      </>
+    )}
+    {patternType && patternType !== 'none' && (
+      <>
+        <circle cx="12" cy="12" r="1.25" fill="currentColor" stroke="none" />
+        <circle cx="19" cy="9" r="1" fill="currentColor" stroke="none" />
+        <circle cx="27" cy="12" r="1.25" fill="currentColor" stroke="none" />
+      </>
+    )}
+  </svg>
+);
 
 export const ProRail: React.FC<ProRailProps> = ({
   theme = 'dark',
@@ -63,6 +102,7 @@ export const ProRail: React.FC<ProRailProps> = ({
 
   const [panel, setPanel] = useState<'color' | 'size' | 'brush' | null>(null);
   const [activeTab, setActiveTab] = useState<BrushCategoryTab>('Core');
+  const [isDesktopExpanded, setIsDesktopExpanded] = useState(true);
 
   // Align popover shelf dynamically beside the active trigger button
   useEffect(() => {
@@ -100,7 +140,7 @@ export const ProRail: React.FC<ProRailProps> = ({
   });
 
   const currentBrushSettings: BrushSettings = brushSettings || {
-    color: '#38bdf8',
+    color: '#000000',
     size: 0.03,
     opacity: 1.0,
     profile: 'tube',
@@ -125,58 +165,66 @@ export const ProRail: React.FC<ProRailProps> = ({
       <nav
         ref={rootRef}
         aria-label="Studio modes"
-        className="fixed left-1.5 sm:left-2 top-1/2 -translate-y-1/2 z-40 select-none pointer-events-none"
+        data-theme={theme}
+        data-expanded={isDesktopExpanded ? 'true' : 'false'}
+        className="paperrocket-studio-rail fixed z-40 select-none pointer-events-none"
       >
-        <div className={`pointer-events-auto flex flex-col items-center gap-2 py-1 ${light ? 'text-neutral-800' : 'text-white/85'}`}>
+        <div className={`paperrocket-studio-rail-inner pointer-events-auto flex items-center ${light ? 'text-neutral-800' : 'text-white/85'}`}>
           {/* Studio Modes: Select, Draw, Create, Deform, Layers */}
-          {MODES.map(({ id, label, icon: Icon }) => {
-            const isActive = openSheet === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                data-pro-rail-button="true"
-                onClick={() => {
-                  haptics.trigger('light');
-                  if (id === 'draw' && setTool) {
-                    setTool('brush');
-                  }
-                  setPanel(null);
-                  if (openSheet === id) {
-                    closeSheet();
-                  } else {
-                    openSheetId(id);
-                  }
-                }}
-                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors active:scale-95 border-0 bg-transparent ${
-                  isActive
-                    ? light
-                      ? 'text-neutral-950 font-bold'
-                      : 'text-white font-bold'
-                    : light
-                      ? 'text-neutral-500 hover:text-neutral-900'
-                      : 'text-neutral-400 hover:text-white'
-                }`}
-                aria-label={label}
-                aria-pressed={isActive}
-                title={label}
-              >
-                <Icon className="h-[21px] w-[21px] shrink-0" strokeWidth={1.35} />
-              </button>
-            );
-          })}
+          <div className="paperrocket-studio-mode-group">
+            {MODES.map(({ id, label, icon: Icon }) => {
+              const isActive = openSheet === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  data-pro-rail-button="true"
+                  data-active={isActive ? 'true' : 'false'}
+                  onClick={() => {
+                    haptics.trigger('light');
+                    if (id === 'draw' && setTool) {
+                      setTool('brush');
+                    }
+                    setPanel(null);
+                    if (openSheet === id) {
+                      closeSheet();
+                    } else {
+                      openSheetId(id);
+                    }
+                  }}
+                  className={`paperrocket-studio-mode flex items-center justify-center rounded-xl transition-colors active:scale-95 border-0 bg-transparent ${
+                    isActive
+                      ? light
+                        ? 'text-neutral-950 font-bold'
+                        : 'text-white font-bold'
+                      : light
+                        ? 'text-neutral-500 hover:text-neutral-900'
+                        : 'text-neutral-400 hover:text-white'
+                  }`}
+                  aria-label={label}
+                  aria-pressed={isActive}
+                  title={label}
+                >
+                  <Icon className="h-[21px] w-[21px] shrink-0" strokeWidth={1.5} />
+                  <span className="paperrocket-studio-mode-label">{label}</span>
+                </button>
+              );
+            })}
+          </div>
 
-          {/* Color swatch disc */}
-          <button
+          <div className="paperrocket-studio-quick-group">
+            {/* Color swatch disc */}
+            <button
             ref={colorBtnRef}
             type="button"
             data-pro-rail-button="true"
+            data-active={panel === 'color' ? 'true' : 'false'}
             onClick={() => {
               haptics.trigger('light');
               closeSheet();
               setPanel((prev) => (prev === 'color' ? null : 'color'));
             }}
-            className="w-11 h-11 rounded-xl grid place-items-center active:scale-95 transition-transform border-0 bg-transparent"
+            className="paperrocket-studio-quick rounded-xl flex items-center justify-center active:scale-95 transition-transform border-0 bg-transparent"
             aria-label="Color"
             title="Color"
           >
@@ -186,21 +234,22 @@ export const ProRail: React.FC<ProRailProps> = ({
                   ? isLight ? 'border-neutral-900 ring-2 ring-neutral-900/40 shadow-xs' : 'border-white ring-2 ring-white/40 shadow-xs'
                   : isLight ? 'border-black/15' : 'border-white/20'
               }`}
-              style={{ background: currentBrushSettings.color || '#38bdf8' }}
+              style={{ background: currentBrushSettings.color || '#000000' }}
             />
-          </button>
+            </button>
 
           {/* Size button - Sleek concentric target circle */}
-          <button
+            <button
             ref={sizeBtnRef}
             type="button"
             data-pro-rail-button="true"
+            data-active={panel === 'size' ? 'true' : 'false'}
             onClick={() => {
               haptics.trigger('light');
               closeSheet();
               setPanel((prev) => (prev === 'size' ? null : 'size'));
             }}
-            className={`w-11 h-11 rounded-xl flex items-center justify-center active:scale-95 transition-colors border-0 bg-transparent ${
+            className={`paperrocket-studio-quick rounded-xl flex items-center justify-center active:scale-95 transition-colors border-0 bg-transparent ${
               panel === 'size'
                 ? isLight
                   ? 'text-neutral-950 font-bold'
@@ -229,13 +278,14 @@ export const ProRail: React.FC<ProRailProps> = ({
                 }}
               />
             </div>
-          </button>
+            </button>
 
           {/* Brushes button - Sleek spline wave curve */}
-          <button
+            <button
             ref={brushBtnRef}
             type="button"
             data-pro-rail-button="true"
+            data-active={panel === 'brush' ? 'true' : 'false'}
             onClick={() => {
               haptics.trigger('light');
               if (setTool) {
@@ -244,7 +294,7 @@ export const ProRail: React.FC<ProRailProps> = ({
               closeSheet();
               setPanel((prev) => (prev === 'brush' ? null : 'brush'));
             }}
-            className={`w-11 h-11 rounded-xl flex items-center justify-center active:scale-95 transition-colors border-0 bg-transparent ${
+            className={`paperrocket-studio-quick rounded-xl flex items-center justify-center active:scale-95 transition-colors border-0 bg-transparent ${
               panel === 'brush'
                 ? isLight
                   ? 'text-neutral-950 font-bold'
@@ -259,6 +309,18 @@ export const ProRail: React.FC<ProRailProps> = ({
             <svg viewBox="0 0 24 24" className="w-5 h-5 stroke-current fill-none">
               <path d="M 4 14 Q 8 6, 12 12 T 20 10" strokeWidth={1.6} strokeLinecap="round" />
             </svg>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="paperrocket-studio-expand rounded-xl items-center justify-center active:scale-95 transition-colors border-0 bg-transparent"
+            onClick={() => setIsDesktopExpanded((expanded) => !expanded)}
+            aria-label={isDesktopExpanded ? 'Collapse Studio rail' : 'Expand Studio rail'}
+            aria-expanded={isDesktopExpanded}
+            title={isDesktopExpanded ? 'Collapse Studio rail' : 'Expand Studio rail'}
+          >
+            <ChevronLeft className="paperrocket-studio-expand-icon h-4 w-4" />
           </button>
         </div>
 
@@ -269,7 +331,7 @@ export const ProRail: React.FC<ProRailProps> = ({
             theme={theme}
             padding={panel === 'brush' ? 'standard' : 'tight'}
             style={shelfTop !== null ? { top: `${shelfTop}px`, transform: 'translateY(-50%)' } : undefined}
-            className={`pointer-events-auto absolute left-full ml-3 z-50 animate-in fade-in slide-in-from-left-2 duration-150 ${
+            className={`paperrocket-studio-shelf pointer-events-auto absolute left-full ml-3 z-50 animate-in fade-in slide-in-from-left-2 duration-150 ${
               shelfTop === null ? 'top-1/2 -translate-y-1/2' : ''
             } ${
               panel === 'color'
@@ -288,10 +350,10 @@ export const ProRail: React.FC<ProRailProps> = ({
                     <div className="flex items-center gap-1.5">
                       <span
                         className="w-3.5 h-3.5 rounded-full border border-black/15 dark:border-white/20 shadow-xs shrink-0"
-                        style={{ background: currentBrushSettings.color || '#38bdf8' }}
+                        style={{ background: currentBrushSettings.color || '#000000' }}
                       />
                       <span className="font-mono text-[10px] font-bold tracking-tight opacity-75">
-                        {(currentBrushSettings.color || '#38bdf8').toUpperCase()}
+                        {(currentBrushSettings.color || '#000000').toUpperCase()}
                       </span>
                     </div>
                     {/* Quick Native Color Picker */}
@@ -301,7 +363,7 @@ export const ProRail: React.FC<ProRailProps> = ({
                     >
                       <input
                         type="color"
-                        value={currentBrushSettings.color || '#38bdf8'}
+                        value={currentBrushSettings.color || '#000000'}
                         onChange={(e) => {
                           const newColor = e.target.value;
                           if (setBrushSettings) {
@@ -315,9 +377,9 @@ export const ProRail: React.FC<ProRailProps> = ({
                   </div>
 
                   {/* Preset Swatches with Selection Indicator */}
-                  <div className="grid grid-cols-4 gap-3 py-0.5 justify-items-center">
+                  <div className="grid grid-cols-3 gap-2.5 py-1 justify-items-center">
                     {COLORS.map((color) => {
-                      const isSelected = (currentBrushSettings.color || '#38bdf8').toLowerCase() === color.toLowerCase();
+                      const isSelected = (currentBrushSettings.color || '#000000').toLowerCase() === color.toLowerCase();
                       const isWhite = color.toLowerCase() === '#ffffff';
                       const isLightColor = color === '#ffffff' || color === '#f59e0b';
                       return (
@@ -331,18 +393,18 @@ export const ProRail: React.FC<ProRailProps> = ({
                             }
                             setPanel(null);
                           }}
-                          className={`w-6 h-6 rounded-full border active:scale-90 transition-all shadow-xs flex items-center justify-center ${
+                          className={`w-5 h-5 rounded-full border transition-transform shadow-xs flex items-center justify-center shrink-0 ${
                             isSelected
                               ? isLight
-                                ? 'ring-2 ring-neutral-900 ring-offset-2 ring-offset-[#FAF9F5] scale-110 border-transparent'
-                                : 'ring-2 ring-white ring-offset-2 ring-offset-[#131518] scale-110 border-transparent'
+                                ? 'ring-2 ring-neutral-900 ring-offset-1 ring-offset-[#FAF9F5] scale-105 border-transparent'
+                                : 'ring-2 ring-white ring-offset-1 ring-offset-[#131518] scale-105 border-transparent'
                               : isWhite
                               ? isLight
-                                ? 'border-black/30 ring-1 ring-black/10 hover:scale-105'
-                                : 'border-white/30 hover:scale-105'
+                                ? 'border-black/30 ring-1 ring-black/10 hover:scale-110 active:scale-95'
+                                : 'border-white/30 hover:scale-110 active:scale-95'
                               : isLight
-                              ? 'border-black/20 hover:scale-105'
-                              : 'border-white/20 hover:scale-105'
+                              ? 'border-black/20 hover:scale-110 active:scale-95'
+                              : 'border-white/20 hover:scale-110 active:scale-95'
                           }`}
                           style={{ background: color }}
                           aria-label={`Use ${color}`}
@@ -350,7 +412,7 @@ export const ProRail: React.FC<ProRailProps> = ({
                         >
                           {isSelected && (
                             <Check
-                              className={`w-3.5 h-3.5 ${isLightColor ? 'text-neutral-950' : 'text-white'}`}
+                              className={`w-3 h-3 ${isLightColor ? 'text-neutral-950' : 'text-white'}`}
                               strokeWidth={3}
                             />
                           )}
@@ -395,13 +457,13 @@ export const ProRail: React.FC<ProRailProps> = ({
 
             {/* Brushes Panel */}
             {panel === 'brush' && (
-              <div className="flex flex-col gap-2.5 w-full">
+                <div className="paperrocket-brush-browser flex flex-col gap-3 w-full">
                 {/* Header Title & Category Tabs */}
                 <div className="flex flex-col gap-1.5">
                   <h3 className={`text-sm font-semibold tracking-tight ${isLight ? 'text-neutral-900' : 'text-white/95'}`}>
                     Brushes
                   </h3>
-                  <div className={`flex items-center gap-3.5 text-xs font-medium border-b pb-1.5 ${isLight ? 'border-black/10' : 'border-white/[0.08]'}`}>
+                  <div className={`paperrocket-brush-tabs grid grid-cols-4 gap-1 rounded-xl p-1 ${isLight ? 'bg-black/[0.05]' : 'bg-white/[0.06]'}`}>
                     {(['Favorites', 'Core', 'Textures', 'Surface'] as BrushCategoryTab[]).map((tab) => {
                       const isTabActive = activeTab === tab;
                       return (
@@ -409,24 +471,22 @@ export const ProRail: React.FC<ProRailProps> = ({
                           key={tab}
                           type="button"
                           onClick={() => setActiveTab(tab)}
-                          className={`transition-colors relative pb-1 ${
+                          className={`paperrocket-brush-tab min-h-8 rounded-lg px-1.5 text-[11px] font-semibold transition-colors ${
                             isTabActive
-                              ? isLight ? 'text-neutral-950 font-bold' : 'text-white font-semibold'
-                              : isLight ? 'text-neutral-500 hover:text-neutral-900' : 'text-white/40 hover:text-white/75'
+                              ? isLight ? 'bg-white text-neutral-950 shadow-sm' : 'bg-white/[0.13] text-white shadow-sm'
+                              : isLight ? 'text-neutral-500 hover:text-neutral-900' : 'text-white/50 hover:text-white/80'
                           }`}
+                          aria-pressed={isTabActive}
                         >
                           {tab}
-                          {isTabActive && (
-                            <span className="absolute -bottom-1.5 left-0 right-0 h-[2px] bg-neutral-900 dark:bg-white rounded-full shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
-                          )}
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* 4-col Presets Grid */}
-                <div className="grid grid-cols-4 gap-2 py-1 max-h-[260px] overflow-y-auto studio-scroll">
+                {/* Readable two-column brush list */}
+                <div className="paperrocket-brush-grid grid grid-cols-2 gap-2 max-h-[320px] overflow-y-auto studio-scroll pr-0.5">
                   {displayedBrushes.map((preset) => {
                     const isSelected = activeBrush.id === preset.id;
                     return (
@@ -443,7 +503,7 @@ export const ProRail: React.FC<ProRailProps> = ({
                           }
                           setPanel(null);
                         }}
-                        className={`relative rounded-xl p-1.5 flex flex-col items-center justify-between transition-all active:scale-95 aspect-[4/5] border ${
+                        className={`paperrocket-brush-card relative min-h-[64px] rounded-xl p-2 flex items-center gap-2 text-left transition-all active:scale-[0.98] border ${
                           isSelected
                             ? isLight
                               ? 'border-neutral-900 bg-black/[0.08] shadow-xs ring-1 ring-neutral-900/60'
@@ -454,25 +514,30 @@ export const ProRail: React.FC<ProRailProps> = ({
                         }`}
                         title={preset.description}
                       >
-                        {isSelected && (
-                          <Star className="w-2.5 h-2.5 text-neutral-900 fill-neutral-900 dark:text-white dark:fill-white absolute top-1.5 right-1.5" />
-                        )}
-                        <div className="w-full flex-1 flex items-center justify-center p-0.5 overflow-hidden">
-                          <img
-                            src={preset.iconUrl}
-                            alt={preset.name}
-                            className="w-9 h-9 object-contain pointer-events-none"
-                          />
+                        <div className={`paperrocket-brush-glyph h-11 w-11 shrink-0 rounded-lg grid place-items-center ${
+                          isLight ? 'bg-white/70' : 'bg-white/[0.07]'
+                        }`}>
+                          <BrushProfileGlyph profile={preset.profile} patternType={preset.patternType} />
                         </div>
-                        <span
-                          className={`text-[9.5px] truncate w-full text-center leading-tight pb-0.5 ${
+                        <span className="min-w-0 flex-1">
+                          <span
+                          className={`block text-[11px] whitespace-normal break-words leading-[1.2] ${
                             isSelected
                               ? isLight ? 'text-neutral-950 font-bold' : 'text-white font-semibold'
                               : isLight ? 'text-neutral-700' : 'text-white/70'
                           }`}
-                        >
-                          {preset.name}
+                          >
+                            {preset.name}
+                          </span>
+                          <span className={`mt-1 block text-[9px] leading-none ${isLight ? 'text-neutral-500' : 'text-white/40'}`}>
+                            {preset.profile === 'tube' ? '3D tube' : preset.profile === 'conformal' ? 'Surface' : preset.profile === 'marker' ? 'Marker' : 'Ribbon'}
+                          </span>
                         </span>
+                        {isSelected && (
+                          <span className={`absolute right-1.5 top-1.5 grid h-4 w-4 place-items-center rounded-full ${isLight ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-950'}`}>
+                            <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                          </span>
+                        )}
                       </button>
                     );
                   })}

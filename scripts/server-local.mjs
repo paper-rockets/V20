@@ -58,6 +58,7 @@ async function startLocalServer() {
     console.log('\x1b[90m%s\x1b[0m', 'Press Ctrl+C to stop the server.');
 
     // Keep process alive indefinitely
+    setInterval(() => {}, 1000 * 60 * 60);
     await new Promise(() => {});
   } catch (err) {
     console.error('\x1b[31m%s\x1b[0m', 'Failed to start local server:', err);

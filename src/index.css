@@ -348,15 +348,17 @@ canvas {
 
   .paperrocket-pro-panel,
   .paperrocket-context-panel {
-    left: 60px !important;
-    top: 68px !important;
-    bottom: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: calc(72px + env(safe-area-inset-bottom)) !important;
     transform: none !important;
     translate: none !important;
-    width: min(280px, calc(100vw - 72px)) !important;
-    max-width: calc(100vw - 72px) !important;
+    width: 100% !important;
+    max-width: none !important;
     height: auto !important;
-    max-height: calc(100dvh - 76px - max(8px, env(safe-area-inset-bottom))) !important;
+    max-height: min(68dvh, calc(100dvh - 132px)) !important;
+    border-radius: 20px 20px 0 0 !important;
   }
 }
 

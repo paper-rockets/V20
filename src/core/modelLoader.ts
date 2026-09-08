@@ -16,6 +16,7 @@ import { modelNormalization } from './modelNormalization';
 import { MaterialCache } from './materialCache';
 import { resolveAssetUrl } from '../utils/assetUrl';
 import { getQualityProfile } from '../utils/deviceProfile';
+import { MeshoptSimplifier } from 'meshoptimizer/simplifier';
 
 export type LoadingTier = 'tier1_full' | 'tier2_safe_geom' | 'tier3_raw_recovery' | 'tier4_point_cloud';
 
@@ -240,6 +241,9 @@ export class ModelLoaderService {
 
     // 4. Sanitize and enhance geometry & materials
     this.sanitizeLoadedHierarchy(loadedObject, warnings);
+
+    // 4b. Automatic Mesh Slimmer: Decimate massive 1,000,000+ triangle scans down to mobile-safe density
+    await this.autoSlimDenseMeshes(loadedObject, warnings);
 
     const rootGroup = new THREE.Group();
     rootGroup.name = primaryFile.name.replace(/\.[^/.]+$/, '');
@@ -765,6 +769,138 @@ export class ModelLoaderService {
         count: degenerateTriangleCount,
       });
     }
+  }
+
+  /**
+   * Automatic Mesh Slimmer: Detects dense high-polygon scans (>300k on mobile, >700k on desktop)
+   * and automatically optimizes them using meshoptimizer with locked borders to preserve UVs & textures.
+   */
+  public async autoSlimDenseMeshes(root: THREE.Object3D, warnings: IntegrityWarning[]): Promise<void> {
+    const profile = getQualityProfile();
+    const threshold = profile.powerPreference === 'low-power' ? 300000 : 700000;
+
+    let totalTriangles = 0;
+    root.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).geometry) {
+        const geom = (child as THREE.Mesh).geometry;
+        const count = geom.index ? geom.index.count / 3 : (geom.attributes.position?.count || 0) / 3;
+        totalTriangles += Math.floor(count);
+      }
+    });
+
+    if (totalTriangles <= threshold) {
+      return;
+    }
+
+    if (MeshoptSimplifier.ready) {
+      await MeshoptSimplifier.ready;
+    }
+
+    const targetRatio = Math.max(0.18, threshold / totalTriangles);
+    let afterTriangles = 0;
+
+    root.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).geometry) {
+        const mesh = child as THREE.Mesh;
+        const geom = mesh.geometry;
+        const count = geom.index ? geom.index.count / 3 : (geom.attributes.position?.count || 0) / 3;
+
+        if (count > 8000) {
+          const simplified = this.simplifyBufferGeometry(geom, targetRatio);
+          if (simplified !== geom) {
+            geom.dispose();
+            mesh.geometry = simplified;
+          }
+        }
+
+        const newCount = mesh.geometry.index ? mesh.geometry.index.count / 3 : (mesh.geometry.attributes.position?.count || 0) / 3;
+        afterTriangles += Math.floor(newCount);
+      }
+    });
+
+    warnings.push({
+      id: 'mesh_slimmer_active',
+      type: 'info',
+      title: 'Mesh Slimmer Active',
+      message: `Automatically optimized dense model (${totalTriangles.toLocaleString()} → ${afterTriangles.toLocaleString()} triangles) for smooth tablet performance.`,
+      count: totalTriangles - afterTriangles,
+    });
+  }
+
+  private simplifyBufferGeometry(geometry: THREE.BufferGeometry, targetRatio: number): THREE.BufferGeometry {
+    const posAttr = geometry.attributes.position;
+    if (!posAttr || posAttr.count < 4) return geometry;
+
+    const positions = posAttr.array as Float32Array;
+    let initialIndices: Uint32Array;
+
+    if (geometry.index) {
+      initialIndices = new Uint32Array(geometry.index.array);
+    } else {
+      initialIndices = new Uint32Array(posAttr.count);
+      for (let i = 0; i < posAttr.count; i++) {
+        initialIndices[i] = i;
+      }
+    }
+
+    if (initialIndices.length < 12) return geometry;
+
+    const clampedRatio = Math.max(0.05, Math.min(1.0, targetRatio));
+    const targetIndexCount = Math.floor((initialIndices.length * clampedRatio) / 3) * 3;
+    if (targetIndexCount >= initialIndices.length) return geometry;
+
+    const [simplifiedIndices] = MeshoptSimplifier.simplify(
+      initialIndices,
+      positions,
+      3,
+      targetIndexCount,
+      0.02,
+      ['LockBorder'] as any
+    );
+
+    if (!simplifiedIndices || simplifiedIndices.length === 0 || simplifiedIndices.length >= initialIndices.length) {
+      return geometry;
+    }
+
+    const remap = new Int32Array(posAttr.count).fill(-1);
+    let newVertexCount = 0;
+    for (let i = 0; i < simplifiedIndices.length; i++) {
+      const oldIdx = simplifiedIndices[i];
+      if (remap[oldIdx] === -1) {
+        remap[oldIdx] = newVertexCount++;
+      }
+    }
+
+    const compactIndices = new Uint32Array(simplifiedIndices.length);
+    for (let i = 0; i < simplifiedIndices.length; i++) {
+      compactIndices[i] = remap[simplifiedIndices[i]];
+    }
+
+    const newGeom = new THREE.BufferGeometry();
+    newGeom.setIndex(new THREE.BufferAttribute(compactIndices, 1));
+
+    for (const name in geometry.attributes) {
+      const attr = geometry.attributes[name];
+      const itemSize = attr.itemSize;
+      const oldArr = attr.array;
+      const newArr = new (oldArr.constructor as any)(newVertexCount * itemSize);
+
+      for (let oldIdx = 0; oldIdx < posAttr.count; oldIdx++) {
+        const newIdx = remap[oldIdx];
+        if (newIdx !== -1) {
+          for (let c = 0; c < itemSize; c++) {
+            newArr[newIdx * itemSize + c] = oldArr[oldIdx * itemSize + c];
+          }
+        }
+      }
+
+      newGeom.setAttribute(name, new THREE.BufferAttribute(newArr, itemSize, attr.normalized));
+    }
+
+    newGeom.computeVertexNormals();
+    newGeom.computeBoundingBox();
+    newGeom.computeBoundingSphere();
+    return newGeom;
   }
 
   public calculateDeepMetadata(

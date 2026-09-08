@@ -283,7 +283,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     } catch (_) {}
   }, []);
 
-  const place = useCallback((x: number, y: number, remember?: boolean) => {
+  const place = useCallback((x: number, y: number, remember = false) => {
     const dock = dockRef.current;
     if (!dock) return;
     const dw = dock.offsetWidth || 160;
@@ -301,12 +301,12 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       const denomH = Math.max(1, window.innerHeight - dh);
       anchorRef.current = {
         ax: Math.max(0, Math.min(1, left / denomW)),
-        ay: Math.max(0, Math.min(1, top / denomH))
+        ay: Math.max(0, Math.min(1, top / denomH)),
       };
       saveLayout();
     }
     positionMenu();
-  }, [saveLayout, positionMenu]);
+  }, [positionMenu, saveLayout]);
 
   const placeFromAnchor = useCallback(() => {
     const dock = dockRef.current;
@@ -1246,63 +1246,23 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     drawGizmo();
   }, [drawGizmo]);
 
-  // Dock dragging handling for repositioning smoothly anywhere on screen with finger or stylus
-  // Dock repositioning via the tab button (drag to move, tap to toggle menu)
+  // Dock menu toggle via the tab button
   useEffect(() => {
     const tab = tabRef.current;
-    const dock = dockRef.current;
-    if (!dock || !tab) return;
+    if (!tab) return;
 
-    let d: { x: number; y: number; left: number; top: number; moved: boolean } | null = null;
-
-    const onTabDown = (e: PointerEvent) => {
+    const onTabClick = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      setNavActive(true);
-      const r = dock.getBoundingClientRect();
-      d = { x: clientX(e), y: clientY(e), left: r.left, top: r.top, moved: false };
-      try { tab.setPointerCapture(e.pointerId); } catch (_) {}
+      setMenu(nvRef.current?.dataset.menu !== 'open');
     };
 
-    function clientX(e: PointerEvent) { return e.clientX; }
-    function clientY(e: PointerEvent) { return e.clientY; }
-
-    const onPointerMove = (e: PointerEvent) => {
-      if (!d) return;
-      if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 3) return;
-      if (!d.moved) setMenu(false);
-      d.moved = true;
-      place(d.left + e.clientX - d.x, d.top + e.clientY - d.y, false);
-    };
-
-    const onPointerUp = (e: PointerEvent) => {
-      setNavActive(false);
-      if (!d) return;
-      const moved = d.moved;
-      const targetLeft = d.left + e.clientX - d.x;
-      const targetTop = d.top + e.clientY - d.y;
-      d = null;
-      try { tab.releasePointerCapture(e.pointerId); } catch (_) {}
-      if (moved) {
-        place(targetLeft, targetTop, true);
-      } else {
-        setMenu(nvRef.current?.dataset.menu !== 'open');
-      }
-    };
-
-    tab.addEventListener('pointerdown', onTabDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
+    tab.addEventListener('click', onTabClick);
 
     return () => {
-      setNavActive(false);
-      tab.removeEventListener('pointerdown', onTabDown);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerUp);
+      tab.removeEventListener('click', onTabClick);
     };
-  }, [place, setMenu]);
+  }, [setMenu]);
 
   // Gizmo pointer events
   useEffect(() => {
@@ -1324,23 +1284,18 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       isRepositioning = false;
       repositionDrag = null;
 
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-      }
-
-      // Long-press detection (400ms hold without dragging) unlocks moving the gizmo anywhere
+      if (longPressTimer) clearTimeout(longPressTimer);
       longPressTimer = setTimeout(() => {
         longPressTimer = null;
         isRepositioning = true;
         haptics.trigger('medium');
         if (dock) {
-          const rDock = dock.getBoundingClientRect();
+          const rect = dock.getBoundingClientRect();
           repositionDrag = {
             startX: downX,
             startY: downY,
-            left: rDock.left,
-            top: rDock.top,
+            left: rect.left,
+            top: rect.top,
             moved: false,
           };
         }
@@ -1378,22 +1333,17 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     };
 
     const onMove = (e: PointerEvent) => {
-      if (longPressTimer) {
-        const distFromDown = Math.hypot(e.clientX - downX, e.clientY - downY);
-        if (distFromDown > 7) {
-          // Intentional drag gesture started before long-press elapsed -> cancel long-press timer
-          clearTimeout(longPressTimer);
-          longPressTimer = null;
-        }
+      if (longPressTimer && Math.hypot(e.clientX - downX, e.clientY - downY) > 7) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
       }
 
       if (isRepositioning && repositionDrag) {
-        // Gizmo is in long-press moving mode!
         const dx = e.clientX - repositionDrag.startX;
         const dy = e.clientY - repositionDrag.startY;
         if (!repositionDrag.moved && Math.hypot(dx, dy) < 2) return;
         repositionDrag.moved = true;
-        place(repositionDrag.left + dx, repositionDrag.top + dy, false);
+        place(repositionDrag.left + dx, repositionDrag.top + dy);
         return;
       }
 
@@ -1488,7 +1438,6 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
           const dx = e.clientX - repositionDrag.startX;
           const dy = e.clientY - repositionDrag.startY;
           place(repositionDrag.left + dx, repositionDrag.top + dy, true);
-          saveLayout();
           haptics.trigger('light');
         }
         repositionDrag = null;
@@ -1539,7 +1488,7 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
       gzc.removeEventListener('pointercancel', onUp);
       gzc.removeEventListener('wheel', onWheel);
     };
-  }, [drawGizmo, applyCamera, applyObject, idleHint, say, engine, place, saveLayout]);
+  }, [drawGizmo, applyCamera, applyObject, idleHint, say, engine, place]);
 
   // Stepping aside while drawing on main canvas
   useEffect(() => {
@@ -1591,11 +1540,12 @@ export const Option3SphereNavigator: React.FC<Option3SphereNavigatorProps> = ({
     let animId: number;
     let lastFrame = 0;
 
-    // Load persisted layout if available
+    // Load the user's saved position, mode, and step settings.
     try {
       const v = JSON.parse(localStorage.getItem(STORE) || 'null');
       if (v) {
-        if (typeof v.ax === 'number') anchorRef.current = { ax: Math.min(1, Math.max(0, v.ax)), ay: Math.min(1, Math.max(0, v.ay)) };
+        if (typeof v.ax === 'number') anchorRef.current.ax = Math.max(0, Math.min(1, v.ax));
+        if (typeof v.ay === 'number') anchorRef.current.ay = Math.max(0, Math.min(1, v.ay));
         if (v.mode) { gzRef.current.mode = v.mode; setModeState(v.mode); }
         if (typeof v.rotStep === 'number') { gzRef.current.rotStep = v.rotStep; setRotStep(v.rotStep); }
         if (typeof v.moveStep === 'number') { gzRef.current.moveStep = v.moveStep; setMoveStep(v.moveStep); }

@@ -76,7 +76,7 @@ export const StudioSheet: React.FC<StudioSheetProps> = ({ id, title, children, t
       style={{
         maxHeight: tall ? '70vh' : '38vh',
         paddingBottom: 'max(env(safe-area-inset-bottom), 14px)',
-        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       <div className="paperrocket-sheet-header px-5 pt-3.5 pb-1 flex items-center justify-between min-h-[44px]">

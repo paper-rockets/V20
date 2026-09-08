@@ -181,11 +181,14 @@ export class ShapeSnappingEngine {
       });
     }
 
+    const lineCenter = startPoint.position.clone().add(endPoint.position).multiplyScalar(0.5);
+
     return {
       detectedShape: 'line',
       confidence,
       snappedPoints,
       length: lineLen,
+      center: lineCenter,
       description: `Straight Line (${(lineLen * 100).toFixed(1)}cm)`,
     };
   }
@@ -431,15 +434,47 @@ export class ShapeSnappingEngine {
       }
     }
 
+    const polyCenter = new THREE.Vector3();
+    for (const c of corners) polyCenter.add(points[c].position);
+    polyCenter.divideScalar(corners.length);
+
     return {
       detectedShape: detectedType,
       confidence: 0.82,
       snappedPoints,
+      center: polyCenter,
       description: detectedType === 'triangle'
         ? 'Equilateral Triangle'
         : detectedType === 'rectangle'
         ? 'Rectangle / Box'
         : `Polygon (${corners.length} Vertices)`,
     };
+  }
+
+  /**
+   * Transforms snapped shape points interactively (Hold to Snap scale & rotation)
+   */
+  public static transformSnappedPoints(
+    basePoints: StrokePoint[],
+    center: THREE.Vector3,
+    scale: number,
+    rotationAngleRad: number,
+    normal?: THREE.Vector3
+  ): StrokePoint[] {
+    const rotNormal = normal ? normal.clone().normalize() : new THREE.Vector3(0, 1, 0);
+    const quat = new THREE.Quaternion().setFromAxisAngle(rotNormal, rotationAngleRad);
+
+    return basePoints.map((p) => {
+      const rel = p.position.clone().sub(center);
+      rel.multiplyScalar(Math.max(0.05, Math.min(10.0, scale)));
+      if (Math.abs(rotationAngleRad) > 1e-4) {
+        rel.applyQuaternion(quat);
+      }
+      return {
+        ...p,
+        position: center.clone().add(rel),
+        normal: p.normal ? (Math.abs(rotationAngleRad) > 1e-4 ? p.normal.clone().applyQuaternion(quat) : p.normal.clone()) : rotNormal.clone(),
+      };
+    });
   }
 }

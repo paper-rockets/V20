@@ -386,7 +386,7 @@ export const StudioSettingsSheet: React.FC<StudioSettingsSheetProps> = ({
       </Row>
 
       {onToggleDisableContextMenu && (
-        <Row icon={Compass} label="Radial Quick Menu" hint="Stylus hover or tap shortcut ring" isLight={isLight}>
+        <Row icon={Compass} label="Radial Quick Menu" hint="Stylus side button or mouse right-click" isLight={isLight}>
           <Toggle on={!disableContextMenu} onChange={() => onToggleDisableContextMenu()} label="Radial Quick Menu" isLight={isLight} />
         </Row>
       )}

@@ -114,6 +114,10 @@ export class PostProcessingEngine {
     grainIntensity: 0.08,
     pixelation: false,
     pixelSize: 4,
+    rayTracing: false,
+    contactShadowSharpness: 1.5,
+    denoiser: true,
+    antiAliasing: true,
   };
 
   constructor(
@@ -191,6 +195,7 @@ export class PostProcessingEngine {
         uGrainIntensity: { value: 0.08 },
         uPixelation: { value: false },
         uPixelSize: { value: 4.0 },
+        uAntiAliasing: { value: true },
       },
       vertexShader: BRIGHT_PASS_VERTEX,
       fragmentShader: `
@@ -212,11 +217,54 @@ export class PostProcessingEngine {
         uniform float uGrainIntensity;
         uniform bool uPixelation;
         uniform float uPixelSize;
+        uniform bool uAntiAliasing;
 
         varying vec2 vUv;
 
         float rand(vec2 co) {
           return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+        }
+
+        // Fast Approximate Anti-Aliasing (FXAA) edge smoothing
+        vec3 applyFXAA(sampler2D tex, vec2 coords, vec2 resolution) {
+          vec2 rcpFrame = 1.0 / resolution;
+          vec3 rgbNW = texture2D(tex, coords + vec2(-0.5, -0.5) * rcpFrame).rgb;
+          vec3 rgbNE = texture2D(tex, coords + vec2(0.5, -0.5) * rcpFrame).rgb;
+          vec3 rgbSW = texture2D(tex, coords + vec2(-0.5, 0.5) * rcpFrame).rgb;
+          vec3 rgbSE = texture2D(tex, coords + vec2(0.5, 0.5) * rcpFrame).rgb;
+          vec3 rgbM  = texture2D(tex, coords).rgb;
+
+          vec3 luma = vec3(0.299, 0.587, 0.114);
+          float lumaNW = dot(rgbNW, luma);
+          float lumaNE = dot(rgbNE, luma);
+          float lumaSW = dot(rgbSW, luma);
+          float lumaSE = dot(rgbSE, luma);
+          float lumaM  = dot(rgbM,  luma);
+
+          float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
+          float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+
+          vec2 dir;
+          dir.x = -((lumaNW + lumaNE) - (lumaSW + lumaSE));
+          dir.y =  ((lumaNW + lumaSW) - (lumaNE + lumaSE));
+
+          float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * 0.125), 0.0078125);
+          float rcpDirMin = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+          dir = min(vec2(8.0), max(vec2(-8.0), dir * rcpDirMin)) * rcpFrame;
+
+          vec3 rgbA = 0.5 * (
+            texture2D(tex, coords + dir * (1.0 / 3.0 - 0.5)).rgb +
+            texture2D(tex, coords + dir * (2.0 / 3.0 - 0.5)).rgb);
+          vec3 rgbB = rgbA * 0.5 + 0.25 * (
+            texture2D(tex, coords + dir * -0.5).rgb +
+            texture2D(tex, coords + dir * 0.5).rgb);
+
+          float lumaB = dot(rgbB, luma);
+          if ((lumaB < lumaMin) || (lumaB > lumaMax)) {
+            return rgbA;
+          } else {
+            return rgbB;
+          }
         }
 
         void main() {
@@ -229,6 +277,9 @@ export class PostProcessingEngine {
           }
 
           vec4 baseColor = texture2D(tDiffuse, uv);
+          if (uAntiAliasing && (!uPixelation || uPixelSize <= 1.0)) {
+            baseColor.rgb = applyFXAA(tDiffuse, uv, uResolution);
+          }
 
           // If Draft Mode, pass through directly
           if (uRenderMode == 0) {
@@ -319,6 +370,8 @@ export class PostProcessingEngine {
     const bh = this.bloomHeight();
     const hdrType = this.profile.halfFloatTargets ? THREE.HalfFloatType : THREE.UnsignedByteType;
 
+    const msaaSamples = (this.settings.antiAliasing !== false && this.profile.postProcessing) ? 4 : 0;
+
     this.renderTargetA = new THREE.WebGLRenderTarget(w, h, {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
@@ -327,6 +380,7 @@ export class PostProcessingEngine {
       stencilBuffer: true,
       depthBuffer: true,
       colorSpace: THREE.SRGBColorSpace,
+      samples: msaaSamples,
     });
 
     const bloomOptions: THREE.RenderTargetOptions = {
@@ -424,6 +478,7 @@ export class PostProcessingEngine {
     u.uGrainIntensity.value = this.settings.grainIntensity;
     u.uPixelation.value = this.settings.pixelation;
     u.uPixelSize.value = this.settings.pixelSize;
+    u.uAntiAliasing.value = this.settings.antiAliasing !== false;
   }
 
   public getSettings(): PostProcessSettings {

@@ -70,6 +70,10 @@ async function startFullScreenServer() {
 
     process.on('SIGINT', handleShutdown);
     process.on('SIGTERM', handleShutdown);
+
+    // Keep process alive indefinitely
+    setInterval(() => {}, 1000 * 60 * 60);
+    await new Promise(() => {});
   } catch (error) {
     console.error('Failed to start full site server:', error);
     process.exit(1);

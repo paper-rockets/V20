@@ -178,10 +178,11 @@ function readOverride(): PerformanceTier | 's6lite' | null {
 
   try {
     const params = new URLSearchParams(window.location.search);
-    // The device simulator already uses ?device=s6lite; honour it as a perf hint too.
+    // The device simulator uses ?device=s6lite or ?device=s25ultra; honour them as perf hints too.
     const fromQuery = normalize(params.get('perf')) || normalize(params.get('quality'));
     if (fromQuery) return fromQuery;
     if (params.get('device') === 's6lite') return 's6lite';
+    if (params.get('device') === 's25ultra') return 'high';
   } catch (_) {
     /* Malformed URL; fall through. */
   }

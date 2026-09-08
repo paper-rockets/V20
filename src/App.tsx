@@ -17,6 +17,7 @@ import {
   Guide3D,
   ActiveControllerType,
   ProjectSaveData,
+  PathTracingProgressInfo,
 } from './types';
 import { StudioEngine } from './core/studioEngine';
 import { Viewport } from './components/Viewport';
@@ -33,10 +34,12 @@ import { ProShell } from './components/pro/ProShell';
 import { useOpenSheet, openSheetId, closeSheet, toggleSheet } from './components/studio/panelStore';
 import { StudioTopStrip } from './components/studio/StudioTopStrip';
 import { StudioSettingsSheet } from './components/studio/StudioSettingsSheet';
+import { WorkLossDecisionSheet } from './components/WorkLossDecisionSheet';
 const StudioImporter = lazy(() =>
   import('./components/studio/StudioImporter').then((m) => ({ default: m.StudioImporter }))
 );
 import { ShapesSheet } from './components/studio/ShapesSheet';
+import { DeviceSimulatorFrame } from './components/DeviceSimulatorFrame';
 import { Compass } from 'lucide-react';
 import { CameraRecoveryPill } from './components/CameraRecoveryPill';
 import { AutoSaveToast, AutoSaveStatus } from './components/AutoSaveToast';
@@ -116,7 +119,8 @@ import {
 const DEFAULT_BRUSH_SETTINGS: BrushSettings = {
   size: 0.035,
   opacity: 1.0,
-  color: '#38bdf8',
+  color: '#000000',
+  solidColor: '#000000',
   roughness: 0.8,
   metalness: 0.0,
   emissiveIntensity: 0.0,
@@ -158,6 +162,11 @@ const DEFAULT_POST_SETTINGS: PostProcessSettings = {
   grainIntensity: 0.08,
   pixelation: false,
   pixelSize: 4,
+  rayTracing: false,
+  contactShadowSharpness: 1.5,
+  denoiser: true,
+  rayTracingBounces: 3,
+  rayTracingSamples: 48,
 };
 
 const DEFAULT_LAYERS: Layer[] = [
@@ -206,6 +215,12 @@ export function App() {
   const [tool, setTool] = useState<ToolType>('brush');
   const [brushSettings, setBrushSettings] = useState<BrushSettings>(DEFAULT_BRUSH_SETTINGS);
   const [postSettings, setPostSettings] = useState<PostProcessSettings>(DEFAULT_POST_SETTINGS);
+  const [pathTracingProgress, setPathTracingProgress] = useState<PathTracingProgressInfo | null>(null);
+
+  useEffect(() => {
+    if (!engine) return;
+    engine.setPostProcessSettings(postSettings);
+  }, [engine, postSettings]);
   const [symmetry, setSymmetry] = useState<SymmetryMode>('none');
   const [layers, setLayers] = useState<Layer[]>(DEFAULT_LAYERS);
   const [activeLayerId, setActiveLayerId] = useState<string>(DEFAULT_LAYERS[0].id);
@@ -244,6 +259,14 @@ export function App() {
     } catch (_) {}
     return 'opt3';
   });
+
+  const [pendingWorkLoss, setPendingWorkLoss] = useState<{
+    title: string;
+    description: string;
+    actionLabel: string;
+    action: () => Promise<void> | void;
+  } | null>(null);
+  const [workLossBusy, setWorkLossBusy] = useState<boolean>(false);
 
   const handleNavigatorStyleChange = (style: 'opt3' | 'opt1' | 'classic') => {
     setNavigatorStyle(style);
@@ -593,6 +616,9 @@ export function App() {
     inst.onGPUInfoUpdate = (info) => {
       setGpuInfo(info);
     };
+    inst.onPathTracingProgress = (info) => {
+      setPathTracingProgress(info);
+    };
     // FPS and camera pose arrive every frame. They go to the telemetry store, not
     // React state - FpsCounter and any pose consumer subscribe as leaves, so a
     // 60 fps stream never re-renders this component tree.
@@ -879,6 +905,7 @@ export function App() {
         }
       },
       closeAllModals: () => {
+        setPendingWorkLoss(null);
         closeSheet();
         setIsSessionModalOpen(false);
         setIsIlluminationOpen(false);
@@ -907,6 +934,59 @@ export function App() {
       setSnappedShapeNotice((cur) => (cur === 'Session saved with full undo history!' ? null : cur));
     }, 2200);
   }, [engine, activeModelName, handleSaveNamedSession]);
+
+  const handleBeforeReplace = useCallback((modelName: string, action: () => Promise<void>) => {
+    setPendingWorkLoss({
+      title: `Replace scene with "${modelName}"?`,
+      description: 'Loading this model will replace your current workspace. You can save your work first or proceed without saving.',
+      actionLabel: 'Load Model',
+      action,
+    });
+  }, []);
+
+  const handleBeforeDestructiveAction = useCallback((title: string, description: string, actionLabel: string, action: () => Promise<void> | void) => {
+    setPendingWorkLoss({
+      title,
+      description,
+      actionLabel,
+      action,
+    });
+  }, []);
+
+  const handleWorkLossSave = useCallback(async () => {
+    if (!pendingWorkLoss) return;
+    setWorkLossBusy(true);
+    try {
+      const defaultName = activeModelName ? `${activeModelName} (Auto-Saved)` : 'Session (Auto-Saved)';
+      await handleSaveNamedSession(defaultName);
+      const action = pendingWorkLoss.action;
+      setPendingWorkLoss(null);
+      await action();
+    } catch (err) {
+      console.error('Failed to save before replacement:', err);
+    } finally {
+      setWorkLossBusy(false);
+    }
+  }, [pendingWorkLoss, activeModelName, handleSaveNamedSession]);
+
+  const handleWorkLossReplace = useCallback(async () => {
+    if (!pendingWorkLoss) return;
+    setWorkLossBusy(true);
+    try {
+      const action = pendingWorkLoss.action;
+      setPendingWorkLoss(null);
+      await action();
+    } catch (err) {
+      console.error('Failed to proceed with replacement:', err);
+    } finally {
+      setWorkLossBusy(false);
+    }
+  }, [pendingWorkLoss]);
+
+  const handleWorkLossCancel = useCallback(() => {
+    if (workLossBusy) return;
+    setPendingWorkLoss(null);
+  }, [workLossBusy]);
 
   // Load named project session from local IndexedDB storage
   const handleLoadNamedSession = useCallback(async (session: SavedProjectSession) => {
@@ -1139,11 +1219,12 @@ export function App() {
     isClipboardOpen;
 
   return (
-    <div
-      className={`paperrocket-ui relative w-full h-full overflow-hidden select-none transition-colors duration-200 ${
-        theme === 'light' ? 'bg-[#ebe5dc] text-neutral-800' : 'bg-[#242629] text-neutral-100'
-      }`}
-    >
+    <DeviceSimulatorFrame>
+      <div
+        className={`paperrocket-ui relative w-full h-full overflow-hidden select-none transition-colors duration-200 ${
+          theme === 'light' ? 'bg-[#ebe5dc] text-neutral-800' : 'bg-[#242629] text-neutral-100'
+        }`}
+      >
       {/* Main 3D Viewport */}
       <Viewport
         tool={tool}
@@ -1202,6 +1283,7 @@ export function App() {
           onClose={() => setIsModelImporterOpen(false)}
           onSaved={(n) => setActiveModelName(n)}
           theme={theme}
+          onBeforeReplace={handleBeforeReplace}
         />
       </DeferredPanel>
 
@@ -1279,6 +1361,7 @@ export function App() {
             setActiveLayerId={setActiveLayerId}
             onClearLayerStrokes={handleClearLayerStrokes}
             onMergeLayerDown={handleMergeLayerDown}
+            onBeforeDestructiveAction={handleBeforeDestructiveAction}
             onOpenIllumination={() => {
               closeSheet();
               setIsIlluminationOpen(true);
@@ -1377,6 +1460,7 @@ export function App() {
             onRecalculateNormals={() => engine?.recalculateMeshNormals()}
             gpuInfo={gpuInfo}
             theme={theme}
+            pathTracingProgress={pathTracingProgress}
           />
         </Suspense>
       )}
@@ -1389,6 +1473,7 @@ export function App() {
             onClose={() => setIsModelsOpen(false)}
             activeModelName={activeModelName}
             theme={theme}
+            onBeforeReplace={handleBeforeReplace}
           />
         </Suspense>
       )}
@@ -1514,7 +1599,7 @@ export function App() {
         <ColorStudioModal
           isOpen={isColorStudioOpen}
           onClose={() => setIsColorStudioOpen(false)}
-          currentColor={brushSettings.color || '#38bdf8'}
+          currentColor={brushSettings.color || '#000000'}
           onChangeColor={(hex) => setBrushSettings((prev) => ({ ...prev, color: hex }))}
           onApplyBrushSettings={(newSettings) =>
             setBrushSettings((prev) => ({ ...prev, ...newSettings }))
@@ -1636,7 +1721,23 @@ export function App() {
         isPersistent={isStoragePersistent}
         theme={theme}
       />
-    </div>
+
+      {/* Work-Loss Decision Modal (Save & Replace / Replace / Cancel) */}
+      {pendingWorkLoss && (
+        <WorkLossDecisionSheet
+          isOpen={Boolean(pendingWorkLoss)}
+          title={pendingWorkLoss.title}
+          description={pendingWorkLoss.description}
+          actionLabel={pendingWorkLoss.actionLabel}
+          theme={theme}
+          busy={workLossBusy}
+          onSave={handleWorkLossSave}
+          onReplace={handleWorkLossReplace}
+          onCancel={handleWorkLossCancel}
+        />
+      )}
+      </div>
+    </DeviceSimulatorFrame>
   );
 }
 
