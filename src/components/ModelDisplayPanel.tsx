@@ -12,6 +12,7 @@ import {
   X,
   RotateCcw,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 
 interface ModelDisplayPanelProps {
@@ -49,6 +50,12 @@ export const ModelDisplayPanel: React.FC<ModelDisplayPanelProps> = ({
       setCloneStatus('Cloned!');
       setTimeout(() => setCloneStatus(null), 1500);
     }
+  };
+
+  const handleDelete = () => {
+    if (!engine) return;
+    engine.deleteActiveSelection();
+    onClose?.();
   };
 
   const handleOpacityChange = (val: number) => {
@@ -200,19 +207,32 @@ export const ModelDisplayPanel: React.FC<ModelDisplayPanelProps> = ({
         </div>
       </div>
 
-      {/* Action Buttons: Clone, Hide/Show, Center, Reset Camera */}
-      <div className={`pt-2 border-t grid grid-cols-4 gap-1.5 text-xs ${isLight ? 'border-black/10' : 'border-neutral-800'}`}>
+      {/* Action Buttons: Clone, Delete, Hide/Show, Center, Reset Camera */}
+      <div className={`pt-2 border-t grid grid-cols-5 gap-1 text-xs ${isLight ? 'border-black/10' : 'border-neutral-800'}`}>
         <button
           onClick={handleClone}
-          className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border text-center transition-all ${
+          className={`flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl border text-center transition-all ${
             isLight
               ? 'bg-neutral-100 hover:bg-neutral-200 border-black/10 text-neutral-800'
               : 'bg-neutral-950/40 border-neutral-800 hover:bg-neutral-800 text-neutral-300'
           }`}
           title="Clone 3D Model with offset"
         >
-          <Layers className="w-4 h-4 text-neutral-700 dark:text-zinc-300" />
-          <span className="text-[10px]">{cloneStatus || 'Clone'}</span>
+          <Layers className="w-3.5 h-3.5 text-neutral-700 dark:text-zinc-300" />
+          <span className="text-[9.5px] truncate">{cloneStatus || 'Clone'}</span>
+        </button>
+
+        <button
+          onClick={handleDelete}
+          className={`flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl border text-center transition-all ${
+            isLight
+              ? 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700'
+              : 'bg-red-950/40 border-red-900/60 hover:bg-red-900/40 text-red-300'
+          }`}
+          title="Delete 3D Model"
+        >
+          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+          <span className="text-[9.5px] truncate">Delete</span>
         </button>
 
         <button

@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { StudioEngine } from '../core/studioEngine';
 import { StylusRadialMenu, RadialMenuPosition } from './StylusRadialMenu';
+import { SelectionActionBar, SelectionInfo } from './pro/SelectionActionBar';
 import {
   RotateCw,
   Maximize2,
@@ -159,6 +160,50 @@ export const Viewport: React.FC<ViewportProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Selection Action Bar state & handlers
+  const [activeSelection, setActiveSelection] = useState<SelectionInfo | null>(null);
+
+  useEffect(() => {
+    const handleSelectionChange = (e: any) => {
+      setActiveSelection(e.detail || null);
+    };
+    window.addEventListener('STUDIO_SELECTION_CHANGED', handleSelectionChange);
+    return () => window.removeEventListener('STUDIO_SELECTION_CHANGED', handleSelectionChange);
+  }, []);
+
+  const handleCloneSelection = useCallback(() => {
+    if (!engineRef.current) return;
+    const cloned = engineRef.current.cloneModel();
+    if (cloned) {
+      triggerHaptic(25);
+      showGestureToast('Cloned', `${cloned.name || 'Object'} duplicated`);
+    }
+  }, []);
+
+  const handleDeleteSelection = useCallback(() => {
+    if (!engineRef.current) return;
+    const success = engineRef.current.deleteActiveSelection();
+    if (success) {
+      triggerHaptic(30);
+      showGestureToast('Deleted', 'Selection removed • Undo available');
+      setActiveSelection(null);
+    }
+  }, []);
+
+  const handleResetSelectionTransform = useCallback(() => {
+    if (!engineRef.current) return;
+    engineRef.current.resetTransform('model');
+    triggerHaptic(15);
+    showGestureToast('Reset Transform', 'Model centered at origin');
+  }, []);
+
+  const handleDeselect = useCallback(() => {
+    if (!engineRef.current) return;
+    engineRef.current.selectStroke(null);
+    engineRef.current.setActiveSelectedModel(null);
+    setActiveSelection(null);
   }, []);
 
   // 2. Hardware-Isolated Touch Pointer Map (Strictly segregated from stylus)
@@ -436,12 +481,13 @@ export const Viewport: React.FC<ViewportProps> = ({
         const res = engine.raycastSelection(coords.x, coords.y);
         if (res.type === 'stroke') {
           triggerHaptic(20);
-          showGestureToast('Curve Selected', `ID: ${res.id?.slice(0, 8)}... (Press Del or Trash to remove)`);
+          showGestureToast('Curve Selected', 'Tap Delete or Clone on-screen');
         } else if (res.type === 'model') {
           triggerHaptic(20);
-          showGestureToast('Object Selected', `${res.name || '3D Object'} (Press Del or Trash to remove)`);
+          showGestureToast('Object Selected', `${res.name || '3D Object'} • Tap Delete or Clone`);
         } else {
           engine.selectStroke(null);
+          engine.setActiveSelectedModel(null);
         }
         return;
       }
@@ -600,12 +646,13 @@ export const Viewport: React.FC<ViewportProps> = ({
           const res = engine.raycastSelection(coords.x, coords.y);
           if (res.type === 'stroke') {
             triggerHaptic(20);
-            showGestureToast('Curve Selected', `ID: ${res.id?.slice(0, 8)}... (Press Del or Trash to remove)`);
+            showGestureToast('Curve Selected', 'Tap Delete or Clone on-screen');
           } else if (res.type === 'model') {
             triggerHaptic(20);
-            showGestureToast('Object Selected', `${res.name || '3D Object'} (Press Del or Trash to remove)`);
+            showGestureToast('Object Selected', `${res.name || '3D Object'} • Tap Delete or Clone`);
           } else {
             engine.selectStroke(null);
+            engine.setActiveSelectedModel(null);
           }
           setIsOrbiting(false);
           return;
@@ -673,12 +720,13 @@ export const Viewport: React.FC<ViewportProps> = ({
         const res = engine.raycastSelection(coords.x, coords.y);
         if (res.type === 'stroke') {
           triggerHaptic(20);
-          showGestureToast('Curve Selected', `ID: ${res.id?.slice(0, 8)}... (Press Del or Trash to remove)`);
+          showGestureToast('Curve Selected', 'Tap Delete or Clone on-screen');
         } else if (res.type === 'model') {
           triggerHaptic(20);
-          showGestureToast('Object Selected', `${res.name || '3D Object'} (Press Del or Trash to remove)`);
+          showGestureToast('Object Selected', `${res.name || '3D Object'} • Tap Delete or Clone`);
         } else {
           engine.selectStroke(null);
+          engine.setActiveSelectedModel(null);
         }
         return;
       }
@@ -1382,6 +1430,16 @@ export const Viewport: React.FC<ViewportProps> = ({
           <Move className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Floating Selection Options Action Bar (Delete, Clone, Reset, Deselect) */}
+      <SelectionActionBar
+        selection={activeSelection}
+        onClone={handleCloneSelection}
+        onDelete={handleDeleteSelection}
+        onResetTransform={handleResetSelectionTransform}
+        onDeselect={handleDeselect}
+        theme={theme}
+      />
 
       {/* S-Pen Hardware Radial Context Menu (At Stylus Tip) */}
       <StylusRadialMenu

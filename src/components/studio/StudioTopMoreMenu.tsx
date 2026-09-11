@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
+  Compass,
   FolderOpen,
   Maximize2,
   Minimize2,
@@ -23,6 +24,8 @@ interface StudioTopMoreMenuProps {
   onOpenSettings: () => void;
   onOpenScaffolding?: () => void;
   onToggleFullscreen: () => void;
+  isGizmoActive?: boolean;
+  onToggleGizmo?: () => void;
 }
 
 interface ActionButtonProps {
@@ -65,6 +68,8 @@ export const StudioTopMoreMenu: React.FC<StudioTopMoreMenuProps> = ({
   onOpenSettings,
   onOpenScaffolding,
   onToggleFullscreen,
+  isGizmoActive = true,
+  onToggleGizmo,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const isLight = theme === 'light';
@@ -160,6 +165,15 @@ export const StudioTopMoreMenu: React.FC<StudioTopMoreMenuProps> = ({
             <ActionButton icon={<User className="h-5 w-5 text-sky-400" strokeWidth={1.7} />} label="Guides" description="3D Armatures & Forms" onSelect={select(onOpenScaffolding)} isLight={isLight} />
           )}
           <ActionButton icon={<Settings className="h-5 w-5" strokeWidth={1.7} />} label="Settings" description="Studio preferences" onSelect={select(onOpenSettings)} isLight={isLight} />
+          {onToggleGizmo && (
+            <ActionButton
+              icon={<Compass className="h-5 w-5 text-sky-400" strokeWidth={1.7} />}
+              label={isGizmoActive ? 'Hide Gizmo' : 'Show Gizmo'}
+              description="3D Navigator"
+              onSelect={select(onToggleGizmo)}
+              isLight={isLight}
+            />
+          )}
           <ActionButton
             icon={isFullscreen ? <Minimize2 className="h-5 w-5" strokeWidth={1.7} /> : <Maximize2 className="h-5 w-5" strokeWidth={1.7} />}
             label={isFullscreen ? 'Exit full screen' : 'Full screen'}

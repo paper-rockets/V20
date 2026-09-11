@@ -222,6 +222,8 @@ export const ProRail: React.FC<ProRailProps> = ({
                     haptics.trigger('light');
                     if (id === 'draw' && setTool) {
                       setTool('brush');
+                    } else if (id === 'select' && setTool) {
+                      setTool('select');
                     }
                     setPanel(null);
                     if (openSheet === id) {

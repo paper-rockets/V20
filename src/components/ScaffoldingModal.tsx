@@ -152,8 +152,10 @@ export const ScaffoldingModal: React.FC<ScaffoldingModalProps> = ({
       setScaffolds(engine.getScaffolds());
       setActiveTab('active_scaffolds');
     } else {
-      // Add as standard scene model
-      engine.getScene().add(group);
+      // Add as standard scene model to modelRoot so it is selectable, movable and deletable
+      const typeName = primitiveConfig.type.charAt(0).toUpperCase() + primitiveConfig.type.slice(1);
+      engine.addPrimitiveToScene(group, `Primitive ${typeName}`);
+      onClose();
     }
   };
 

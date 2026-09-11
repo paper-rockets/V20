@@ -28,6 +28,8 @@ interface StudioTopStripProps {
   onOpenScaffolding?: () => void;
   onQuickSave?: () => void;
   onOpenSessions?: () => void;
+  isGizmoActive?: boolean;
+  onToggleGizmo?: () => void;
 }
 
 export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
@@ -42,6 +44,8 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
   onOpenScaffolding,
   onQuickSave,
   onOpenSessions,
+  isGizmoActive,
+  onToggleGizmo,
 }) => {
   const ink = theme === 'light' ? 'text-neutral-800' : 'text-white/90';
   const button = `pointer-events-auto shrink-0 min-w-[44px] min-h-[44px] w-11 h-11 grid place-items-center rounded-xl transition-colors hover:bg-current/[0.045] active:bg-current/[0.075] ${ink}`;
@@ -266,6 +270,8 @@ export const StudioTopStrip: React.FC<StudioTopStripProps> = ({
         onOpenSettings={openSettings}
         onOpenScaffolding={onOpenScaffolding}
         onToggleFullscreen={handleToggleFullscreen}
+        isGizmoActive={isGizmoActive}
+        onToggleGizmo={onToggleGizmo}
       />
     </header>
   );

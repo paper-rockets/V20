@@ -215,7 +215,15 @@ export function App() {
   const openSheet = useOpenSheet();
   const hasOnboarded = useHasOnboarded();
   const [showPerformanceStats, setShowPerformanceStats] = useState<boolean>(false);
-  const [showStudioNavigator, setShowStudioNavigator] = useState<boolean>(true);
+  const [showStudioNavigator, setShowStudioNavigator] = useState<boolean>(() => {
+    try {
+      const savedCtrl = localStorage.getItem('mody_active_controller');
+      if (savedCtrl === 'hidden') return true; // Fix restart lockout: default to active on app restart
+      const navVisible = localStorage.getItem('paperrocket_show_navigator');
+      if (navVisible !== null) return navVisible === 'true';
+    } catch (_) {}
+    return true;
+  });
   const [isModelImporterOpen, setIsModelImporterOpen] = useState<boolean>(false);
   const [tool, setTool] = useState<ToolType>('brush');
   const [brushSettings, setBrushSettings] = useState<BrushSettings>(DEFAULT_BRUSH_SETTINGS);
@@ -234,11 +242,17 @@ export function App() {
   const [activeModelName, setActiveModelName] = useState<string>('Drawing Canvas');
   const [modelMetadata, setModelMetadata] = useState<ModelMetadata | null>(null);
   const [lightingPreset, setLightingPreset] = useState<LightingPreset>('clay_neutral');
-  const [gizmoMode, setGizmoMode] = useState<GizmoMode>('Standard');
+  const [gizmoMode, setGizmoMode] = useState<GizmoMode>(() => {
+    try {
+      const savedCtrl = localStorage.getItem('mody_active_controller');
+      if (savedCtrl === 'hidden') return 'Standard';
+    } catch (_) {}
+    return 'Standard';
+  });
   const [activeController, setActiveController] = useState<ActiveControllerType>(() => {
     try {
       const saved = localStorage.getItem('mody_active_controller');
-      if (saved === 'navigator' || saved === 'tactile' || saved === 'both' || saved === 'hidden') {
+      if (saved === 'navigator' || saved === 'tactile' || saved === 'both') {
         return saved as ActiveControllerType;
       }
     } catch (_) {}
@@ -252,8 +266,57 @@ export function App() {
     } catch (_) {}
     if (ctrl === 'hidden') {
       setGizmoMode('Hidden');
+      setShowStudioNavigator(false);
+      try {
+        localStorage.setItem('paperrocket_show_navigator', 'false');
+      } catch (_) {}
     } else {
       setGizmoMode('Standard');
+      setShowStudioNavigator(true);
+      try {
+        localStorage.setItem('paperrocket_show_navigator', 'true');
+      } catch (_) {}
+    }
+  };
+
+  const handleToggleNavigator = (show: boolean) => {
+    setShowStudioNavigator(show);
+    try {
+      localStorage.setItem('paperrocket_show_navigator', String(show));
+    } catch (_) {}
+    if (show) {
+      setActiveController('navigator');
+      setGizmoMode('Standard');
+      try {
+        localStorage.setItem('mody_active_controller', 'navigator');
+      } catch (_) {}
+    } else {
+      setActiveController('hidden');
+      setGizmoMode('Hidden');
+      try {
+        localStorage.setItem('mody_active_controller', 'hidden');
+      } catch (_) {}
+    }
+  };
+
+  const handleToggleGizmo = () => {
+    const isCurrentlyHidden = gizmoMode === 'Hidden' || activeController === 'hidden' || !showStudioNavigator;
+    if (isCurrentlyHidden) {
+      setGizmoMode('Standard');
+      setActiveController('navigator');
+      setShowStudioNavigator(true);
+      try {
+        localStorage.setItem('mody_active_controller', 'navigator');
+        localStorage.setItem('paperrocket_show_navigator', 'true');
+      } catch (_) {}
+    } else {
+      setGizmoMode('Hidden');
+      setActiveController('hidden');
+      setShowStudioNavigator(false);
+      try {
+        localStorage.setItem('mody_active_controller', 'hidden');
+        localStorage.setItem('paperrocket_show_navigator', 'false');
+      } catch (_) {}
     }
   };
 
@@ -275,8 +338,14 @@ export function App() {
 
   const handleNavigatorStyleChange = (style: NavigatorLayout) => {
     setNavigatorStyle(style);
+    // Explicitly restore visibility and controller state whenever a layout is picked
+    setActiveController('navigator');
+    setGizmoMode('Standard');
+    setShowStudioNavigator(true);
     try {
       localStorage.setItem('paperrocket_nav_style', style);
+      localStorage.setItem('mody_active_controller', 'navigator');
+      localStorage.setItem('paperrocket_show_navigator', 'true');
     } catch (_) {}
   };
 
@@ -578,6 +647,8 @@ export function App() {
       if (guide) {
         setTargetScope('guide');
         setGizmoMode('Standard');
+        setActiveController('navigator');
+        setShowStudioNavigator(true);
       }
     });
   }, [engine]);
@@ -1293,6 +1364,8 @@ export function App() {
         onOpenScaffolding={() => setIsScaffoldingOpen(true)}
         onQuickSave={handleQuickSave}
         onOpenSessions={() => setIsSessionModalOpen(true)}
+        isGizmoActive={gizmoMode !== 'Hidden' && activeController !== 'hidden' && showStudioNavigator}
+        onToggleGizmo={handleToggleGizmo}
       />
 
       {/* Omnipresent Safety & Recovery Anchor: "Lost? Tap to return to artwork" */}
@@ -1318,8 +1391,8 @@ export function App() {
             setTool={setTool}
             brushSettings={brushSettings}
             setBrushSettings={setBrushSettings}
-            isGizmoActive={gizmoMode !== 'Hidden'}
-            onToggleGizmo={() => setGizmoMode(gizmoMode === 'Hidden' ? 'Standard' : 'Hidden')}
+            isGizmoActive={gizmoMode !== 'Hidden' && activeController !== 'hidden' && showStudioNavigator}
+            onToggleGizmo={handleToggleGizmo}
             isGizmoLocked={isGizmoLocked}
             onToggleLock={() => setIsGizmoLocked((prev) => !prev)}
             targetScope={targetScope}
@@ -1444,14 +1517,30 @@ export function App() {
           )
       )}
 
+      {/* 3D Navigator Floating Restore Pill when Gizmo is Closed / Hidden */}
+      {(gizmoMode === 'Hidden' || activeController === 'hidden' || !showStudioNavigator) &&
+        !isModelsOpen && !isExportOpen &&
+        !isIlluminationOpen && !isColorStudioOpen && !isARViewerOpen && !isClipboardOpen && (
+          <button
+            type="button"
+            onClick={() => handleToggleNavigator(true)}
+            className="fixed bottom-[max(20px,env(safe-area-inset-bottom))] right-[max(20px,env(safe-area-inset-right))] z-40 flex items-center gap-2 rounded-full border border-black/10 bg-white/90 px-3.5 py-2 text-xs font-semibold text-neutral-800 shadow-xl backdrop-blur-md transition-all hover:scale-105 hover:bg-white active:scale-95 dark:border-white/15 dark:bg-[#1a1d24]/90 dark:text-neutral-100 dark:hover:bg-[#222630]"
+            aria-label="Reopen 3D Gizmo Navigator"
+            title="Reopen 3D Gizmo Navigator"
+          >
+            <Compass className="h-4 w-4 text-sky-500" strokeWidth={2.2} />
+            <span>Gizmo</span>
+          </button>
+      )}
+
       {/* 3D Guide On-Canvas HUD Control Bar */}
       <GuideControlBar
         activeGuide={activeGuide}
         engine={engine}
         targetScope={targetScope}
         onSelectTargetScope={handleSelectTargetScope}
-        isGizmoActive={gizmoMode !== 'Hidden'}
-        onToggleGizmo={() => setGizmoMode(gizmoMode === 'Hidden' ? 'Standard' : 'Hidden')}
+        isGizmoActive={gizmoMode !== 'Hidden' && activeController !== 'hidden' && showStudioNavigator}
+        onToggleGizmo={handleToggleGizmo}
         onOpenBentGuide={() => setIsBentGuideOpen(true)}
         onOpenScaffolding={() => setIsScaffoldingOpen(true)}
         setTool={setTool}
@@ -1776,8 +1865,8 @@ export function App() {
         onNavigatorStyleChange={handleNavigatorStyleChange}
         navigatorSensitivity={navigatorSensitivity}
         onSensitivityChange={setNavigatorSensitivity}
-        showNavigator={showStudioNavigator}
-        onToggleNavigator={setShowStudioNavigator}
+        showNavigator={showStudioNavigator && activeController !== 'hidden' && gizmoMode !== 'Hidden'}
+        onToggleNavigator={handleToggleNavigator}
         showStats={showPerformanceStats}
         onToggleStats={setShowPerformanceStats}
       />

@@ -431,6 +431,7 @@ export class StudioEngine {
   private currentLayers: Layer[] = [];
 
   private activeSelectedModelId: string | null = null;
+  private modelSelectionHighlightHelper: THREE.BoxHelper | null = null;
   private guideHelperMesh: THREE.Mesh | null = null;
   private cachedRect: DOMRect | null = null;
   private drawingPlaneMesh: THREE.Mesh | null = null;
@@ -1297,6 +1298,7 @@ export class StudioEngine {
    * Deletes the currently selected stroke or 3D model/primitive
    */
   public deleteActiveSelection(): boolean {
+    // 1. Delete selected stroke if one is active
     if (this.selectedStrokeId) {
       const entry = this.strokes.get(this.selectedStrokeId);
       if (entry) {
@@ -1311,33 +1313,92 @@ export class StudioEngine {
           m.geometry.dispose();
         });
         this.strokes.delete(this.selectedStrokeId);
-        this.selectedStrokeId = null;
+        this.selectStroke(null);
         this.markDirty();
         this.notifyHistory();
+        this.dispatchSelectionEvent(null);
         return true;
       }
     }
 
+    // 2. Delete selected model, or fallback to first non-drawing-canvas model in scene
+    let modelToDelete: THREE.Object3D | null = null;
     if (this.activeSelectedModelId) {
-      const model = this.modelRoot.children.find((c) => c.uuid === this.activeSelectedModelId);
-      if (model && model !== this.strokeRoot) {
-        this.historyUndoStack.push({
-          kind: 'primitive',
-          objectId: model.uuid,
-          object: model,
-          timestamp: Date.now(),
+      modelToDelete = this.modelRoot.children.find((c) => c.uuid === this.activeSelectedModelId) || null;
+    }
+    // Fallback: If no model was explicitly clicked, find the primary editable model (e.g. donut/primitive/import)
+    if (!modelToDelete) {
+      modelToDelete =
+        this.modelRoot.children.find(
+          (c) => c !== this.strokeRoot && c !== this.drawingPlaneMesh && c.name !== 'DrawingPlaneCanvas'
+        ) || null;
+    }
+
+    // Secondary fallback: check for stray scene primitives (from legacy bugs)
+    if (!modelToDelete) {
+      const stray = this.scene.children.find(
+        (c) =>
+          c !== this.modelRoot &&
+          c !== this.helperRoot &&
+          c !== this.camera &&
+          c.name &&
+          (c.name.startsWith('Primitive') || c.name.startsWith('ScaffoldImport'))
+      );
+      if (stray) {
+        this.scene.remove(stray);
+        stray.traverse((child: any) => {
+          if (child.geometry) try { child.geometry.dispose(); } catch (_) {}
+          if (child.material) {
+            try {
+              if (Array.isArray(child.material)) child.material.forEach((m: any) => m.dispose());
+              else child.material.dispose();
+            } catch (_) {}
+          }
         });
-        this.historyRedoStack = [];
-        this.modelRoot.remove(model);
-        this.targetMeshes = this.targetMeshes.filter((m) => m !== model && !model.children.includes(m));
-        this.activeSelectedModelId = null;
-        this.notifyModelsChanged();
         this.markDirty();
+        this.notifyModelsChanged();
+        this.dispatchSelectionEvent(null);
         return true;
       }
+    }
+
+    if (modelToDelete && modelToDelete !== this.strokeRoot) {
+      this.historyUndoStack.push({
+        kind: 'primitive',
+        objectId: modelToDelete.uuid,
+        object: modelToDelete,
+        timestamp: Date.now(),
+      });
+      this.historyRedoStack = [];
+      this.modelRoot.remove(modelToDelete);
+      this.targetMeshes = this.targetMeshes.filter((m) => m !== modelToDelete && !modelToDelete.children.includes(m));
+      this.setActiveSelectedModel(null);
+
+      // If all 3D models were deleted and no drawing canvas is visible, restore default drawing plane
+      const remainingModels = this.modelRoot.children.filter((c) => c !== this.strokeRoot);
+      if (remainingModels.length === 0) {
+        this.setupDefaultDrawingPlane();
+      }
+
+      this.notifyModelsChanged();
+      this.notifyHistory();
+      this.markDirty();
+      this.dispatchSelectionEvent(null);
+      return true;
     }
 
     return false;
+  }
+
+  /**
+   * Dispatches studio selection event for UI components
+   */
+  public dispatchSelectionEvent(
+    detail: { type: 'model' | 'stroke'; id: string; name: string } | null
+  ): void {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('STUDIO_SELECTION_CHANGED', { detail }));
+    }
   }
 
   /**
@@ -1347,7 +1408,10 @@ export class StudioEngine {
     const strokeId = this.raycastStroke(screenX, screenY);
     if (strokeId) {
       this.selectStroke(strokeId);
-      return { type: 'stroke', id: strokeId };
+      this.setActiveSelectedModel(null);
+      const sel = { type: 'stroke' as const, id: strokeId, name: '3D Curve' };
+      this.dispatchSelectionEvent(sel);
+      return sel;
     }
 
     // Raycast model/primitive
@@ -1364,7 +1428,8 @@ export class StudioEngine {
       }
 
       if (topChild && topChild !== this.strokeRoot) {
-        this.activeSelectedModelId = topChild.uuid;
+        this.selectStroke(null);
+        this.setActiveSelectedModel(topChild.uuid);
         this.notifyModelsChanged();
         this.markDirty();
         return { type: 'model', id: topChild.uuid, name: topChild.name || '3D Object' };
@@ -1372,6 +1437,8 @@ export class StudioEngine {
     }
 
     this.selectStroke(null);
+    this.setActiveSelectedModel(null);
+    this.dispatchSelectionEvent(null);
     return { type: 'none' };
   }
 
@@ -2591,6 +2658,32 @@ export class StudioEngine {
       });
     });
 
+    // 2.5. Sweep any stray primitive or guide meshes attached directly to the scene
+    const straySceneChildren: THREE.Object3D[] = [];
+    this.scene.children.forEach((child) => {
+      if (child !== this.modelRoot && child !== this.helperRoot && child !== this.camera) {
+        if (child.name && (child.name.startsWith('Primitive') || child.name.startsWith('ScaffoldImport'))) {
+          straySceneChildren.push(child);
+        }
+      }
+    });
+    straySceneChildren.forEach((child) => {
+      this.scene.remove(child);
+      child.traverse((c: any) => {
+        if (c.geometry) try { c.geometry.dispose(); } catch (_) {}
+        if (c.material) {
+          try {
+            if (Array.isArray(c.material)) c.material.forEach((m: any) => m.dispose());
+            else c.material.dispose();
+          } catch (_) {}
+        }
+      });
+    });
+
+    try {
+      this.scaffoldingEngine.dispose();
+    } catch (_) {}
+
     this.drawingPlaneMesh = null;
     this.targetMeshes = [];
     this.modelRoot.position.set(0, 0, 0);
@@ -2607,7 +2700,7 @@ export class StudioEngine {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('MODEL_CLEARED'));
     }
-    this.activeSelectedModelId = null;
+    this.setActiveSelectedModel(null);
     this.notifyModelsChanged();
   }
 
@@ -2743,6 +2836,43 @@ export class StudioEngine {
 
   public setActiveSelectedModel(modelId: string | null): void {
     this.activeSelectedModelId = modelId;
+
+    // Clean up previous selection highlight
+    if (this.modelSelectionHighlightHelper) {
+      this.helperRoot.remove(this.modelSelectionHighlightHelper);
+      this.modelSelectionHighlightHelper.geometry.dispose();
+      if (Array.isArray(this.modelSelectionHighlightHelper.material)) {
+        this.modelSelectionHighlightHelper.material.forEach((m) => m.dispose());
+      } else if (this.modelSelectionHighlightHelper.material) {
+        this.modelSelectionHighlightHelper.material.dispose();
+      }
+      this.modelSelectionHighlightHelper = null;
+    }
+
+    if (modelId) {
+      const model = this.modelRoot.children.find((c) => c.uuid === modelId && c !== this.strokeRoot);
+      if (model) {
+        const helper = new THREE.BoxHelper(model, 0x38bdf8);
+        (helper.material as THREE.LineBasicMaterial).depthTest = false;
+        (helper.material as THREE.LineBasicMaterial).transparent = true;
+        (helper.material as THREE.LineBasicMaterial).opacity = 0.85;
+        this.modelSelectionHighlightHelper = helper;
+        this.helperRoot.add(helper);
+
+        const isDrawingPlane = model === this.drawingPlaneMesh || model.name === 'DrawingPlaneCanvas';
+        const name = model.name || (isDrawingPlane ? 'Drawing Canvas' : '3D Model');
+        this.dispatchSelectionEvent({
+          type: 'model',
+          id: model.uuid,
+          name,
+        });
+      } else {
+        this.dispatchSelectionEvent(null);
+      }
+    } else {
+      this.dispatchSelectionEvent(null);
+    }
+    this.markDirty();
   }
 
   public getActiveSelectedModelId(): string | null {
@@ -3492,7 +3622,19 @@ export class StudioEngine {
     if (this.onMetadataUpdate) {
       this.onMetadataUpdate(this.modelMetadata);
     }
+
+    this.historyUndoStack.push({
+      kind: 'primitive',
+      objectId: cloned.uuid,
+      object: cloned,
+      timestamp: Date.now(),
+    });
+    this.historyRedoStack = [];
+
+    this.setActiveSelectedModel(cloned.uuid);
     this.notifyModelsChanged();
+    this.notifyHistory();
+    this.markDirty();
     return cloned;
   }
 

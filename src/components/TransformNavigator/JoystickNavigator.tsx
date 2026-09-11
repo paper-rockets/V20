@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { StudioEngine } from '../../core/studioEngine';
 import { haptics } from '../../utils/haptics';
@@ -40,6 +40,181 @@ export const JoystickNavigator: React.FC<JoystickNavigatorProps> = ({
     { axis: 'z', dx: -0.866, dy: 0.5, angle: 150, usable: 1 },
   ]);
 
+  // Position & Repositioning State
+  const [customPos, setCustomPos] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const saved = localStorage.getItem('paperrocket_nav_custom_pos');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          const clampedX = Math.min(Math.max(parsed.x, 10), Math.max(10, window.innerWidth - 150));
+          const clampedY = Math.min(Math.max(parsed.y, 55), Math.max(55, window.innerHeight - 200));
+          return { x: clampedX, y: clampedY };
+        }
+      }
+    } catch (_) {}
+    return null;
+  });
+  const [isRepositioning, setIsRepositioning] = useState<boolean>(false);
+  const [isInUse, setIsInUse] = useState<boolean>(false);
+
+  const wrapRef = useRef<HTMLElement | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const currentPosRef = useRef<{ x: number; y: number } | null>(customPos);
+
+  useEffect(() => {
+    currentPosRef.current = customPos;
+  }, [customPos]);
+
+  // Clamp position when window resizes or device orientation changes
+  useEffect(() => {
+    const handleResize = () => {
+      setCustomPos((prev) => {
+        if (!prev) return null;
+        const width = wrapRef.current?.offsetWidth || 150;
+        const height = wrapRef.current?.offsetHeight || 220;
+        const minX = 10;
+        const maxX = Math.max(minX, window.innerWidth - width - 10);
+        const minY = 55;
+        const maxY = Math.max(minY, window.innerHeight - height - 70);
+        const clampedX = Math.min(Math.max(prev.x, minX), maxX);
+        const clampedY = Math.min(Math.max(prev.y, minY), maxY);
+        if (clampedX !== prev.x || clampedY !== prev.y) {
+          const next = { x: clampedX, y: clampedY };
+          try {
+            localStorage.setItem('paperrocket_nav_custom_pos', JSON.stringify(next));
+          } catch (_) {}
+          return next;
+        }
+        return prev;
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Global pointer listeners while dragging to reposition
+  useEffect(() => {
+    if (!isRepositioning) return;
+
+    const handleWindowPointerMove = (e: PointerEvent) => {
+      const targetX = e.clientX - dragOffsetRef.current.x;
+      const targetY = e.clientY - dragOffsetRef.current.y;
+      const width = wrapRef.current?.offsetWidth || 150;
+      const height = wrapRef.current?.offsetHeight || 220;
+      const minX = 10;
+      const maxX = Math.max(minX, window.innerWidth - width - 10);
+      const minY = 55;
+      const maxY = Math.max(minY, window.innerHeight - height - 70);
+      const clampedX = Math.min(Math.max(targetX, minX), maxX);
+      const clampedY = Math.min(Math.max(targetY, minY), maxY);
+
+      const nextPos = { x: clampedX, y: clampedY };
+      currentPosRef.current = nextPos;
+      setCustomPos(nextPos);
+    };
+
+    const handleWindowPointerUp = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      setIsRepositioning(false);
+      setIsInUse(false);
+      haptics.trigger('light');
+      if (currentPosRef.current) {
+        try {
+          localStorage.setItem('paperrocket_nav_custom_pos', JSON.stringify(currentPosRef.current));
+        } catch (_) {}
+      }
+    };
+
+    window.addEventListener('pointermove', handleWindowPointerMove);
+    window.addEventListener('pointerup', handleWindowPointerUp, { capture: true });
+    window.addEventListener('pointercancel', handleWindowPointerUp, { capture: true });
+
+    return () => {
+      window.removeEventListener('pointermove', handleWindowPointerMove);
+      window.removeEventListener('pointerup', handleWindowPointerUp, { capture: true });
+      window.removeEventListener('pointercancel', handleWindowPointerUp, { capture: true });
+    };
+  }, [isRepositioning]);
+
+  // Global listener to release in-use enlargement when pointer lifts
+  useEffect(() => {
+    if (!isInUse || isRepositioning) return;
+
+    const handleGlobalPointerUp = () => {
+      setIsInUse(false);
+    };
+
+    window.addEventListener('pointerup', handleGlobalPointerUp, { capture: true });
+    window.addEventListener('pointercancel', handleGlobalPointerUp, { capture: true });
+
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerUp, { capture: true });
+      window.removeEventListener('pointercancel', handleGlobalPointerUp, { capture: true });
+    };
+  }, [isInUse, isRepositioning]);
+
+  const handleGripPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    // 350ms hold triggers reposition mode with tactile vibration
+    longPressTimerRef.current = window.setTimeout(() => {
+      setIsRepositioning(true);
+      setIsInUse(true);
+      haptics.trigger('medium');
+
+      if (wrapRef.current) {
+        const rect = wrapRef.current.getBoundingClientRect();
+        dragOffsetRef.current = {
+          x: pointerStartRef.current.x - rect.left,
+          y: pointerStartRef.current.y - rect.top,
+        };
+        const initial = { x: rect.left, y: rect.top };
+        currentPosRef.current = initial;
+        setCustomPos(initial);
+      }
+    }, 350);
+  };
+
+  const handleGripPointerMove = (e: React.PointerEvent) => {
+    if (!isRepositioning) {
+      const dist = Math.hypot(
+        e.clientX - pointerStartRef.current.x,
+        e.clientY - pointerStartRef.current.y
+      );
+      if (dist > 8 && longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+  };
+
+  const handleGripPointerUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleResetPosition = () => {
+    setCustomPos(null);
+    currentPosRef.current = null;
+    try {
+      localStorage.removeItem('paperrocket_nav_custom_pos');
+    } catch (_) {}
+    haptics.trigger('light');
+  };
+
   const updateAxisScreenInfo = useCallback(() => {
     const cam = engine?.getCamera?.() || (engine as any)?.cameraController?.camera;
     if (!cam) return;
@@ -70,6 +245,17 @@ export const JoystickNavigator: React.FC<JoystickNavigatorProps> = ({
 
   useEffect(() => {
     updateAxisScreenInfo();
+    let animId: number;
+    let lastTime = 0;
+    const loop = (time: number) => {
+      if (time - lastTime > 80) {
+        lastTime = time;
+        updateAxisScreenInfo();
+      }
+      animId = requestAnimationFrame(loop);
+    };
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
   }, [updateAxisScreenInfo]);
 
   const handleOrbit = useCallback(
@@ -126,10 +312,71 @@ export const JoystickNavigator: React.FC<JoystickNavigatorProps> = ({
   };
 
   return (
-    <aside className={`jn-wrap jn-${theme}`} aria-label="Precision Navigation Control">
+    <aside
+      ref={wrapRef}
+      className={`jn-wrap jn-${theme} ${isInUse ? 'jn-in-use' : ''} ${isRepositioning ? 'jn-repositioning' : ''}`}
+      style={
+        customPos
+          ? {
+              left: `${customPos.x}px`,
+              top: `${customPos.y}px`,
+              right: 'auto',
+              bottom: 'auto',
+              transformOrigin: 'center center',
+            }
+          : undefined
+      }
+      onPointerDownCapture={(e) => {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest('.jn-close') || target?.closest('.jn-reset-pos-btn')) {
+          return;
+        }
+        setIsInUse(true);
+      }}
+      aria-label="Precision Navigation Control"
+    >
       <div className="jn-rig">
-        {/* Top layout strip: Disc | Petal | Collar */}
-        <div className="rig-strip" role="tablist" aria-label="Joystick type">
+        {/* Dedicated reposition drag handle: long press to drag */}
+        <div
+          className={`jn-drag-handle ${isRepositioning ? 'dragging' : ''}`}
+          onPointerDown={handleGripPointerDown}
+          onPointerMove={handleGripPointerMove}
+          onPointerUp={handleGripPointerUp}
+          onPointerCancel={handleGripPointerUp}
+          onDoubleClick={handleResetPosition}
+          title="Press and hold to reposition • Double-click to reset corner"
+          aria-label="Reposition drag handle"
+        >
+          <div className="jn-drag-pill" />
+          {customPos && !isRepositioning && (
+            <button
+              type="button"
+              className="jn-reset-pos-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleResetPosition();
+              }}
+              title="Reset to default corner"
+              aria-label="Reset position"
+            >
+              ↺
+            </button>
+          )}
+          {isRepositioning && <span className="jn-drag-hint">Moving</span>}
+        </div>
+
+        {/* Top layout strip: Sphere | Disc | Petal | Collar */}
+        <div className="rig-strip" role="tablist" aria-label="Navigator style">
+          <button
+            type="button"
+            className="rig-chip"
+            onClick={() => {
+              onLayoutChange('sphere');
+              haptics.trigger('light');
+            }}
+          >
+            Sphere
+          </button>
           <button
             type="button"
             className={`rig-chip ${layout === 'disc' ? 'on' : ''}`}
